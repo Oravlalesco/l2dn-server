@@ -120,14 +120,18 @@ public class AdminTeleport: IAdminCommandHandler
 		{
 			try
 			{
-				string val = command.Substring(14);
+				// "admin_move_to" is 13 chars; old code used Substring(14) assuming a trailing space and crashed on bare bypass.
+				const string moveToPrefix = "admin_move_to";
+				string val = command.Length > moveToPrefix.Length
+					? command.Substring(moveToPrefix.Length).Trim()
+					: string.Empty;
+				if (val.Length == 0)
+				{
+					AdminHtml.showAdminHtml(activeChar, "teleports.htm");
+					return true;
+				}
+
 				teleportTo(activeChar, val);
-			}
-			catch (IndexOutOfRangeException e)
-			{
-                _logger.Error(e);
-				// Case of empty or missing coordinates
-				AdminHtml.showAdminHtml(activeChar, "teleports.htm");
 			}
 			catch (FormatException nfe)
 			{
@@ -140,26 +144,45 @@ public class AdminTeleport: IAdminCommandHandler
 		{
 			try
 			{
-				string val = command.Substring(25);
+				// "admin_teleport_character" is 24 chars; Substring(25) threw when bypass had no trailing space.
+				const string teleportCharPrefix = "admin_teleport_character";
+				string val = command.Length > teleportCharPrefix.Length
+					? command.Substring(teleportCharPrefix.Length).Trim()
+					: string.Empty;
+				if (val.Length == 0)
+				{
+					BuilderUtil.sendSysMessage(activeChar, "Wrong or no Coordinates given.");
+					showTeleportCharWindow(activeChar);
+					return true;
+				}
+
 				TeleportCharacter(activeChar, val);
 			}
-			catch (IndexOutOfRangeException e)
+			catch (Exception e)
 			{
                 _logger.Error(e);
-				// Case of empty coordinates
 				BuilderUtil.sendSysMessage(activeChar, "Wrong or no Coordinates given.");
 				showTeleportCharWindow(activeChar); // back to character teleport
 			}
 		}
-		else if (command.startsWith("admin_teleportto "))
+		else if (command.startsWith("admin_teleportto"))
 		{
 			try
 			{
-				string targetName = command.Substring(17);
+				const string teleportToPrefix = "admin_teleportto";
+				string targetName = command.Length > teleportToPrefix.Length
+					? command.Substring(teleportToPrefix.Length).Trim()
+					: string.Empty;
+				if (targetName.Length == 0)
+				{
+					BuilderUtil.sendSysMessage(activeChar, "Usage: //teleportto <playername>");
+					return true;
+				}
+
 				Player? player = World.getInstance().getPlayer(targetName);
 				TeleportToCharacter(activeChar, player);
 			}
-			catch (IndexOutOfRangeException e)
+			catch (Exception e)
 			{
                 _logger.Error(e);
 			}
