@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/spawns.xsd">
+	<!-- NPC 50008 (SchemeBuffer.xml): sólo aparece cuando hay entrada de spawn aquí o con //admin_spawn_monster 50008 -->
+	<spawn name="SchemeBuffer">
+		<group>
+			<!-- Al lado de los Class Masters de Giran; ajusta x/y/z si quieres otra ubicación -->
+			<npc id="50008" x="83105" y="147780" z="-3467" heading="32000" respawnTime="60sec" />
+		</group>
+	</spawn>
+</list>
