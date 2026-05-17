@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,7 +34,6 @@ public class DbClan
 
     public int LeaderId { get; set; }
 
-    [ForeignKey(nameof(LeaderId))]
     public DbCharacter Leader { get; set; } = null!;
 
     public int? CrestId { get; set; }

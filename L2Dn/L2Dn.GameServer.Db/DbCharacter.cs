@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using L2Dn.GameServer.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -74,7 +74,6 @@ public class DbCharacter
     // Clan
     public int? ClanId { get; set; }
 
-    [ForeignKey(nameof(ClanId))]
     public DbClan? Clan { get; set; }
     public int ClanPrivileges { get; set; }
     public int SubPledge { get; set; }

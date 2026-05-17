@@ -1,10 +1,25 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 namespace L2Dn.GameServer.Db;
 
 public class GameServerDbContext(DbContextOptions options)
     : DbContext(options)
 {
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<DbCharacter>()
+            .HasOne(c => c.Clan)
+            .WithMany()
+            .HasForeignKey(c => c.ClanId);
+
+        modelBuilder.Entity<DbClan>()
+            .HasOne(c => c.Leader)
+            .WithMany()
+            .HasForeignKey(c => c.LeaderId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+    }
+
     public DbSet<DbAccountRef> AccountRefs => Set<DbAccountRef>();
     public DbSet<DbAccountPremium> AccountPremiums => Set<DbAccountPremium>();
     public DbSet<DbAccountVariable> AccountVariables => Set<DbAccountVariable>();

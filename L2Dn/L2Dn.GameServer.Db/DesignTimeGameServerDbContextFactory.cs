@@ -1,6 +1,7 @@
-﻿using L2Dn.Configuration;
+using L2Dn.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NLog;
 using Npgsql;
 
@@ -33,6 +34,10 @@ public sealed class DesignTimeGameServerDbContextFactory: IDesignTimeDbContextFa
             data => { logger.Log(LogLevel.FromOrdinal((int)data.LogLevel), data.ToString()); }).EnableDetailedErrors();
         
         optionsBuilder.EnableThreadSafetyChecks(false);
+
+        // EF 9+: Migrate() falla si el snapshot difiere del modelo (p. ej. renombre Character → DbCharacter sin nueva migración).
+        // Ignorar permite aplicar migraciones pendientes y arrancar; lo correcto a medio plazo es `dotnet ef migrations add`.
+        optionsBuilder.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
         
         return optionsBuilder.Options;
     }
