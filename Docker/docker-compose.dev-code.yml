@@ -1,0 +1,9 @@
+# Desarrollo con cambios en C#: publica en host y monta los binarios (sin rebuild de imagen).
+#   .\dev-publish.ps1
+#   docker compose -f docker-compose.yml -f docker-compose.dev-code.yml -f docker-compose.dev.yml up -d l2dn-gameserver
+# dev.yml debe ir al final para que DataPack/Config del host tapen los del publish.
+
+services:
+  l2dn-gameserver:
+    volumes:
+      - ./publish/gameserver:/App

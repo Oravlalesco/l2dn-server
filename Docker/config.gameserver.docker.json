@@ -1,0 +1,52 @@
+{
+  "ClientListener": {
+    "ListenAddress": "0.0.0.0",
+    "Port": 7777,
+    "Protocol": 447,
+    "Encryption": false
+  },
+  "AuthServerConnection": {
+    "Address": "l2dn-authserver",
+    "Port": 2107,
+    "AccessKey": "oE~{!5cmTK{Z.gYA~%yx!^m=nbC=L",
+    "PublishAddress": "127.0.0.1"
+  },
+  "GameServerParams": {
+    "ServerId": 1,
+    "AcceptAlternateServerId": true,
+    "ServerType": "Classic",
+    "AgeLimit": 0,
+    "IsPvpServer": false,
+    "IsTestServer": false,
+    "Brackets": false,
+    "MaxPlayerCount": 5000
+  },
+  "Database": {
+    "Server": "db",
+    "DatabaseName": "l2dev",
+    "UserName": "l2dev_user",
+    "Password": "l2dev_user_pass",
+    "PoolSize": 1024,
+    "LogLevel": "Warn"
+  },
+  "DataPack": {
+    "Path": "DataPack",
+    "ConfigPath": "Config",
+    "ScriptPath": "DataPack/scripts",
+    "GeoData": {
+      "Download": false,
+      "Update": false,
+      "FileListUrl": "https://l2dn.pages.dev/latest/geodata.json"
+    }
+  },
+  "Logging": {
+    "File": {
+      "Enabled": true,
+      "LogLevel": "Trace"
+    },
+    "Console": {
+      "Enabled": true,
+      "LogLevel": "Trace"
+    }
+  }
+}

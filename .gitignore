@@ -1,4 +1,4 @@
-﻿.idea
+.idea
 .temp
 .vs
 obj
@@ -7,3 +7,6 @@ bin
 
 # Geodata
 *.gz
+
+# Docker dev publish output (generado por dev-publish*.ps1)
+Docker/publish/

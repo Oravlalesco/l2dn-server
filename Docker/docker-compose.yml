@@ -1,3 +1,5 @@
+# Desarrollo (DataPack/Config sin rebuild): ver docker-compose.dev.yml y dev-restart.ps1
+
 services:
     postgres:
         image: postgres:alpine

@@ -1,0 +1,8 @@
+# AuthServer: binarios publicados en host (dev-publish-auth.ps1). Usar después de docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.dev-auth.yml up -d --force-recreate l2dn-authserver
+
+services:
+  l2dn-authserver:
+    command: ["/App/L2Dn.AuthServer"]
+    volumes:
+      - ./publish/authserver:/App

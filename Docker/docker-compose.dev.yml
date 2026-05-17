@@ -1,0 +1,14 @@
+# Desarrollo: monta DataPack y Config del host. Solo hace falta Docker en el PC.
+#   .\dev-up.ps1          — activar modo dev (primera vez)
+#   .\dev-restart.ps1     — tras cambiar XML/HTML/INI
+#   .\dev-publish.ps1     — C# GameServer (SDK en contenedor, sin .NET local)
+#   .\dev-restart.ps1 -Code
+#
+# Migraciones EF (puntual): .\dev-restart.ps1 -Migrate
+
+services:
+  l2dn-gameserver:
+    volumes:
+      - ../L2Dn/L2Dn.GameServer/DataPack:/App/DataPack
+      - ../L2Dn/L2Dn.GameServer/Config:/App/Config
+    command: ["/App/L2Dn.GameServer"]
