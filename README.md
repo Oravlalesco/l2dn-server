@@ -143,6 +143,90 @@ docker compose build
 docker compose up -d
 ```
 
+### Logging (consola, archivos y paquetes de red)
+
+El Game Server y el Auth Server usan **NLog**. El nivel mínimo se define en `config.json` (sección `Logging`), no en `General.ini`.
+
+| Archivo | Cuándo aplica |
+|---------|----------------|
+| `L2Dn/L2Dn.GameServer/config.json` | Imagen Docker de producción (`docker compose up --build`) |
+| `Docker/config.gameserver.docker.json` | Publish de desarrollo (`dev-publish.ps1` → copia a `publish/gameserver/config.json`) |
+| `L2Dn/L2Dn.AuthServer/config.json` | Auth Server (imagen y publish auth) |
+
+#### Qué aparece en consola con nivel `Trace`
+
+Con `Logging.Console.LogLevel` y `Logging.File.LogLevel` en **`Trace`** (valor por defecto actual en el repo), la consola muestra cada paquete cliente/servidor, por ejemplo:
+
+```text
+[03:52:55.610][Trace] S(2)  Sending packet SocialActionPacket (27), length: 15
+```
+
+Eso sale del protocolo (`L2Dn.Protocol`, nivel `Trace` en `Connection.cs` y handlers de paquetes). **No** depende de `Developer = True` ni de `DebugServerPackets` en `Config/General.ini`.
+
+En `General.ini` existen `DebugClientPackets`, `DebugServerPackets` y `ExcludedPacketList` (incluye `SocialAction`), pensados para depuración fina de paquetes, pero **hoy no están enlazados** al logger del protocolo; el filtro efectivo es solo el `LogLevel` de NLog en `config.json`.
+
+#### Por qué importa en producción (futuro)
+
+En un servidor en vivo conviene **no** dejar `Trace` como nivel global:
+
+- **Ruido y volumen**: paquetes como `SocialAction`, `MoveToLocation` o `UserInfo` se envían muy a menudo; el log se vuelve ilegible.
+- **Rendimiento**: cada línea implica formatear cadenas y escribir en consola/archivo en caliente.
+- **Disco**: con `Logging.File.Enabled: true` y nivel `Trace`, la carpeta `logs/` crece rápido (hay rotación diaria, pero el tráfico sigue siendo alto).
+- **Docker / orquestación**: stdout acumulado por el driver de logs del contenedor.
+
+No suele provocar un “memory leak” clásico, pero sí coste de I/O y almacenamiento que en producción debe evitarse.
+
+**Recomendación para producción** (cuando despliegues en serio, revisar y ajustar):
+
+```json
+"Logging": {
+  "File": {
+    "Enabled": true,
+    "LogLevel": "Info"
+  },
+  "Console": {
+    "Enabled": true,
+    "LogLevel": "Warn"
+  }
+}
+```
+
+- **`Info` en archivo**: eventos del servidor sin volcado de cada paquete.
+- **`Warn` en consola**: solo avisos y errores en `docker compose logs` (o subir consola a `Info` si necesitas más detalle operativo).
+- La base de datos EF ya usa `"LogLevel": "Warn"` en la misma `config.json`; conviene alinear el resto del logging con esa idea.
+
+Tras cambiar `config.json`, hay que **reconstruir la imagen** o volver a publicar y reiniciar el contenedor para que cargue la nueva configuración.
+
+#### Desarrollo y depuración de red
+
+Para **debug local** (investigar protocolo, paquetes desconocidos, estados de sesión), el nivel actual del repo es coherente:
+
+```json
+"Logging": {
+  "File": {
+    "Enabled": true,
+    "LogLevel": "Trace"
+  },
+  "Console": {
+    "Enabled": true,
+    "LogLevel": "Trace"
+  }
+}
+```
+
+- **`Trace` en consola**: ves envío/recepción de paquetes en tiempo real (útil con el cliente conectado).
+- **`Trace` en archivo**: historial completo en `logs/` dentro del contenedor o del directorio de publish.
+
+Variantes útiles en dev:
+
+| Objetivo | Ajuste sugerido |
+|----------|-----------------|
+| Menos ruido en terminal, historial completo en disco | `Console`: `Info` o `Warn`, `File`: `Trace` |
+| Solo terminal, sin archivos | `File.Enabled`: `false`, `Console.LogLevel`: `Trace` |
+| Depuración mínima (rates, spawns, errores) | Ambos en `Info` |
+
+Cuando `DebugServerPackets` / `ExcludedPacketList` de `General.ini` estén implementados en el protocolo, podrán complementar este esquema (filtrar tipos concretos con `Trace` global); hasta entonces, subir o bajar `LogLevel` en `config.json` es la palanca disponible.
+
 ### Resumen rápido
 
 | Qué cambiaste              | Qué hacer                                      |
@@ -152,6 +236,7 @@ docker compose up -d
 | C# (GameServer)          | `.\dev-publish.ps1` + `.\dev-restart.ps1 -Code` |
 | Esquema de base de datos | `run ... -UpdateDatabase` o `-Migrate`         |
 | Dockerfile / dependencias| `docker compose up -d --build`                 |
+| `config.json` → `Logging` | Rebuild o `dev-publish` + restart; prod: preferir `Info`/`Warn` |
 
 ### Archivos útiles en `Docker/`
 
@@ -165,5 +250,5 @@ docker compose up -d
 | `dev-publish.ps1` | Publica GameServer vía contenedor SDK (sin .NET local) |
 | `dev-publish-auth.ps1` | Publica AuthServer vía contenedor SDK |
 | `docker-compose.dev-auth.yml` | Monta `publish/authserver` en Auth |
-| `config.gameserver.docker.json` | `config.json` para publish del GameServer |
+| `config.gameserver.docker.json` | `config.json` para publish del GameServer (incl. `Logging`; ver sección anterior) |
 | [`.cursor/rules/l2dn-docker.mdc`](.cursor/rules/l2dn-docker.mdc) | Reglas para Cursor / agentes IA |
