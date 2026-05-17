@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/spawns.xsd">
+	<!-- NPC 50009 (GmShopMerchant.xml): mercader tipo tienda GM; coordenadas junto al Scheme Buffer en Giran -->
+	<spawn name="GmShop">
+		<group>
+			<npc id="50009" x="83145" y="147780" z="-3467" heading="32000" respawnTime="60sec" />
+		</group>
+	</spawn>
+</list>
