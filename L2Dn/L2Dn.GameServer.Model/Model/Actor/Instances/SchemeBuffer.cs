@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text;
 using L2Dn.Extensions;
 using L2Dn.GameServer.Data;
@@ -88,7 +88,10 @@ public class SchemeBuffer: Npc
                      (Config.SchemeBuffer.BUFFER_ITEM_ID != 57 &&
                          player.destroyItemByItemId("NPC Buffer", Config.SchemeBuffer.BUFFER_ITEM_ID, cost, player, true)))
             {
-                // TODO: buffer scheme must be the list of Skill, level pairs
+                // Player as effector (not the NPC): dances/songs and many buffs fail or behave wrongly otherwise.
+                // Apply normal buffs first, then dances/songs so slot limits do not drop them afterward.
+                List<Skill> buffSkills = [];
+                List<Skill> danceSkills = [];
                 foreach (int skillId in SchemeBufferTable.getInstance().getScheme(player.ObjectId, schemeName))
                 {
                     BuffSkillHolder? availableBuff = SchemeBufferTable.getInstance().getAvailableBuff(skillId);
@@ -99,20 +102,31 @@ public class SchemeBuffer: Npc
                     if (skill == null)
                         continue;
 
-                    if (buffSummons)
-                    {
-                        Pet? pet = player.getPet();
-                        if (pet != null)
-                        {
-                            skill.applyEffects(this, pet);
-                        }
-
-                        player.getServitors().Values.ForEach(servitor => skill.applyEffects(this, servitor));
-                    }
+                    if (skill.isDance())
+                        danceSkills.Add(skill);
                     else
-                    {
-                        skill.applyEffects(this, player);
-                    }
+                        buffSkills.Add(skill);
+                }
+
+                void applyScheme(Creature target)
+                {
+                    foreach (Skill skill in buffSkills)
+                        skill.applyEffects(player, target);
+                    foreach (Skill skill in danceSkills)
+                        skill.applyEffects(player, target);
+                }
+
+                if (buffSummons)
+                {
+                    Pet? pet = player.getPet();
+                    if (pet != null)
+                        applyScheme(pet);
+
+                    player.getServitors().Values.ForEach(applyScheme);
+                }
+                else
+                {
+                    applyScheme(player);
                 }
             }
         }
@@ -325,15 +339,26 @@ public class SchemeBuffer: Npc
         }
 
         // Calculate page number.
-        int max = MathUtil.countPagesNumber(skills.Count, PAGE_LIMIT);
+        int max = Math.Max(1, MathUtil.countPagesNumber(skills.Count, PAGE_LIMIT));
         int page = pageValue;
+        if (page < 1)
+        {
+            page = 1;
+        }
+
         if (page > max)
         {
             page = max;
         }
 
-        // Cut skills list up to page number.
-        skills = skills.GetRange((page - 1) * PAGE_LIMIT, Math.Min(page * PAGE_LIMIT, skills.Count));
+        int startIndex = (page - 1) * PAGE_LIMIT;
+        int sliceCount = Math.Min(PAGE_LIMIT, skills.Count - startIndex);
+        if (sliceCount <= 0)
+        {
+            return string.Empty;
+        }
+
+        skills = skills.GetRange(startIndex, sliceCount);
 
         List<int> schemeSkills = SchemeBufferTable.getInstance().getScheme(player.ObjectId, schemeName);
         StringBuilder sb = new StringBuilder(skills.Count * 150);

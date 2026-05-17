@@ -1,4 +1,4 @@
-﻿using L2Dn.Events;
+using L2Dn.Events;
 using L2Dn.GameServer.Data.Xml;
 using L2Dn.GameServer.Db;
 using L2Dn.GameServer.Dto;
@@ -1309,6 +1309,7 @@ public class NpcTemplate: CreatureTemplate, IIdentifiable
             "PetManager" => new PetManager(this),
             "FriendlyMob" => new FriendlyMob(this),
             "Chest" => new Chest(this),
+            "SchemeBuffer" => new SchemeBuffer(this),
 
             "VillageMaster" => new VillageMaster(this),
             "VillageMasterDElf" => new VillageMasterDElf(this),
