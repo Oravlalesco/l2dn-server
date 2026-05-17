@@ -1,5 +1,6 @@
-﻿using L2Dn.Cryptography;
+using L2Dn.Cryptography;
 using L2Dn.GameServer.Configuration;
+using L2Dn.GameServer.Data;
 using L2Dn.GameServer.Network;
 using L2Dn.GameServer.NetworkAuthServer;
 using L2Dn.Network;
@@ -58,5 +59,8 @@ public class GameServer
 
         if (_clientListenerTask is not null)
             await _clientListenerTask.ConfigureAwait(false);
+
+        _logger.Info("Saving scheme buffer data...");
+        SchemeBufferTable.getInstance().saveSchemes();
     }
 }

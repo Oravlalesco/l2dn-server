@@ -141,6 +141,7 @@ public class SchemeBuffer: Npc
             int skillId = int.Parse(st.nextToken());
             int page = int.Parse(st.nextToken());
             List<int> skills = SchemeBufferTable.getInstance().getScheme(player.ObjectId, schemeName);
+            bool schemeChanged = false;
             if (currentCommand.startsWith("skillselect") && !schemeName.equalsIgnoreCase("none"))
             {
                 Skill? skill = SkillData.getInstance().getSkill(skillId, SkillData.getInstance().getMaxLevel(skillId));
@@ -151,6 +152,7 @@ public class SchemeBuffer: Npc
                         if (getCountOf(skills, true) < Config.Character.DANCES_MAX_AMOUNT)
                         {
                             skills.Add(skillId);
+                            schemeChanged = true;
                         }
                         else
                         {
@@ -162,6 +164,7 @@ public class SchemeBuffer: Npc
                         if (getCountOf(skills, false) < player.getStat().getMaxBuffCount())
                         {
                             skills.Add(skillId);
+                            schemeChanged = true;
                         }
                         else
                         {
@@ -172,7 +175,12 @@ public class SchemeBuffer: Npc
             }
             else if (currentCommand.startsWith("skillunselect"))
             {
-                skills.Remove(skillId);
+                schemeChanged = skills.Remove(skillId);
+            }
+
+            if (schemeChanged)
+            {
+                SchemeBufferTable.getInstance().persistScheme(player.ObjectId, schemeName);
             }
 
             showEditSchemeWindow(player, groupType, schemeName, page);
@@ -212,7 +220,9 @@ public class SchemeBuffer: Npc
                     }
                 }
 
-                SchemeBufferTable.getInstance().setScheme(player.ObjectId, schemeName.Trim(), new List<int>());
+                string trimmedSchemeName = schemeName.Trim();
+                SchemeBufferTable.getInstance().setScheme(player.ObjectId, trimmedSchemeName, new List<int>());
+                SchemeBufferTable.getInstance().saveSchemeRow(player.ObjectId, trimmedSchemeName, []);
                 showGiveBuffsWindow(player);
             }
             catch (Exception e)
@@ -227,9 +237,9 @@ public class SchemeBuffer: Npc
             {
                 string schemeName = st.nextToken();
                 Map<string, List<int>>? schemes = SchemeBufferTable.getInstance().getPlayerSchemes(player.ObjectId);
-                if (schemes != null && schemes.ContainsKey(schemeName))
+                if (schemes != null && schemes.remove(schemeName) != null)
                 {
-                    schemes.remove(schemeName);
+                    SchemeBufferTable.getInstance().deleteSchemeRow(player.ObjectId, schemeName);
                 }
             }
             catch (Exception e)

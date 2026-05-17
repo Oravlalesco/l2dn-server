@@ -84,36 +84,80 @@ public sealed class SchemeBufferTable: DataReaderBase
 		            " available buffs.");
 	}
 
+	private const int MaxSkillsColumnLength = 500;
+
 	public void saveSchemes()
 	{
 		try
 		{
-			using GameServerDbContext ctx = DbFactory.Instance.CreateDbContext();
-
-			// Delete all entries from database.
-			ctx.BufferSchemes.ExecuteDelete();
-
-			// Save _schemesTable content.
-			foreach (var player in _schemesTable)
+			foreach (KeyValuePair<int, Map<string, List<int>>> player in _schemesTable)
 			{
-				foreach (var scheme in player.Value)
+				foreach (KeyValuePair<string, List<int>> scheme in player.Value)
 				{
-					// Build a String composed of skill ids seperated by a ",".
-					string skills = string.Join(",", scheme.Value);
-					ctx.BufferSchemes.Add(new()
-					{
-						ObjectId = player.Key,
-						Name = scheme.Key,
-						Skills = skills
-					});
+					saveSchemeRow(player.Key, scheme.Key, scheme.Value);
 				}
+			}
+		}
+		catch (Exception e)
+		{
+			LOGGER.Warn("SchemeBufferTable: Error while saving schemes: " + e);
+		}
+	}
+
+	public void persistScheme(int objectId, string schemeName)
+	{
+		saveSchemeRow(objectId, schemeName, getScheme(objectId, schemeName));
+	}
+
+	public void saveSchemeRow(int objectId, string schemeName, IReadOnlyList<int> skillIds)
+	{
+		try
+		{
+			string skills = string.Join(",", skillIds);
+			if (skills.Length > MaxSkillsColumnLength)
+			{
+				LOGGER.Warn(
+					"SchemeBufferTable: Scheme skills exceed column limit for objectId={0}, scheme={1} (length={2}, max={3}).",
+					objectId, schemeName, skills.Length, MaxSkillsColumnLength);
+				return;
+			}
+
+			using GameServerDbContext ctx = DbFactory.Instance.CreateDbContext();
+			DbBufferScheme? existing = ctx.BufferSchemes.Find(objectId, schemeName);
+			if (existing != null)
+			{
+				existing.Skills = skills;
+			}
+			else
+			{
+				ctx.BufferSchemes.Add(new DbBufferScheme
+				{
+					ObjectId = objectId,
+					Name = schemeName,
+					Skills = skills
+				});
 			}
 
 			ctx.SaveChanges();
 		}
 		catch (Exception e)
 		{
-			LOGGER.Warn("BufferTableScheme: Error while saving schemes : " + e);
+			LOGGER.Warn("SchemeBufferTable: Error while saving scheme objectId={0}, name={1}: {2}",
+				objectId, schemeName, e);
+		}
+	}
+
+	public void deleteSchemeRow(int objectId, string schemeName)
+	{
+		try
+		{
+			using GameServerDbContext ctx = DbFactory.Instance.CreateDbContext();
+			ctx.BufferSchemes.Where(r => r.ObjectId == objectId && r.Name == schemeName).ExecuteDelete();
+		}
+		catch (Exception e)
+		{
+			LOGGER.Warn("SchemeBufferTable: Error while deleting scheme objectId={0}, name={1}: {2}",
+				objectId, schemeName, e);
 		}
 	}
 

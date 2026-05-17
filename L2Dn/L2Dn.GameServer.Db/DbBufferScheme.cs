@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 
 namespace L2Dn.GameServer.Db;
@@ -11,6 +11,6 @@ public class DbBufferScheme
     [MaxLength(16)]
     public string Name { get; set; } = "default";
 
-    [MaxLength(200)]
+    [MaxLength(500)]
     public string Skills { get; set; } = string.Empty;
 }
