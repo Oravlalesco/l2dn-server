@@ -1,5 +1,63 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/npcs.xsd">
+	<npc id="21344" level="80" type="Monster" name="Ketra Elite Guard">
+		<parameters>
+			<param name="MoveAroundSocial" value="90" />
+			<param name="MoveAroundSocial1" value="65" />
+			<param name="MoveAroundSocial2" value="90" />
+			<param name="FriendShip1" value="7211" />
+			<param name="FriendShip2" value="7212" />
+			<param name="FriendShip3" value="7213" />
+			<param name="FriendShip4" value="7214" />
+			<param name="FriendShip5" value="7215" />
+			<param name="SoulShot" value="100" />
+			<param name="SoulShotRate" value="30" />
+			<skill name="PhysicalSpecial" id="4572" level="8" />
+			<skill name="DeBuff" id="4038" level="5" />
+		</parameters>
+		<race>HUMANOID</race>
+		<sex>MALE</sex>
+		<equipment rhand="79" lhand="6919" />
+		<acquire exp="350000" sp="9500" />
+		<stats str="40" int="21" dex="30" wit="20" con="43" men="20">
+			<vitals hp="2364.576" hpRegen="8.5" mp="3281.58" mpRegen="3" />
+			<attack physical="855.81387" magical="584.40994" random="30" critical="4" accuracy="4.75" attackSpeed="253" type="SWORD" range="40" distance="80" width="120" />
+			<defence physical="332.70061" magical="221.515820894982" shield="166" shieldRate="20" />
+			<attribute>
+				<defence fire="20" water="20" wind="20" earth="20" holy="20" dark="20" />
+			</attribute>
+			<speed>
+				<walk ground="36" />
+				<run ground="175" />
+			</speed>
+			<hitTime>540</hitTime>
+		</stats>
+		<status undying="false" canBeSown="true" />
+		<skillList>
+			<skill id="4038" level="5" />
+			<skill id="4572" level="8" />
+			<skill id="4416" level="6" />
+			<skill id="4408" level="11" />
+			<skill id="4410" level="10" />
+			<skill id="4412" level="10" />
+			<skill id="4413" level="9" />
+			<skill id="4085" level="1" />
+			<skill id="4086" level="1" />
+			<skill id="4458" level="1" />
+		</skillList>
+		<shots shotChance="30" spiritChance="30" />
+		<exCrtEffect>false</exCrtEffect>
+		<sNpcPropHpRate>2</sNpcPropHpRate>
+		<ai type="BALANCED" aggroRange="300" clanHelpRange="300">
+			<clanList>
+				<clan>KETRA_ORC</clan>
+			</clanList>
+		</ai>
+		<collision>
+			<radius normal="12" grown="14" />
+			<height normal="24" grown="28.8" />
+		</collision>
+	</npc>
 	<npc id="21396" level="84" type="Monster" name="Carrion Scarab">
 		<race>BUG</race>
 		<sex>MALE</sex>
