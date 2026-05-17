@@ -1,4 +1,4 @@
-﻿namespace L2Dn.GameServer.Configuration;
+namespace L2Dn.GameServer.Configuration;
 
 internal static class FileNames
 {
@@ -26,7 +26,7 @@ internal static class FileNames
         public const string OrcFortress = "OrcFortress.ini";
         public const string GraciaSeeds = "GraciaSeeds.ini";
         public const string GeoEngine = "GeoEngine.ini";
-        public const string ChatFilter = "ChatFilter.txt";
+        public const string ChatFilter = "chatfilter.txt";
 
         // Custom
         public const string AllowedPlayerRaces = "Custom/AllowedPlayerRaces.ini";
