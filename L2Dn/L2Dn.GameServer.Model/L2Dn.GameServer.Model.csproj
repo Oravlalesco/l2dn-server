@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
@@ -6,6 +6,10 @@
         <Nullable>enable</Nullable>
         <RootNamespace>L2Dn.GameServer</RootNamespace>
     </PropertyGroup>
+
+    <ItemGroup>
+      <InternalsVisibleTo Include="L2Dn.GameServer.Model.Tests" />
+    </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\L2Dn.GameServer.Db\L2Dn.GameServer.Db.csproj" />

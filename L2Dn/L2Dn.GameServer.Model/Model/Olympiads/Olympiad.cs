@@ -143,9 +143,9 @@ public class Olympiad
 
 			_currentCycle = parser.getInt("CurrentCycle", 1);
 			_period = parser.getInt("Period", 0);
-			_olympiadEnd = DateTime.MinValue; // parser.getLong("OlympiadEnd", 0);
-			_validationEnd = DateTime.MinValue; // parser.getLong("ValidationEnd", 0);
-			_nextWeeklyChange = DateTime.MinValue; // parser.getLong("NextWeeklyChange", 0);
+			_olympiadEnd = DateTime.SpecifyKind(DateTime.MinValue, DateTimeKind.Utc);
+			_validationEnd = DateTime.SpecifyKind(DateTime.MinValue, DateTimeKind.Utc);
+			_nextWeeklyChange = DateTime.SpecifyKind(DateTime.MinValue, DateTimeKind.Utc);
 		}
 
 		DateTime currentTime = DateTime.UtcNow;
@@ -593,8 +593,8 @@ public class Olympiad
 		sm.Params.addInt(_currentCycle);
 		Broadcast.toAllOnlinePlayers(sm);
 
-		DateTime currentTime = DateTime.Today;
-		DateTime nextChange = DateTime.Now;
+		DateTime currentTime = DateTime.UtcNow.Date;
+		DateTime nextChange = DateTime.UtcNow;
 
 		switch (Config.Olympiad.ALT_OLY_PERIOD)
 		{
@@ -828,8 +828,9 @@ public class Olympiad
 
 	/**
 	 * Save olympiad.properties file with current olympiad status and update noblesse table in database
+	 * @return true if olympiad data was saved successfully
 	 */
-	public void saveOlympiadStatus()
+	public bool saveOlympiadStatus()
 	{
 		saveNobleData();
 
@@ -847,18 +848,26 @@ public class Olympiad
 				ctx.OlympiadData.Add(record);
 			}
 
+			_olympiadEnd = ToUtc(_olympiadEnd);
+			_validationEnd = ToUtc(_validationEnd);
+			_nextWeeklyChange = ToUtc(_nextWeeklyChange);
+
 			record.CurrentCycle = (short)_currentCycle;
 			record.Period = (short)_period;
 			record.OlympiadEnd = _olympiadEnd;
 			record.ValidationEnd = _validationEnd;
 			record.NextWeeklyChange = _nextWeeklyChange;
 			ctx.SaveChanges();
+			return true;
 		}
 		catch (Exception e)
 		{
 			LOGGER.Error("Olympiad System: Failed to save olympiad data to database: " + e);
+			return false;
 		}
 	}
+
+	internal static DateTime ToUtc(DateTime value) => GameServerDbContext.ToUtc(value);
 
 	protected void updateMonthlyData()
 	{

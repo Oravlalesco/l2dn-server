@@ -1,12 +1,31 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace L2Dn.GameServer.Db;
 
 public class GameServerDbContext(DbContextOptions options)
     : DbContext(options)
 {
+    private static readonly ValueConverter<DateTime, DateTime> UtcDateTimeConverter = new(
+        v => ToUtc(v),
+        v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+    public static DateTime ToUtc(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Utc => value,
+        DateTimeKind.Local => value.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+    };
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<DbOlympiadData>(entity =>
+        {
+            entity.Property(e => e.OlympiadEnd).HasConversion(UtcDateTimeConverter);
+            entity.Property(e => e.ValidationEnd).HasConversion(UtcDateTimeConverter);
+            entity.Property(e => e.NextWeeklyChange).HasConversion(UtcDateTimeConverter);
+        });
+
         modelBuilder.Entity<DbCharacter>()
             .HasOne(c => c.Clan)
             .WithMany()
