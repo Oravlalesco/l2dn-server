@@ -226,17 +226,8 @@ public sealed class Skill: IIdentifiable
 		_abnormalLevel = set.getInt("abnormalLevel", 0);
 		_abnormalType = set.getEnum("abnormalType", AbnormalType.NONE);
 		_subordinationAbnormalType = set.getEnum("subordinationAbnormalType", AbnormalType.NONE);
-		TimeSpan abnormalTime = TimeSpan.FromSeconds(set.getDouble("abnormalTime", 0));
-        if (Config.Character.ENABLE_MODIFY_SKILL_DURATION && _operateType != SkillOperateType.T &&
-            Config.Character.SKILL_DURATION_LIST.TryGetValue(_id, out TimeSpan temp))
-        {
-            if (_level < 100 || _level > 140)
-                abnormalTime = temp;
-            else if (_level >= 100 && _level < 140)
-                abnormalTime += temp;
-        }
-
-        _abnormalTime = abnormalTime;
+        _abnormalTime = Config.Character.ResolveAbnormalTime(_id, _level, _operateType == SkillOperateType.T,
+            TimeSpan.FromSeconds(set.getDouble("abnormalTime", 0)));
 		_isAbnormalInstant = set.getBoolean("abnormalInstant", false);
 		_abnormalVisualEffects = ParseAbnormalVisualEffect(_id, set.getString("abnormalVisualEffect", string.Empty));
 		_stayAfterDeath = set.getBoolean("stayAfterDeath", false);
@@ -405,17 +396,8 @@ public sealed class Skill: IIdentifiable
         _abnormalLevel = pars.GetInt32(XmlSkillParameterType.AbnormalLevel, 0);
         _abnormalType = pars.GetEnum(XmlSkillParameterType.AbnormalType, AbnormalType.NONE);
         _subordinationAbnormalType = pars.GetEnum(XmlSkillParameterType.SubordinationAbnormalType, AbnormalType.NONE);
-        TimeSpan abnormalTime = pars.GetTimeSpanSeconds(XmlSkillParameterType.AbnormalTime, TimeSpan.Zero);
-        if (Config.Character.ENABLE_MODIFY_SKILL_DURATION && _operateType != SkillOperateType.T &&
-            Config.Character.SKILL_DURATION_LIST.TryGetValue(_id, out TimeSpan temp))
-        {
-            if (_level < 100 || _level > 140)
-                abnormalTime = temp;
-            else if (_level >= 100 && _level < 140)
-                abnormalTime += temp;
-        }
-
-        _abnormalTime = abnormalTime;
+        _abnormalTime = Config.Character.ResolveAbnormalTime(_id, _level, _operateType == SkillOperateType.T,
+            pars.GetTimeSpanSeconds(XmlSkillParameterType.AbnormalTime, TimeSpan.Zero));
         _isAbnormalInstant = pars.GetBoolean(XmlSkillParameterType.AbnormalInstant, false);
         _abnormalVisualEffects = ParseAbnormalVisualEffect(_id,
             pars.GetString(XmlSkillParameterType.AbnormalVisualEffect, string.Empty));

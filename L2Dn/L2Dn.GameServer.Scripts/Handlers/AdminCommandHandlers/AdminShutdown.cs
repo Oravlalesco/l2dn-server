@@ -8,7 +8,6 @@ using L2Dn.GameServer.Network.Enums;
 using L2Dn.GameServer.Network.OutgoingPackets;
 using L2Dn.GameServer.TaskManagers;
 using L2Dn.GameServer.Utilities;
-using NLog;
 
 namespace L2Dn.GameServer.Scripts.Handlers.AdminCommandHandlers;
 
@@ -17,7 +16,6 @@ namespace L2Dn.GameServer.Scripts.Handlers.AdminCommandHandlers;
  */
 public class AdminShutdown: IAdminCommandHandler
 {
-    private static readonly Logger _logger = LogManager.GetLogger(nameof(AdminShowQuests));
 	private static readonly string[] ADMIN_COMMANDS =
     [
         "admin_server_shutdown",
@@ -27,45 +25,36 @@ public class AdminShutdown: IAdminCommandHandler
 
 	public bool useAdminCommand(string command, Player activeChar)
 	{
-		if (command.startsWith("admin_server_shutdown"))
+		const string shutdownPrefix = "admin_server_shutdown";
+		const string restartPrefix = "admin_server_restart";
+
+		if (command.startsWith(shutdownPrefix))
 		{
-			try
+			string val = command.Length > shutdownPrefix.Length
+				? command.Substring(shutdownPrefix.Length).Trim()
+				: string.Empty;
+			if (int.TryParse(val, CultureInfo.InvariantCulture, out int valInt))
 			{
-				string val = command.Substring(22);
-				if (int.TryParse(val, CultureInfo.InvariantCulture, out int valInt))
-				{
-					serverShutdown(activeChar, valInt, false);
-				}
-				else
-				{
-					BuilderUtil.sendSysMessage(activeChar, "Usage: //server_shutdown <seconds>");
-					sendHtmlForm(activeChar);
-				}
+				serverShutdown(activeChar, valInt, false);
 			}
-			catch (IndexOutOfRangeException e)
+			else
 			{
-                _logger.Error(e);
+				BuilderUtil.sendSysMessage(activeChar, "Usage: //server_shutdown <seconds>");
 				sendHtmlForm(activeChar);
 			}
 		}
-		else if (command.startsWith("admin_server_restart"))
+		else if (command.startsWith(restartPrefix))
 		{
-			try
+			string val = command.Length > restartPrefix.Length
+				? command.Substring(restartPrefix.Length).Trim()
+				: string.Empty;
+			if (int.TryParse(val, CultureInfo.InvariantCulture, out int valInt))
 			{
-				string val = command.Substring(21);
-				if (int.TryParse(val, CultureInfo.InvariantCulture, out int valInt))
-				{
-					serverShutdown(activeChar, valInt, true);
-				}
-				else
-				{
-					BuilderUtil.sendSysMessage(activeChar, "Usage: //server_restart <seconds>");
-					sendHtmlForm(activeChar);
-				}
+				serverShutdown(activeChar, valInt, true);
 			}
-			catch (IndexOutOfRangeException e)
+			else
 			{
-                _logger.Error(e);
+				BuilderUtil.sendSysMessage(activeChar, "Usage: //server_restart <seconds>");
 				sendHtmlForm(activeChar);
 			}
 		}

@@ -9,9 +9,7 @@ Set-Location $PSScriptRoot
 
 $files = @("docker-compose.yml")
 if ($Code) {
-    if (-not (Test-Path "publish/gameserver/L2Dn.GameServer.dll")) {
-        & "$PSScriptRoot/dev-publish.ps1"
-    }
+    & "$PSScriptRoot/dev-publish.ps1"
     $files += "docker-compose.dev-code.yml"
 }
 $files += "docker-compose.dev.yml"
@@ -22,5 +20,5 @@ if ($Migrate) {
     docker compose @compose run --rm l2dn-gameserver /App/L2Dn.GameServer -UpdateDatabase
 }
 
-docker compose @compose restart l2dn-gameserver
+docker compose @compose up -d --force-recreate l2dn-gameserver
 Write-Host "Gameserver restarted (dev mode)."

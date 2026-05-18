@@ -9,6 +9,7 @@ using L2Dn.GameServer.Model.Html;
 using L2Dn.GameServer.Model.Skills;
 using L2Dn.GameServer.Network.OutgoingPackets;
 using L2Dn.GameServer.Utilities;
+using NLog;
 using Config = L2Dn.GameServer.Configuration.Config;
 
 namespace L2Dn.GameServer.Model.Actor.Instances;
@@ -23,244 +24,297 @@ public class SchemeBuffer: Npc
 
     public override void onBypassFeedback(Player player, string commandValue)
     {
-        // Simple hack to use createscheme bypass with a space.
-        string command = commandValue.Replace("createscheme ", "createscheme;");
-
-        StringTokenizer st = new StringTokenizer(command, ";");
-        string currentCommand = st.nextToken();
-        if (currentCommand.startsWith("menu"))
+        if (!SchemeBufferBypass.TryParse(commandValue, out SchemeBufferBypass bypass))
         {
-            HtmlContent htmlContent = HtmlContent.LoadFromFile(getHtmlPath(getId(), 0, player), player);
-            htmlContent.Replace("%objectId%", ObjectId.ToString());
-            NpcHtmlMessagePacket html = new NpcHtmlMessagePacket(ObjectId, 0, htmlContent);
-            player.sendPacket(html);
+            player.sendMessage("Comando del buffer incorrecto.");
+            return;
         }
-        else if (currentCommand.startsWith("cleanup"))
+
+        switch (bypass.Command)
         {
-            player.stopAllEffects();
-
-            Summon? summon = player.getPet();
-            if (summon != null)
-            {
-                summon.stopAllEffects();
-            }
-
-            player.getServitors().Values.ForEach(servitor => servitor.stopAllEffects());
-
-            HtmlContent htmlContent = HtmlContent.LoadFromFile(getHtmlPath(getId(), 0, player), player);
-            htmlContent.Replace("%objectId%", ObjectId.ToString());
-            NpcHtmlMessagePacket html = new NpcHtmlMessagePacket(ObjectId, 0, htmlContent);
-            player.sendPacket(html);
+            case var cmd when cmd.startsWith("menu"):
+                handleMenu(player);
+                break;
+            case var cmd when cmd.startsWith("cleanup"):
+                handleCleanup(player);
+                break;
+            case var cmd when cmd.startsWith("heal"):
+                handleHeal(player);
+                break;
+            case var cmd when cmd.startsWith("support"):
+                PlayerBufferSchemeContext.ClearActiveScheme(player.ObjectId);
+                showGiveBuffsWindow(player);
+                break;
+            case var cmd when cmd.startsWith("givebuffs"):
+                handleGiveBuffs(player, bypass);
+                break;
+            case var cmd when cmd.startsWith("editschemes"):
+                handleEditSchemes(player, bypass);
+                break;
+            case "skillselect":
+                handleSkillSelect(player, bypass);
+                break;
+            case "skillunselect":
+                handleSkillUnselect(player, bypass);
+                break;
+            case var cmd when cmd.startsWith("createscheme"):
+                handleCreateScheme(player, bypass);
+                break;
+            case var cmd when cmd.startsWith("deletescheme"):
+                handleDeleteScheme(player, bypass);
+                break;
         }
-        else if (currentCommand.startsWith("heal"))
+    }
+
+    private void handleMenu(Player player)
+    {
+        sendMainHtml(player);
+    }
+
+    private void handleCleanup(Player player)
+    {
+        player.stopAllEffects();
+
+        Summon? summon = player.getPet();
+        if (summon != null)
+            summon.stopAllEffects();
+
+        player.getServitors().Values.ForEach(servitor => servitor.stopAllEffects());
+        sendMainHtml(player);
+    }
+
+    private void handleHeal(Player player)
+    {
+        player.setCurrentHpMp(player.getMaxHp(), player.getMaxMp());
+        player.setCurrentCp(player.getMaxCp());
+
+        Summon? summon = player.getPet();
+        if (summon != null)
+            summon.setCurrentHpMp(summon.getMaxHp(), summon.getMaxMp());
+
+        player.getServitors().Values.
+            ForEach(servitor => servitor.setCurrentHpMp(servitor.getMaxHp(), servitor.getMaxMp()));
+        sendMainHtml(player);
+    }
+
+    private void handleGiveBuffs(Player player, SchemeBufferBypass bypass)
+    {
+        string parsedScheme = bypass.TokenAt(1);
+        if (!bypass.TryParseInt(2, out int cost) || !tryResolveScheme(player, parsedScheme, out string schemeName))
         {
-            player.setCurrentHpMp(player.getMaxHp(), player.getMaxMp());
-            player.setCurrentCp(player.getMaxCp());
-
-            Summon? summon = player.getPet();
-            if (summon != null)
-            {
-                summon.setCurrentHpMp(summon.getMaxHp(), summon.getMaxMp());
-            }
-
-            player.getServitors().Values.
-                ForEach(servitor => servitor.setCurrentHpMp(servitor.getMaxHp(), servitor.getMaxMp()));
-
-            HtmlContent htmlContent = HtmlContent.LoadFromFile(getHtmlPath(getId(), 0, player), player);
-            htmlContent.Replace("%objectId%", ObjectId.ToString());
-            NpcHtmlMessagePacket html = new NpcHtmlMessagePacket(ObjectId, 0, htmlContent);
-            player.sendPacket(html);
-        }
-        else if (currentCommand.startsWith("support"))
-        {
+            player.sendMessage("Esquema desconocido o no valido.");
             showGiveBuffsWindow(player);
+            return;
         }
-        else if (currentCommand.startsWith("givebuffs"))
+
+        bool buffSummons = bypass.Tokens.Count > 3 && bypass.TokenAt(3).equalsIgnoreCase("pet");
+        if (buffSummons && player.getPet() == null && !player.hasServitors())
         {
-            string schemeName = st.nextToken();
-            int cost = int.Parse(st.nextToken());
-            bool buffSummons = st.hasMoreTokens() && st.nextToken().equalsIgnoreCase("pet");
-            if (buffSummons && player.getPet() == null && !player.hasServitors())
+            player.sendMessage("You don't have a pet.");
+            return;
+        }
+
+        if (cost == 0 || (Config.SchemeBuffer.BUFFER_ITEM_ID == 57 && player.reduceAdena("NPC Buffer", cost, this, true)) ||
+            (Config.SchemeBuffer.BUFFER_ITEM_ID != 57 &&
+             player.destroyItemByItemId("NPC Buffer", Config.SchemeBuffer.BUFFER_ITEM_ID, cost, player, true)))
+        {
+            List<Skill> buffSkills = [];
+            List<Skill> danceSkills = [];
+            foreach (int skillId in SchemeBufferTable.getInstance().getScheme(player.ObjectId, schemeName))
             {
-                player.sendMessage("You don't have a pet.");
+                BuffSkillHolder? availableBuff = SchemeBufferTable.getInstance().getAvailableBuff(skillId);
+                if (availableBuff == null)
+                    continue;
+
+                Skill? skill = SkillData.getInstance().getSkill(skillId, availableBuff.getLevel());
+                if (skill == null)
+                    continue;
+
+                if (skill.isDance())
+                    danceSkills.Add(skill);
+                else
+                    buffSkills.Add(skill);
             }
-            else if (cost == 0 || (Config.SchemeBuffer.BUFFER_ITEM_ID == 57 && player.reduceAdena("NPC Buffer", cost, this, true)) ||
-                     (Config.SchemeBuffer.BUFFER_ITEM_ID != 57 &&
-                         player.destroyItemByItemId("NPC Buffer", Config.SchemeBuffer.BUFFER_ITEM_ID, cost, player, true)))
+
+            void applyScheme(Creature target)
             {
-                // Player as effector (not the NPC): dances/songs and many buffs fail or behave wrongly otherwise.
-                // Apply normal buffs first, then dances/songs so slot limits do not drop them afterward.
-                List<Skill> buffSkills = [];
-                List<Skill> danceSkills = [];
-                foreach (int skillId in SchemeBufferTable.getInstance().getScheme(player.ObjectId, schemeName))
+                foreach (Skill skill in buffSkills)
+                    skill.applyEffects(player, target);
+                foreach (Skill skill in danceSkills)
+                    skill.applyEffects(player, target);
+            }
+
+            if (buffSummons)
+            {
+                Pet? pet = player.getPet();
+                if (pet != null)
+                    applyScheme(pet);
+
+                player.getServitors().Values.ForEach(applyScheme);
+            }
+            else
+            {
+                applyScheme(player);
+            }
+        }
+    }
+
+    private void handleEditSchemes(Player player, SchemeBufferBypass bypass)
+    {
+        string groupType = bypass.TokenAt(1);
+        string parsedScheme = bypass.TokenAt(2);
+        if (!bypass.TryParseInt(3, out int page))
+            page = 1;
+
+        if (!tryResolveScheme(player, parsedScheme, out string schemeName))
+        {
+            logInvalidScheme(player, parsedScheme);
+            player.sendMessage("Esquema no valido. Vuelve a Magic support y pulsa Edit de nuevo.");
+            showGiveBuffsWindow(player);
+            return;
+        }
+
+        PlayerBufferSchemeContext.SetActiveScheme(player.ObjectId, schemeName);
+        showEditSchemeWindow(player, groupType, schemeName, page);
+    }
+
+    private void handleSkillSelect(Player player, SchemeBufferBypass bypass)
+    {
+        if (!tryParseSkillBypass(player, bypass, out string groupType, out string schemeName, out int skillId, out int page))
+            return;
+
+        List<int> skills = SchemeBufferTable.getInstance().getScheme(player.ObjectId, schemeName);
+        bool schemeChanged = false;
+        Skill? skill = SkillData.getInstance().getSkill(skillId, SkillData.getInstance().getMaxLevel(skillId));
+        if (skill != null)
+        {
+            if (skill.isDance())
+            {
+                if (getCountOf(skills, true) < Config.Character.DANCES_MAX_AMOUNT)
                 {
-                    BuffSkillHolder? availableBuff = SchemeBufferTable.getInstance().getAvailableBuff(skillId);
-                    if (availableBuff == null)
-                        continue;
-
-                    Skill? skill = SkillData.getInstance().getSkill(skillId, availableBuff.getLevel());
-                    if (skill == null)
-                        continue;
-
-                    if (skill.isDance())
-                        danceSkills.Add(skill);
-                    else
-                        buffSkills.Add(skill);
-                }
-
-                void applyScheme(Creature target)
-                {
-                    foreach (Skill skill in buffSkills)
-                        skill.applyEffects(player, target);
-                    foreach (Skill skill in danceSkills)
-                        skill.applyEffects(player, target);
-                }
-
-                if (buffSummons)
-                {
-                    Pet? pet = player.getPet();
-                    if (pet != null)
-                        applyScheme(pet);
-
-                    player.getServitors().Values.ForEach(applyScheme);
+                    skills.Add(skillId);
+                    schemeChanged = true;
                 }
                 else
                 {
-                    applyScheme(player);
+                    player.sendMessage("This scheme has reached the maximum amount of dances/songs.");
+                }
+            }
+            else
+            {
+                if (getCountOf(skills, false) < player.getStat().getMaxBuffCount())
+                {
+                    skills.Add(skillId);
+                    schemeChanged = true;
+                }
+                else
+                {
+                    player.sendMessage("This scheme has reached the maximum amount of buffs.");
                 }
             }
         }
-        else if (currentCommand.startsWith("editschemes"))
+
+        if (schemeChanged)
+            SchemeBufferTable.getInstance().persistScheme(player.ObjectId, schemeName);
+
+        showEditSchemeWindow(player, groupType, schemeName, page);
+    }
+
+    private void handleSkillUnselect(Player player, SchemeBufferBypass bypass)
+    {
+        if (!tryParseSkillBypass(player, bypass, out string groupType, out string schemeName, out int skillId, out int page))
+            return;
+
+        List<int> skills = SchemeBufferTable.getInstance().getScheme(player.ObjectId, schemeName);
+        if (skills.Remove(skillId))
+            SchemeBufferTable.getInstance().persistScheme(player.ObjectId, schemeName);
+
+        showEditSchemeWindow(player, groupType, schemeName, page);
+    }
+
+    private bool tryParseSkillBypass(Player player, SchemeBufferBypass bypass, out string groupType,
+        out string schemeName, out int skillId, out int page)
+    {
+        groupType = bypass.TokenAt(1);
+        string parsedScheme = bypass.TokenAt(2);
+        schemeName = string.Empty;
+        skillId = 0;
+        page = 1;
+
+        if (!bypass.TryParseInt(3, out skillId) || !bypass.TryParseInt(4, out page))
         {
-            showEditSchemeWindow(player, st.nextToken(), st.nextToken(), int.Parse(st.nextToken()));
+            player.sendMessage("Comando del buffer incorrecto.");
+            showGiveBuffsWindow(player);
+            return false;
         }
-        else if (currentCommand.startsWith("skill"))
-        {
-            string groupType = st.nextToken();
-            string schemeName = st.nextToken();
-            int skillId = int.Parse(st.nextToken());
-            int page = int.Parse(st.nextToken());
-            List<int> skills = SchemeBufferTable.getInstance().getScheme(player.ObjectId, schemeName);
-            if (currentCommand.startsWith("skillselect") && !schemeName.equalsIgnoreCase("none"))
-            {
-                Skill? skill = SkillData.getInstance().getSkill(skillId, SkillData.getInstance().getMaxLevel(skillId));
-                if (skill != null)
-                {
-                    if (skill.isDance())
-                    {
-                        if (getCountOf(skills, true) < Config.Character.DANCES_MAX_AMOUNT)
-                        {
-                            skills.Add(skillId);
-                        }
-                        else
-                        {
-                            player.sendMessage("This scheme has reached the maximum amount of dances/songs.");
-                        }
-                    }
-                    else
-                    {
-                        if (getCountOf(skills, false) < player.getStat().getMaxBuffCount())
-                        {
-                            skills.Add(skillId);
-                        }
-                        else
-                        {
-                            player.sendMessage("This scheme has reached the maximum amount of buffs.");
-                        }
-                    }
-                }
-            }
-            else if (currentCommand.startsWith("skillunselect"))
-            {
-                skills.Remove(skillId);
-            }
 
-            showEditSchemeWindow(player, groupType, schemeName, page);
+        if (!tryResolveScheme(player, parsedScheme, out schemeName))
+        {
+            logInvalidScheme(player, parsedScheme);
+            player.sendMessage("Esquema no valido. Vuelve a Magic support y pulsa Edit de nuevo.");
+            showGiveBuffsWindow(player);
+            return false;
         }
-        else if (currentCommand.startsWith("createscheme"))
+
+        PlayerBufferSchemeContext.SetActiveScheme(player.ObjectId, schemeName);
+        return true;
+    }
+
+    private void handleCreateScheme(Player player, SchemeBufferBypass bypass)
+    {
+        try
         {
-            try
+            string schemeName = bypass.TokenAt(1);
+            if (!SchemeBufferTable.getInstance().tryAddScheme(player.ObjectId, schemeName, out string? error))
             {
-                string schemeName = st.nextToken().Trim();
-                if (schemeName.Length > 14)
-                {
-                    player.sendMessage("Scheme's name must contain up to 14 chars.");
-                    return;
-                }
-
-                // Simple hack to use spaces, dots, commas, minus, plus, exclamations or question marks.
-                if (!schemeName.Replace(" ", "").Replace(".", "").Replace(",", "").Replace("-", "").Replace("+", "").
-                        Replace("!", "").Replace("?", "").ContainsAlphaNumericOnly())
-                {
-                    player.sendMessage("Please use plain alphanumeric characters.");
-                    return;
-                }
-
-                Map<string, List<int>>? schemes = SchemeBufferTable.getInstance().getPlayerSchemes(player.ObjectId);
-                if (schemes != null)
-                {
-                    if (schemes.Count == Config.SchemeBuffer.BUFFER_MAX_SCHEMES)
-                    {
-                        player.sendMessage("Maximum schemes amount is already reached.");
-                        return;
-                    }
-
-                    if (schemes.ContainsKey(schemeName))
-                    {
-                        player.sendMessage("The scheme name already exists.");
-                        return;
-                    }
-                }
-
-                SchemeBufferTable.getInstance().setScheme(player.ObjectId, schemeName.Trim(), new List<int>());
-                showGiveBuffsWindow(player);
-            }
-            catch (Exception e)
-            {
-                LOGGER.Error(e);
-                player.sendMessage("Scheme's name must contain up to 14 chars.");
-            }
-        }
-        else if (currentCommand.startsWith("deletescheme"))
-        {
-            try
-            {
-                string schemeName = st.nextToken();
-                Map<string, List<int>>? schemes = SchemeBufferTable.getInstance().getPlayerSchemes(player.ObjectId);
-                if (schemes != null && schemes.ContainsKey(schemeName))
-                {
-                    schemes.remove(schemeName);
-                }
-            }
-            catch (Exception e)
-            {
-                LOGGER.Error(e);
-                player.sendMessage("This scheme name is invalid.");
+                player.sendMessage(error ?? "No se pudo crear el esquema.");
+                return;
             }
 
+            string resolved = SchemeBufferSchemeNames.Normalize(schemeName)!;
+            PlayerBufferSchemeContext.SetActiveScheme(player.ObjectId, resolved);
             showGiveBuffsWindow(player);
         }
+        catch (Exception e)
+        {
+            LOGGER.Error(e);
+            player.sendMessage("Scheme's name must contain up to 14 chars.");
+        }
+    }
+
+    private void handleDeleteScheme(Player player, SchemeBufferBypass bypass)
+    {
+        try
+        {
+            if (!SchemeBufferTable.getInstance().tryRemoveScheme(player.ObjectId, bypass.TokenAt(1), out string? error))
+                player.sendMessage(error ?? "This scheme name is invalid.");
+        }
+        catch (Exception e)
+        {
+            LOGGER.Error(e);
+            player.sendMessage("This scheme name is invalid.");
+        }
+
+        showGiveBuffsWindow(player);
+    }
+
+    private void sendMainHtml(Player player)
+    {
+        PlayerBufferSchemeContext.ClearActiveScheme(player.ObjectId);
+        HtmlContent htmlContent = HtmlContent.LoadFromFile(getHtmlPath(getId(), 0, player), player);
+        htmlContent.Replace("%objectId%", ObjectId.ToString());
+        player.sendPacket(new NpcHtmlMessagePacket(ObjectId, 0, htmlContent));
     }
 
     public override string getHtmlPath(int npcId, int value, Player? player)
     {
-        string filename;
-        if (value == 0)
-        {
-            filename = npcId.ToString(CultureInfo.InvariantCulture);
-        }
-        else
-        {
-            filename = npcId + "-" + value;
-        }
+        string filename = value == 0
+            ? npcId.ToString(CultureInfo.InvariantCulture)
+            : npcId + "-" + value;
 
         return "html/mods/SchemeBuffer/" + filename + ".htm";
     }
 
-    /**
-     * Sends an html packet to player with Give Buffs menu info for player and pet, depending on targetType parameter {player, pet}
-     * @param player : The player to make checks on.
-     */
     private void showGiveBuffsWindow(Player player)
     {
         StringBuilder sb = new StringBuilder(200);
@@ -273,14 +327,17 @@ public class SchemeBuffer: Npc
         {
             foreach (var scheme in schemes)
             {
+                if (!SchemeBufferSchemeNames.IsValidFormat(scheme.Key, out _))
+                    continue;
+
                 int cost = getFee(scheme.Value);
                 sb.Append("<font color=\"LEVEL\">" + scheme.Key + " [" + scheme.Value.Count + " skill(s)]" +
                     (cost > 0 ? " - cost: " + cost : "") + "</font><br1>");
 
-                sb.Append("<a action=\"bypass -h npc_%objectId%_givebuffs;" + scheme.Key + ";" + cost +
+                sb.Append("<a action=\"bypass npc_%objectId%_givebuffs;" + scheme.Key + ";" + cost +
                     "\">Use on Me</a>&nbsp;|&nbsp;");
 
-                sb.Append("<a action=\"bypass -h npc_%objectId%_givebuffs;" + scheme.Key + ";" + cost +
+                sb.Append("<a action=\"bypass npc_%objectId%_givebuffs;" + scheme.Key + ";" + cost +
                     ";pet\">Use on Pet</a>&nbsp;|&nbsp;");
 
                 sb.Append("<a action=\"bypass npc_%objectId%_editschemes;Buffs;" + scheme.Key +
@@ -294,17 +351,9 @@ public class SchemeBuffer: Npc
         htmlContent.Replace("%schemes%", sb.ToString());
         htmlContent.Replace("%max_schemes%", Config.SchemeBuffer.BUFFER_MAX_SCHEMES.ToString());
         htmlContent.Replace("%objectId%", ObjectId.ToString());
-        NpcHtmlMessagePacket html = new NpcHtmlMessagePacket(ObjectId, 0, htmlContent);
-        player.sendPacket(html);
+        player.sendPacket(new NpcHtmlMessagePacket(ObjectId, 0, htmlContent));
     }
 
-    /**
-     * This sends an html packet to player with Edit Scheme Menu info. This allows player to edit each created scheme (add/delete skills)
-     * @param player : The player to make checks on.
-     * @param groupType : The group of skills to select.
-     * @param schemeName : The scheme to make check.
-     * @param page The page.
-     */
     private void showEditSchemeWindow(Player player, string groupType, string schemeName, int page)
     {
         List<int> schemeSkills = SchemeBufferTable.getInstance().getScheme(player.ObjectId, schemeName);
@@ -318,45 +367,27 @@ public class SchemeBuffer: Npc
         htmlContent.Replace("%typesframe%", getTypesFrame(groupType, schemeName));
         htmlContent.Replace("%skilllistframe%", getGroupSkillList(player, groupType, schemeName, page));
         htmlContent.Replace("%objectId%", ObjectId.ToString());
-        NpcHtmlMessagePacket html = new NpcHtmlMessagePacket(ObjectId, 0, htmlContent);
-        player.sendPacket(html);
+        player.sendPacket(new NpcHtmlMessagePacket(ObjectId, 0, htmlContent));
     }
 
-    /**
-     * @param player : The player to make checks on.
-     * @param groupType : The group of skills to select.
-     * @param schemeName : The scheme to make check.
-     * @param pageValue The page.
-     * @return a String representing skills available to selection for a given groupType.
-     */
     private string getGroupSkillList(Player player, string groupType, string schemeName, int pageValue)
     {
-        // Retrieve the entire skills list based on group type.
         List<int> skills = SchemeBufferTable.getInstance().getSkillsIdsByType(groupType);
         if (skills.Count == 0)
-        {
             return "That group doesn't contain any skills.";
-        }
 
-        // Calculate page number.
         int max = Math.Max(1, MathUtil.countPagesNumber(skills.Count, PAGE_LIMIT));
         int page = pageValue;
         if (page < 1)
-        {
             page = 1;
-        }
 
         if (page > max)
-        {
             page = max;
-        }
 
         int startIndex = (page - 1) * PAGE_LIMIT;
         int sliceCount = Math.Min(PAGE_LIMIT, skills.Count - startIndex);
         if (sliceCount <= 0)
-        {
             return string.Empty;
-        }
 
         skills = skills.GetRange(startIndex, sliceCount);
 
@@ -400,7 +431,6 @@ public class SchemeBuffer: Npc
             row++;
         }
 
-        // Build page footer.
         sb.Append("<br><img src=\"L2UI.SquareGray\" width=277 height=1><table width=\"100%\" bgcolor=000000><tr>");
         if (page > 1)
         {
@@ -427,11 +457,6 @@ public class SchemeBuffer: Npc
         return sb.ToString();
     }
 
-    /**
-     * @param groupType : The group of skills to select.
-     * @param schemeName : The scheme to make check.
-     * @return a string representing all groupTypes available. The group currently on selection isn't linkable.
-     */
     private static string getTypesFrame(string groupType, string schemeName)
     {
         StringBuilder sb = new StringBuilder(500);
@@ -441,9 +466,7 @@ public class SchemeBuffer: Npc
         foreach (string type in SchemeBufferTable.getInstance().getSkillTypes())
         {
             if (count == 0)
-            {
                 sb.Append("<tr>");
-            }
 
             if (groupType.equalsIgnoreCase(type))
             {
@@ -464,25 +487,16 @@ public class SchemeBuffer: Npc
         }
 
         if (!sb.ToString().EndsWith("</tr>"))
-        {
             sb.Append("</tr>");
-        }
 
         sb.Append("</table>");
-
         return sb.ToString();
     }
 
-    /**
-     * @param list : A list of skill ids.
-     * @return a global fee for all skills contained in list.
-     */
     private static int getFee(List<int> list)
     {
         if (Config.SchemeBuffer.BUFFER_STATIC_BUFF_COST > 0)
-        {
             return list.Count * Config.SchemeBuffer.BUFFER_STATIC_BUFF_COST;
-        }
 
         int fee = 0;
         foreach (int sk in list)
@@ -506,5 +520,29 @@ public class SchemeBuffer: Npc
         }
 
         return count;
+    }
+
+    private static bool tryResolveScheme(Player player, string parsedScheme, out string schemeName)
+    {
+        schemeName = string.Empty;
+        SchemeBufferTable table = SchemeBufferTable.getInstance();
+        string? active = PlayerBufferSchemeContext.GetActiveScheme(player.ObjectId);
+        if (!table.tryResolveSchemeKey(player.ObjectId, parsedScheme, active, out string resolved))
+            return false;
+
+        schemeName = resolved;
+        return true;
+    }
+
+    private static void logInvalidScheme(Player player, string parsedScheme)
+    {
+        Map<string, List<int>>? schemes = SchemeBufferTable.getInstance().getPlayerSchemes(player.ObjectId);
+        string known = schemes == null
+            ? string.Empty
+            : string.Join(", ", schemes.Keys.Select(k => "'" + k + "'"));
+        string? active = PlayerBufferSchemeContext.GetActiveScheme(player.ObjectId);
+        LogManager.GetLogger(nameof(SchemeBuffer)).Warn(
+            "SchemeBuffer: invalid scheme for player {0}: parsed='{1}', active='{2}', known=[{3}]",
+            player.ObjectId, parsedScheme, active ?? string.Empty, known);
     }
 }

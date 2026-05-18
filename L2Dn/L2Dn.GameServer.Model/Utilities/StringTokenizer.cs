@@ -1,4 +1,4 @@
-﻿namespace L2Dn.GameServer.Utilities;
+namespace L2Dn.GameServer.Utilities;
 
 public struct StringTokenizer
 {
@@ -7,11 +7,12 @@ public struct StringTokenizer
     private readonly string[] _tokens;
     private int _index = 0;
 
-    public StringTokenizer(string input, string delimiters = " \t\n\r\f")
+    public StringTokenizer(string input, string delimiters = " \t\n\r\f", bool removeEmptyEntries = true)
     {
         _input = input;
         _delimiters = delimiters;
-        _tokens = input.Split(delimiters.ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
+        _tokens = input.Split(delimiters.ToCharArray(),
+            removeEmptyEntries ? StringSplitOptions.RemoveEmptyEntries : StringSplitOptions.None);
         if (_tokens.Length == 1 && string.IsNullOrEmpty(_tokens[0]))
             _tokens = Array.Empty<string>();
     }

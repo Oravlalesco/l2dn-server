@@ -1,4 +1,4 @@
-﻿using L2Dn.GameServer.Configuration;
+using L2Dn.GameServer.Configuration;
 using L2Dn.GameServer.Data;
 using L2Dn.GameServer.Data.Sql;
 using L2Dn.GameServer.InstanceManagers;
@@ -419,8 +419,14 @@ public class Shutdown
 		LOGGER.Info("GrandBossManager: All Grand Boss info saved(" + tc.getEstimatedTimeAndRestartCounter() + "ms).");
 		ItemAuctionManager.getInstance().shutdown();
 		LOGGER.Info("Item Auction Manager: All tasks stopped(" + tc.getEstimatedTimeAndRestartCounter() + "ms).");
-		Olympiad.getInstance().saveOlympiadStatus();
-		LOGGER.Info("Olympiad System: Data saved(" + tc.getEstimatedTimeAndRestartCounter() + "ms).");
+		if (Olympiad.getInstance().saveOlympiadStatus())
+		{
+			LOGGER.Info("Olympiad System: Data saved(" + tc.getEstimatedTimeAndRestartCounter() + "ms).");
+		}
+		else
+		{
+			LOGGER.Warn("Olympiad System: Data was NOT saved(" + tc.getEstimatedTimeAndRestartCounter() + "ms).");
+		}
 
 		Hero.getInstance().shutdown();
 		LOGGER.Info("Hero System: Data saved(" + tc.getEstimatedTimeAndRestartCounter() + "ms).");

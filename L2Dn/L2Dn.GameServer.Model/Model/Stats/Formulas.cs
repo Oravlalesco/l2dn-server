@@ -1201,10 +1201,24 @@ public class Formulas
 	 */
 	public static TimeSpan? calcEffectAbnormalTime(Creature caster, Creature target, Skill skill)
 	{
-		TimeSpan? time = skill == null || skill.isPassive() || skill.isToggle() ? null : skill.getAbnormalTime();
+		if (skill == null || skill.isPassive() || skill.isToggle())
+		{
+			return null;
+		}
+
+		// Apply Character.ini overrides at effect time (seconds). Fixes wrong durations if an old build
+		// parsed SkillDurationList as milliseconds.
+		TimeSpan? time = skill.getAbnormalTime();
+		if (Config.Character.ENABLE_MODIFY_SKILL_DURATION &&
+		    skill.getOperateType() != SkillOperateType.T &&
+		    Config.Character.SKILL_DURATION_LIST.TryGetValue(skill.getId(), out TimeSpan configured) &&
+		    (skill.getLevel() < 100 || skill.getLevel() > 140))
+		{
+			time = configured;
+		}
 
 		// If the skill is a mastery skill, the effect will last twice the default time.
-		if (skill != null && !skill.isStatic() && calcSkillMastery(caster, skill))
+		if (!skill.isStatic() && calcSkillMastery(caster, skill))
 		{
 			time *= 2;
 		}

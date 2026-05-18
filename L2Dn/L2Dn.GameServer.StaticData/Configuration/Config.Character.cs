@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using System.Globalization;
 using L2Dn.Configuration;
 using L2Dn.GameServer.Dto;
@@ -251,13 +251,15 @@ public static partial class Config
             ENABLE_MODIFY_SKILL_DURATION = parser.getBoolean("EnableModifySkillDuration");
             if (ENABLE_MODIFY_SKILL_DURATION)
             {
-                SKILL_DURATION_LIST = GetSkillDurationList(parser, "SkillDurationList");
+                SKILL_DURATION_LIST = GetSkillDurationList(parser, "SkillDurationList", useSeconds: true);
+                _logger.Info(
+                    $"Character: Loaded {SKILL_DURATION_LIST.Count} skill duration overrides from SkillDurationList (values are in seconds).");
             }
 
             ENABLE_MODIFY_SKILL_REUSE = parser.getBoolean("EnableModifySkillReuse");
             if (ENABLE_MODIFY_SKILL_REUSE)
             {
-                SKILL_REUSE_LIST = GetSkillDurationList(parser, "SkillReuseList");
+                SKILL_REUSE_LIST = GetSkillDurationList(parser, "SkillReuseList", useSeconds: false);
             }
 
             AUTO_LEARN_SKILLS = parser.getBoolean("AutoLearnSkills");
@@ -471,7 +473,8 @@ public static partial class Config
             ABILITY_POINTS_RESET_ADENA = parser.getLong("AbilityPointsResetAdena", 10_000_000);
         }
 
-        private static ImmutableDictionary<int, TimeSpan> GetSkillDurationList(ConfigurationParser parser, string key)
+        private static ImmutableDictionary<int, TimeSpan> GetSkillDurationList(ConfigurationParser parser, string key,
+            bool useSeconds)
         {
             var result = ImmutableDictionary<int, TimeSpan>.Empty;
             string value = parser.getString(key);
@@ -494,7 +497,8 @@ public static partial class Config
 
                 try
                 {
-                    result = result.Add(skillId, TimeSpan.FromMilliseconds(duration));
+                    result = result.Add(skillId,
+                        useSeconds ? TimeSpan.FromSeconds(duration) : TimeSpan.FromMilliseconds(duration));
                 }
                 catch (ArgumentException)
                 {
@@ -504,6 +508,31 @@ public static partial class Config
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Applies <see cref="SKILL_DURATION_LIST"/> overrides from Character.ini (duration values in seconds).
+        /// </summary>
+        /// <param name="isToggle">When true, overrides are not applied (toggle skills).</param>
+        public static TimeSpan ResolveAbnormalTime(int skillId, int level, bool isToggle, TimeSpan dataPackTime)
+        {
+            if (!ENABLE_MODIFY_SKILL_DURATION || isToggle ||
+                !SKILL_DURATION_LIST.TryGetValue(skillId, out TimeSpan configured))
+            {
+                return dataPackTime;
+            }
+
+            if (level < 100 || level > 140)
+            {
+                return configured;
+            }
+
+            if (level >= 100 && level < 140)
+            {
+                return dataPackTime + configured;
+            }
+
+            return dataPackTime;
         }
 
         private static ImmutableArray<Range<int>> GetPartyXpCutoffGaps(ConfigurationParser parser, string key,

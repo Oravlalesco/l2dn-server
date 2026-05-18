@@ -46,34 +46,43 @@ public sealed class SchemeBufferTable: DataReaderBase
 		}
 
 		int count = 0;
+		int skipped = 0;
 		try
 		{
 			using GameServerDbContext ctx = DbFactory.Instance.CreateDbContext();
-			DbSet<DbBufferScheme> schemes = ctx.BufferSchemes;
+			List<DbBufferScheme> schemes = ctx.BufferSchemes.ToList();
 			foreach (DbBufferScheme scheme in schemes)
 			{
-				int objectId = scheme.ObjectId;
-				string schemeName = scheme.Name;
+				if (!SchemeBufferSchemeNames.IsValidFormat(scheme.Name, out _))
+				{
+					LOGGER.Warn(
+						"SchemeBufferTable: Skipping invalid scheme from database objectId={0}, name='{1}'.",
+						scheme.ObjectId, scheme.Name);
+					ctx.BufferSchemes.Where(r => r.ObjectId == scheme.ObjectId && r.Name == scheme.Name)
+						.ExecuteDelete();
+					skipped++;
+					continue;
+				}
+
+				string schemeName = SchemeBufferSchemeNames.Normalize(scheme.Name)!;
 				string[] skills = scheme.Skills.Split(",");
 				List<int> schemeList = [];
 				foreach (string skill in skills)
 				{
-					// Don't feed the skills list if the list is empty.
 					if (string.IsNullOrEmpty(skill))
-					{
 						break;
-					}
 
 					int skillId = int.Parse(skill);
 					if (_availableBuffs.ContainsKey(skillId))
-					{
 						schemeList.Add(skillId);
-					}
 				}
 
-				setScheme(objectId, schemeName, schemeList);
+				putScheme(scheme.ObjectId, schemeName, schemeList);
 				count++;
 			}
+
+			if (skipped > 0)
+				ctx.SaveChanges();
 		}
 		catch (Exception e)
 		{
@@ -84,132 +93,258 @@ public sealed class SchemeBufferTable: DataReaderBase
 		            " available buffs.");
 	}
 
+	private const int MaxSkillsColumnLength = 500;
+
 	public void saveSchemes()
 	{
 		try
 		{
-			using GameServerDbContext ctx = DbFactory.Instance.CreateDbContext();
-
-			// Delete all entries from database.
-			ctx.BufferSchemes.ExecuteDelete();
-
-			// Save _schemesTable content.
-			foreach (var player in _schemesTable)
+			foreach (KeyValuePair<int, Map<string, List<int>>> player in _schemesTable)
 			{
-				foreach (var scheme in player.Value)
+				foreach (KeyValuePair<string, List<int>> scheme in player.Value)
 				{
-					// Build a String composed of skill ids seperated by a ",".
-					string skills = string.Join(",", scheme.Value);
-					ctx.BufferSchemes.Add(new()
-					{
-						ObjectId = player.Key,
-						Name = scheme.Key,
-						Skills = skills
-					});
+					saveSchemeRow(player.Key, scheme.Key, scheme.Value);
 				}
+			}
+		}
+		catch (Exception e)
+		{
+			LOGGER.Warn("SchemeBufferTable: Error while saving schemes: " + e);
+		}
+	}
+
+	public void persistScheme(int objectId, string schemeName)
+	{
+		if (!tryResolveSchemeKey(objectId, schemeName, null, out string resolved))
+			return;
+
+		saveSchemeRow(objectId, resolved, getScheme(objectId, resolved));
+	}
+
+	public void saveSchemeRow(int objectId, string schemeName, IReadOnlyList<int> skillIds)
+	{
+		try
+		{
+			string skills = string.Join(",", skillIds);
+			if (skills.Length > MaxSkillsColumnLength)
+			{
+				LOGGER.Warn(
+					"SchemeBufferTable: Scheme skills exceed column limit for objectId={0}, scheme={1} (length={2}, max={3}).",
+					objectId, schemeName, skills.Length, MaxSkillsColumnLength);
+				return;
+			}
+
+			using GameServerDbContext ctx = DbFactory.Instance.CreateDbContext();
+			DbBufferScheme? existing = ctx.BufferSchemes.Find(objectId, schemeName);
+			if (existing != null)
+			{
+				existing.Skills = skills;
+			}
+			else
+			{
+				ctx.BufferSchemes.Add(new DbBufferScheme
+				{
+					ObjectId = objectId,
+					Name = schemeName,
+					Skills = skills
+				});
 			}
 
 			ctx.SaveChanges();
 		}
 		catch (Exception e)
 		{
-			LOGGER.Warn("BufferTableScheme: Error while saving schemes : " + e);
+			LOGGER.Warn("SchemeBufferTable: Error while saving scheme objectId={0}, name={1}: {2}",
+				objectId, schemeName, e);
 		}
 	}
 
-    public void setScheme(int playerId, string schemeName, List<int> list)
-    {
-        Map<string, List<int>> schemes = _schemesTable.GetOrAdd(playerId,
-            static _ => new Map<string, List<int>>(StringComparer.InvariantCultureIgnoreCase));
-
-        if (schemes.Count >= Config.SchemeBuffer.BUFFER_MAX_SCHEMES)
-        {
-            return;
-        }
-
-        schemes.put(schemeName, list);
-    }
-
-    /**
-     * @param playerId : The player objectId to check.
-     * @return the list of schemes for a given player.
-     */
-	public Map<string, List<int>>? getPlayerSchemes(int playerId)
+	public void deleteSchemeRow(int objectId, string schemeName)
 	{
-		return _schemesTable.get(playerId);
-	}
-
-	/**
-	 * @param playerId : The player objectId to check.
-	 * @param schemeName : The scheme name to check.
-	 * @return the List holding skills for the given scheme name and player, or null (if scheme or player isn't registered).
-	 */
-	public List<int> getScheme(int playerId, string schemeName)
-	{
-        if (!_schemesTable.TryGetValue(playerId, out Map<string, List<int>>? schemes))
-            return [];
-
-        if (!schemes.TryGetValue(schemeName, out List<int>? scheme))
-            return [];
-
-		return scheme;
-	}
-
-	/**
-	 * @param playerId : The player objectId to check.
-	 * @param schemeName : The scheme name to check.
-	 * @param skillId : The skill id to check.
-	 * @return true if the skill is already registered on the scheme, or false otherwise.
-	 */
-	public bool getSchemeContainsSkill(int playerId, string schemeName, int skillId)
-	{
-		List<int> skills = getScheme(playerId, schemeName);
-		if (skills.Count == 0)
+		try
 		{
+			using GameServerDbContext ctx = DbFactory.Instance.CreateDbContext();
+			ctx.BufferSchemes.Where(r => r.ObjectId == objectId && r.Name == schemeName).ExecuteDelete();
+		}
+		catch (Exception e)
+		{
+			LOGGER.Warn("SchemeBufferTable: Error while deleting scheme objectId={0}, name={1}: {2}",
+				objectId, schemeName, e);
+		}
+	}
+
+	public bool tryAddScheme(int playerId, string schemeName, out string? error)
+	{
+		error = null;
+		if (!SchemeBufferSchemeNames.IsValidFormat(schemeName, out string? formatError))
+		{
+			error = formatError switch
+            {
+                "empty" => "You must enter a scheme name.",
+                "length" => "Scheme's name must contain up to 14 chars.",
+                "forbidden" => "Scheme name contains invalid characters.",
+                _ => "Please use plain alphanumeric characters."
+            };
 			return false;
 		}
 
-		foreach (int id in skills)
+		string normalized = SchemeBufferSchemeNames.Normalize(schemeName)!;
+		Map<string, List<int>> schemes = _schemesTable.GetOrAdd(playerId,
+			static _ => new Map<string, List<int>>(StringComparer.InvariantCultureIgnoreCase));
+
+		if (schemes.ContainsKey(normalized))
 		{
-			if (id == skillId)
-			{
-				return true;
-			}
+			error = "The scheme name already exists.";
+			return false;
+		}
+
+		if (schemes.Count >= Config.SchemeBuffer.BUFFER_MAX_SCHEMES)
+		{
+			error = "Maximum schemes amount is already reached.";
+			return false;
+		}
+
+		putScheme(playerId, normalized, []);
+		saveSchemeRow(playerId, normalized, []);
+		return true;
+	}
+
+	public bool tryRemoveScheme(int playerId, string schemeName, out string? error)
+	{
+		error = null;
+		if (!tryResolveSchemeKey(playerId, schemeName, PlayerBufferSchemeContext.GetActiveScheme(playerId),
+			    out string resolved))
+		{
+			error = "This scheme name is invalid.";
+			return false;
+		}
+
+		Map<string, List<int>>? schemes = getPlayerSchemes(playerId);
+		if (schemes == null || schemes.remove(resolved) == null)
+		{
+			error = "This scheme name is invalid.";
+			return false;
+		}
+
+		deleteSchemeRow(playerId, resolved);
+		string? active = PlayerBufferSchemeContext.GetActiveScheme(playerId);
+		if (active != null && active.Equals(resolved, StringComparison.InvariantCultureIgnoreCase))
+			PlayerBufferSchemeContext.ClearActiveScheme(playerId);
+
+		return true;
+	}
+
+	public bool hasScheme(int playerId, string schemeName)
+	{
+		return tryResolveSchemeKey(playerId, schemeName, PlayerBufferSchemeContext.GetActiveScheme(playerId),
+			out _);
+	}
+
+	public bool tryResolveSchemeKey(int playerId, string parsedName, string? activeFallback, out string resolvedKey)
+	{
+		resolvedKey = string.Empty;
+		Map<string, List<int>>? schemes = getPlayerSchemes(playerId);
+		if (schemes == null || schemes.Count == 0)
+			return false;
+
+		string? candidate = SchemeBufferSchemeNames.Normalize(parsedName);
+		if (candidate == null)
+			candidate = SchemeBufferSchemeNames.Normalize(activeFallback);
+
+		if (candidate == null || candidate.equalsIgnoreCase("none"))
+			return false;
+
+		if (schemes.TryGetValue(candidate, out _))
+		{
+			resolvedKey = getCanonicalKey(schemes, candidate);
+			return true;
 		}
 
 		return false;
 	}
 
-	/**
-	 * @param groupType : The type of skills to return.
-	 * @return a list of skills ids based on the given groupType.
-	 */
+	private static string getCanonicalKey(Map<string, List<int>> schemes, string candidate)
+	{
+		foreach (KeyValuePair<string, List<int>> entry in schemes)
+		{
+			if (entry.Key.Equals(candidate, StringComparison.InvariantCultureIgnoreCase))
+				return entry.Key;
+		}
+
+		return candidate;
+	}
+
+	private void putScheme(int playerId, string schemeName, List<int> list)
+	{
+		Map<string, List<int>> schemes = _schemesTable.GetOrAdd(playerId,
+			static _ => new Map<string, List<int>>(StringComparer.InvariantCultureIgnoreCase));
+
+		if (schemes.ContainsKey(schemeName))
+		{
+			schemes.put(schemeName, list);
+			return;
+		}
+
+		if (schemes.Count >= Config.SchemeBuffer.BUFFER_MAX_SCHEMES)
+			return;
+
+		schemes.put(schemeName, list);
+	}
+
+	public Map<string, List<int>>? getPlayerSchemes(int playerId)
+	{
+		return _schemesTable.get(playerId);
+	}
+
+	public List<int> getScheme(int playerId, string schemeName)
+	{
+		if (!tryResolveSchemeKey(playerId, schemeName, PlayerBufferSchemeContext.GetActiveScheme(playerId),
+			    out string resolved))
+			return [];
+
+		if (!_schemesTable.TryGetValue(playerId, out Map<string, List<int>>? schemes))
+			return [];
+
+		if (!schemes.TryGetValue(resolved, out List<int>? scheme))
+			return [];
+
+		return scheme;
+	}
+
+	public bool getSchemeContainsSkill(int playerId, string schemeName, int skillId)
+	{
+		List<int> skills = getScheme(playerId, schemeName);
+		if (skills.Count == 0)
+			return false;
+
+		foreach (int id in skills)
+		{
+			if (id == skillId)
+				return true;
+		}
+
+		return false;
+	}
+
 	public List<int> getSkillsIdsByType(string groupType)
 	{
 		List<int> skills = new();
 		foreach (BuffSkillHolder skill in _availableBuffs.Values)
 		{
 			if (skill.getType().equalsIgnoreCase(groupType))
-			{
 				skills.Add(skill.getId());
-			}
 		}
 
 		return skills;
 	}
 
-	/**
-	 * @return a list of all buff types available.
-	 */
 	public List<string> getSkillTypes()
 	{
 		List<string> skillTypes = new();
 		foreach (BuffSkillHolder skill in _availableBuffs.Values)
 		{
 			if (!skillTypes.Contains(skill.getType()))
-			{
 				skillTypes.Add(skill.getType());
-			}
 		}
 
 		return skillTypes;
