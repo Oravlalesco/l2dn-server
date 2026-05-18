@@ -9,9 +9,7 @@ Set-Location $PSScriptRoot
 
 $files = @("docker-compose.yml")
 if ($Code) {
-    if (-not (Test-Path "publish/gameserver/L2Dn.GameServer.dll")) {
-        & "$PSScriptRoot/dev-publish.ps1"
-    }
+    & "$PSScriptRoot/dev-publish.ps1"
     $files += "docker-compose.dev-code.yml"
 }
 $files += "docker-compose.dev.yml"
