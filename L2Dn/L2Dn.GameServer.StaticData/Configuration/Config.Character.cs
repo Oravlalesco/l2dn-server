@@ -252,6 +252,8 @@ public static partial class Config
             if (ENABLE_MODIFY_SKILL_DURATION)
             {
                 SKILL_DURATION_LIST = GetSkillDurationList(parser, "SkillDurationList", useSeconds: true);
+                _logger.Info(
+                    $"Character: Loaded {SKILL_DURATION_LIST.Count} skill duration overrides from SkillDurationList (values are in seconds).");
             }
 
             ENABLE_MODIFY_SKILL_REUSE = parser.getBoolean("EnableModifySkillReuse");
@@ -506,6 +508,31 @@ public static partial class Config
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Applies <see cref="SKILL_DURATION_LIST"/> overrides from Character.ini (duration values in seconds).
+        /// </summary>
+        /// <param name="isToggle">When true, overrides are not applied (toggle skills).</param>
+        public static TimeSpan ResolveAbnormalTime(int skillId, int level, bool isToggle, TimeSpan dataPackTime)
+        {
+            if (!ENABLE_MODIFY_SKILL_DURATION || isToggle ||
+                !SKILL_DURATION_LIST.TryGetValue(skillId, out TimeSpan configured))
+            {
+                return dataPackTime;
+            }
+
+            if (level < 100 || level > 140)
+            {
+                return configured;
+            }
+
+            if (level >= 100 && level < 140)
+            {
+                return dataPackTime + configured;
+            }
+
+            return dataPackTime;
         }
 
         private static ImmutableArray<Range<int>> GetPartyXpCutoffGaps(ConfigurationParser parser, string key,
