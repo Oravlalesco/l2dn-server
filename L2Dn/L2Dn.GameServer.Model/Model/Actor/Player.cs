@@ -2546,56 +2546,71 @@ public class Player: Playable
 	 */
 	private static Weapon findFistsWeaponItem(CharacterClass characterClass)
 	{
-		// TODO the method looks like dirty hack
-		int classId = (int)characterClass;
-		Weapon? weaponItem = null;
-		if (classId >= 0x00 && classId <= 0x09)
+		var classList = ClassListData.getInstance().getClassList();
+		CharacterClass current = characterClass;
+		while (true)
 		{
-			// human fighter fists
-			weaponItem = (Weapon?)ItemData.getInstance().getTemplate(246);
-		}
-		else if (classId >= 0x0a && classId <= 0x11)
-		{
-			// human mage fists
-			weaponItem = (Weapon?)ItemData.getInstance().getTemplate(251);
-		}
-		else if (classId >= 0x12 && classId <= 0x18)
-		{
-			// elven fighter fists
-			weaponItem = (Weapon?)ItemData.getInstance().getTemplate(244);
-		}
-		else if (classId >= 0x19 && classId <= 0x1e)
-		{
-			// elven mage fists
-			weaponItem = (Weapon?)ItemData.getInstance().getTemplate(249);
-		}
-		else if (classId >= 0x1f && classId <= 0x25)
-		{
-			// dark elven fighter fists
-			weaponItem = (Weapon?)ItemData.getInstance().getTemplate(245);
-		}
-		else if (classId >= 0x26 && classId <= 0x2b)
-		{
-			// dark elven mage fists
-			weaponItem = (Weapon?)ItemData.getInstance().getTemplate(250);
-		}
-		else if (classId >= 0x2c && classId <= 0x30)
-		{
-			// orc fighter fists
-			weaponItem = (Weapon?)ItemData.getInstance().getTemplate(248);
-		}
-		else if (classId >= 0x31 && classId <= 0x34)
-		{
-			// orc mage fists
-			weaponItem = (Weapon?)ItemData.getInstance().getTemplate(252);
-		}
-		else if (classId >= 0x35 && classId <= 0x39)
-		{
-			// dwarven fists
-			weaponItem = (Weapon?)ItemData.getInstance().getTemplate(247);
+			Weapon? weaponItem = findFistsWeaponItemForBaseClass(current);
+			if (weaponItem != null)
+				return weaponItem;
+
+			if (!classList.TryGetValue(current, out ClassInfoHolder? classInfo) ||
+			    classInfo.getParentClassId() is not CharacterClass parent)
+			{
+				break;
+			}
+
+			current = parent;
 		}
 
-        return weaponItem ?? throw new InvalidOperationException("Default fist weapon item not found");
+		// Kamael classes are not mapped to the classic fist items; use human fighter fists.
+		if (isKamaelClassTree(characterClass, classList))
+			return getFistsWeaponTemplate(246);
+
+		throw new InvalidOperationException($"Default fist weapon item not found for class {characterClass}");
+	}
+
+	private static bool isKamaelClassTree(CharacterClass characterClass,
+		IReadOnlyDictionary<CharacterClass, ClassInfoHolder> classList)
+	{
+		CharacterClass current = characterClass;
+		while (true)
+		{
+			if (current == CharacterClass.KAMAEL_SOLDIER)
+				return true;
+
+			if (!classList.TryGetValue(current, out ClassInfoHolder? classInfo) ||
+			    classInfo.getParentClassId() is not CharacterClass parent)
+			{
+				return false;
+			}
+
+			current = parent;
+		}
+	}
+
+	private static Weapon getFistsWeaponTemplate(int itemId) =>
+		(Weapon?)ItemData.getInstance().getTemplate(itemId) ??
+		throw new InvalidOperationException($"Default fist weapon item {itemId} not found");
+
+	private static Weapon? findFistsWeaponItemForBaseClass(CharacterClass characterClass)
+	{
+		int classId = (int)characterClass;
+		int? fistItemId = classId switch
+		{
+			>= 0x00 and <= 0x09 => 246, // human fighter fists
+			>= 0x0a and <= 0x11 => 251, // human mage fists
+			>= 0x12 and <= 0x18 => 244, // elven fighter fists
+			>= 0x19 and <= 0x1e => 249, // elven mage fists
+			>= 0x1f and <= 0x25 => 245, // dark elven fighter fists
+			>= 0x26 and <= 0x2b => 250, // dark elven mage fists
+			>= 0x2c and <= 0x30 => 248, // orc fighter fists
+			>= 0x31 and <= 0x34 => 252, // orc mage fists
+			>= 0x35 and <= 0x39 => 247, // dwarven fists
+			_ => null,
+		};
+
+		return fistItemId == null ? null : getFistsWeaponTemplate(fistItemId.Value);
 	}
 
 	/**

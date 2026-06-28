@@ -13,7 +13,8 @@ public sealed class PlayerClassChange: AbstractScript
 {
     private const int FirstClassMinLevel = 20;
     private const int SecondClassMinLevel = 40;
-    
+    private const int ThirdClassMinLevel = 76;
+
     [SubscribeEvent(SubscriptionType.GlobalPlayers)]
     public void OnPlayerLevelChanged(OnPlayerLevelChanged ev) => CheckRequirementAndNotify(ev.getPlayer());
 
@@ -25,10 +26,13 @@ public sealed class PlayerClassChange: AbstractScript
         if (player == null)
             return;
 
-        if (player.getLevel() >= FirstClassMinLevel && CategoryData.getInstance()
-                .isInCategory(CategoryType.FIRST_CLASS_GROUP, player.getClassId()) || 
-            player.getLevel() >= SecondClassMinLevel && CategoryData.getInstance()
-                .isInCategory(CategoryType.SECOND_CLASS_GROUP, player.getClassId()))
+        CategoryData categories = CategoryData.getInstance();
+        CharacterClass classId = player.getClassId();
+        int level = player.getLevel();
+
+        if ((level >= FirstClassMinLevel && categories.isInCategory(CategoryType.FIRST_CLASS_GROUP, classId)) ||
+            (level >= SecondClassMinLevel && categories.isInCategory(CategoryType.SECOND_CLASS_GROUP, classId)) ||
+            (level >= ThirdClassMinLevel && categories.isInCategory(CategoryType.THIRD_CLASS_GROUP, classId)))
         {
             player.sendPacket(ExClassChangeSetAlarmPacket.STATIC_PACKET);
         }

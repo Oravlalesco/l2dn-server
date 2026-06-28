@@ -1,7 +1,5 @@
 ﻿using L2Dn.GameServer.Enums;
-using L2Dn.GameServer.InstanceManagers;
 using L2Dn.GameServer.Model.Actor;
-using L2Dn.GameServer.Model.Quests;
 using L2Dn.GameServer.Network.OutgoingPackets.ClassChange;
 using L2Dn.Model;
 using L2Dn.Model.Enums;
@@ -85,15 +83,9 @@ public struct ExRequestChangeClassVerifyingPacket: IIncomingPacket<GameSession>
 		return player.getLevel() >= 40;
 	}
 
-	private static bool thirdClassCheck(Player player) => IsQuestCompleted(player, 19900);
-
-	private static bool IsQuestCompleted(Player player, int questId)
+	private static bool thirdClassCheck(Player player)
 	{
-		Quest? quest = QuestManager.getInstance().getQuest(questId);
-		if (quest is null)
-			return false;
-
-		QuestState? qs = player.getQuestState(quest.Name);
-		return qs != null && qs.isCompleted();
+		// ThirdClassChange.java has only level check (quest 19900 not required for now).
+		return player.getLevel() >= 76;
 	}
 }
