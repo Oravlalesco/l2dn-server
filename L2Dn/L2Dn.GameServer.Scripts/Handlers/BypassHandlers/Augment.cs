@@ -1,3 +1,4 @@
+using System.Globalization;
 using L2Dn.GameServer.Handlers;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Network.OutgoingPackets.Variations;
@@ -9,7 +10,9 @@ public class Augment: IBypassHandler
 {
 	private static readonly Logger _logger = LogManager.GetLogger(nameof(Augment));
 
-	private static readonly string[] COMMANDS = ["Augment"];
+	private const string CommandPrefix = "Augment";
+
+	private static readonly string[] COMMANDS = [CommandPrefix];
 
 	public bool useBypass(string command, Player player, Creature? target)
 	{
@@ -18,28 +21,43 @@ public class Augment: IBypassHandler
 			return false;
 		}
 
-		try
+		if (!TryParseAugmentMode(command, out int mode))
 		{
-			switch (int.Parse(command.Substring(8, 9).Trim()))
-			{
-				case 1:
-				{
-					player.sendPacket(ExShowVariationMakeWindowPacket.STATIC_PACKET);
-					return true;
-				}
-				case 2:
-				{
-					player.sendPacket(ExShowVariationCancelWindowPacket.STATIC_PACKET);
-					return true;
-				}
-			}
-		}
-		catch (Exception e)
-		{
-			_logger.Warn($"Exception in {GetType().Name}: {e}");
+			_logger.Warn($"Invalid Augment bypass: [{command}]");
+			return false;
 		}
 
-		return false;
+		switch (mode)
+		{
+			case 1:
+			{
+				player.sendPacket(ExShowVariationMakeWindowPacket.STATIC_PACKET);
+				return true;
+			}
+			case 2:
+			{
+				player.sendPacket(ExShowVariationCancelWindowPacket.STATIC_PACKET);
+				return true;
+			}
+			default:
+			{
+				_logger.Warn($"Unknown Augment mode {mode} in bypass: [{command}]");
+				return false;
+			}
+		}
+	}
+
+	private static bool TryParseAugmentMode(string command, out int mode)
+	{
+		mode = 0;
+		if (string.IsNullOrWhiteSpace(command) ||
+		    !command.AsSpan().TrimStart().StartsWith(CommandPrefix, StringComparison.OrdinalIgnoreCase))
+		{
+			return false;
+		}
+
+		ReadOnlySpan<char> args = command.AsSpan(CommandPrefix.Length).TrimStart();
+		return int.TryParse(args, NumberStyles.Integer, CultureInfo.InvariantCulture, out mode);
 	}
 
 	public string[] getBypassList()

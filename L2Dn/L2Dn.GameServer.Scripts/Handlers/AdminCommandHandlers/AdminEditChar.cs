@@ -332,10 +332,27 @@ public class AdminEditChar: IAdminCommandHandler
 		}
 		else if (command.startsWith("admin_setclass"))
 		{
+			const string setClassCommand = "admin_setclass";
 			try
 			{
-				string val = command.Substring(15).Trim();
-				CharacterClass classidval = (CharacterClass)int.Parse(val);
+				string arg = command.Length > setClassCommand.Length
+					? command.AsSpan(setClassCommand.Length).Trim().ToString()
+					: string.Empty;
+
+				if (string.IsNullOrEmpty(arg))
+				{
+					AdminHtml.showAdminHtml(activeChar, "setclass/human_fighter.htm");
+					return true;
+				}
+
+				if (!int.TryParse(arg.Split(' ')[0], NumberStyles.Integer, CultureInfo.InvariantCulture,
+					    out int classIdInt))
+				{
+					BuilderUtil.sendSysMessage(activeChar, "Usage: //setclass <valid_new_classid>");
+					return false;
+				}
+
+				CharacterClass classidval = (CharacterClass)classIdInt;
 				WorldObject? target = activeChar.getTarget();
 				if (target == null || !target.isPlayer())
 				{
@@ -488,14 +505,9 @@ public class AdminEditChar: IAdminCommandHandler
 					BuilderUtil.sendSysMessage(activeChar, "Usage: //setclass <valid_new_classid>");
 				}
 			}
-			catch (IndexOutOfRangeException e)
+			catch (Exception e)
 			{
-                LOGGER.Error(e);
-				AdminHtml.showAdminHtml(activeChar, "setclass/human_fighter.htm");
-			}
-			catch (FormatException e)
-			{
-                LOGGER.Error(e);
+				LOGGER.Error(e);
 				BuilderUtil.sendSysMessage(activeChar, "Usage: //setclass <valid_new_classid>");
 			}
 		}
