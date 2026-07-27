@@ -265,15 +265,9 @@ public class QuestState
 		{
 			try
 			{
-				int previousVal = 0;
-				try
-				{
-					previousVal = int.Parse(old ?? string.Empty);
-				}
-				catch (Exception exception)
-				{
-                    LOGGER.Error(exception);
-				}
+				// A newly created quest variable has no previous value. Treat that initial
+				// state as condition 0 instead of attempting to parse an empty string.
+				int previousVal = string.IsNullOrEmpty(old) ? 0 : int.Parse(old);
 				int newCond = 0;
 				try
 				{
@@ -485,7 +479,8 @@ public class QuestState
 
 		if (isStarted())
 		{
-			set(COND_VAR, condition.ToString());
+			// Persist the numeric enum value ("1", "2", "3"), not the name ("STARTED").
+			set(COND_VAR, ((int)condition).ToString());
 			if (condition == QuestCondType.DONE)
 			{
 				string? soundName = QuestSound.ITEMSOUND_QUEST_MIDDLE.GetSoundName();
