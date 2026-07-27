@@ -5,8 +5,6 @@ services:
         image: postgres:alpine
         container_name: db
         restart: unless-stopped
-#        ports:
-#            - 5432:5432
         volumes:
             - ./create_database.sql:/docker-entrypoint-initdb.d/create_database.sql:ro
 #            - ./:/var/lib/postgresql/data
@@ -38,6 +36,8 @@ services:
         build:
             context: ../
             dockerfile: Docker/Dockerfile.GameServer
+            args:
+                PUBLISH_ADDRESS: ${L2DN_PUBLISH_ADDRESS:-192.168.0.100}
         image: l2dn-gameserver
         container_name: l2dn-gameserver
         depends_on:

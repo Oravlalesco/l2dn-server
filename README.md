@@ -53,6 +53,26 @@ docker compose up -d --build
 
 La primera ejecución del Game Server aplica migraciones (`-UpdateDatabase` en la imagen).
 
+**Arranque para una red local:**
+
+```powershell
+cd Docker
+.\start-lan.ps1
+```
+
+El script publica `192.168.0.100` por defecto. Para usar otra dirección:
+
+```powershell
+.\start-lan.ps1 -PublishAddress 192.168.1.50
+```
+
+PostgreSQL permanece accesible solo dentro de Docker. Para exponer también el
+puerto `5432` durante una tarea administrativa:
+
+```powershell
+.\start-lan.ps1 -ExposeDatabase
+```
+
 **Desarrollo habitual (recomendado):** DataPack y Config montados desde el repo:
 
 ```powershell
