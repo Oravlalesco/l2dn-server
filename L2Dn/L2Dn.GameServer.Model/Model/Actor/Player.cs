@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using L2Dn.Events;
 using L2Dn.Extensions;
@@ -2546,7 +2546,6 @@ public class Player: Playable
 	 */
 	private static Weapon findFistsWeaponItem(CharacterClass characterClass)
 	{
-		var classList = ClassListData.getInstance().getClassList();
 		CharacterClass current = characterClass;
 		while (true)
 		{
@@ -2554,39 +2553,29 @@ public class Player: Playable
 			if (weaponItem != null)
 				return weaponItem;
 
-			if (!classList.TryGetValue(current, out ClassInfoHolder? classInfo) ||
-			    classInfo.getParentClassId() is not CharacterClass parent)
-			{
+			CharacterClass? parent = current.GetParentClass();
+			if (parent == null)
 				break;
-			}
 
-			current = parent;
+			current = parent.Value;
 		}
 
-		// Kamael classes are not mapped to the classic fist items; use human fighter fists.
-		if (isKamaelClassTree(characterClass, classList))
-			return getFistsWeaponTemplate(246);
-
-		throw new InvalidOperationException($"Default fist weapon item not found for class {characterClass}");
+		return getFistsWeaponTemplate(getDefaultFistItemId(characterClass));
 	}
 
-	private static bool isKamaelClassTree(CharacterClass characterClass,
-		IReadOnlyDictionary<CharacterClass, ClassInfoHolder> classList)
+	private static int getDefaultFistItemId(CharacterClass characterClass)
 	{
-		CharacterClass current = characterClass;
-		while (true)
+		CharacterClassInfo classInfo = characterClass.GetClassInfo();
+		bool isMage = classInfo.isMage();
+		return classInfo.getRace() switch
 		{
-			if (current == CharacterClass.KAMAEL_SOLDIER)
-				return true;
-
-			if (!classList.TryGetValue(current, out ClassInfoHolder? classInfo) ||
-			    classInfo.getParentClassId() is not CharacterClass parent)
-			{
-				return false;
-			}
-
-			current = parent;
-		}
+			Race.HUMAN or Race.KAMAEL or Race.SYLPH => isMage ? 251 : 246,
+			Race.ELF or Race.HIGH_ELF => isMage ? 249 : 244,
+			Race.DARK_ELF => isMage ? 250 : 245,
+			Race.ORC => isMage ? 252 : 248,
+			Race.DWARF => 247,
+			_ => isMage ? 251 : 246,
+		};
 	}
 
 	private static Weapon getFistsWeaponTemplate(int itemId) =>
