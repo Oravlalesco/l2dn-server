@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/buylist.xsd">
+	<npcs>
+		<npc>50011</npc> <!-- GradeCShopMerchant.xml -->
+	</npcs>
+	<!-- Grado C guerreros: espadas, dagas, duales, ancient swords y rapieres. Catalogo completo generado desde stats/items (crystal_type=C). -->
+	<item id="2551" price="1960000" /> <!-- Crimson Sword*Crimson Sword (no vendido por mercaderes vanilla) -->
+	<item id="2552" price="1960000" /> <!-- Crimson Sword*Elven Sword (no vendido por mercaderes vanilla) -->
+	<item id="2555" price="1960000" /> <!-- Elven Sword*Elven Sword (no vendido por mercaderes vanilla) -->
+	<item id="2523" price="1960000" /> <!-- Saber*Sword of Revolution (no vendido por mercaderes vanilla) -->
+	<item id="2544" price="2120000" /> <!-- Artisan's Sword*Sword of Revolution (no vendido por mercaderes vanilla) -->
+	<item id="2531" price="2120000" /> <!-- Bastard Sword*Sword of Revolution (no vendido por mercaderes vanilla) -->
+	<item id="2549" price="2120000" /> <!-- Knight's Sword*Sword of Revolution (no vendido por mercaderes vanilla) -->
+	<item id="2538" price="2120000" /> <!-- Spinebone Sword*Sword of Revolution (no vendido por mercaderes vanilla) -->
+	<item id="226" price="2290000" /> <!-- Cursed Dagger (no vendido por mercaderes vanilla) -->
+	<item id="232" price="2290000" /> <!-- Dark Elven Dagger (no vendido por mercaderes vanilla) -->
+	<item id="71" price="2290000" /> <!-- Flamberge (no vendido por mercaderes vanilla) -->
+	<item id="2524" price="2290000" /> <!-- Saber*Elven Long Sword (no vendido por mercaderes vanilla) -->
+	<item id="91884" price="2290000" /> <!-- Schlager (no vendido por mercaderes vanilla) -->
+	<item id="91899" price="2290000" /> <!-- Soldat Estoc (no vendido por mercaderes vanilla) -->
+	<item id="72" price="2290000" /> <!-- Stormbringer (no vendido por mercaderes vanilla) -->
+	<item id="230" price="2290000" /> <!-- Wolverine Fang (no vendido por mercaderes vanilla) -->
+	<item id="2545" price="2470000" /> <!-- Artisan's Sword*Elven Long Sword (no vendido por mercaderes vanilla) -->
+	<item id="2532" price="2470000" /> <!-- Bastard Sword*Elven Long Sword (no vendido por mercaderes vanilla) -->
+	<item id="2553" price="2470000" /> <!-- Crimson Sword*Sword of Revolution (no vendido por mercaderes vanilla) -->
+	<item id="2556" price="2470000" /> <!-- Elven Sword*Sword of Revolution (no vendido por mercaderes vanilla) -->
+	<item id="2550" price="2470000" /> <!-- Knight's Sword*Elven Long Sword (no vendido por mercaderes vanilla) -->
+	<item id="2539" price="2470000" /> <!-- Spinebone Sword*Elven Long Sword (no vendido por mercaderes vanilla) -->
+	<item id="91898" price="2870000" /> <!-- Chevalier Rapier (no vendido por mercaderes vanilla) -->
+	<item id="2554" price="2870000" /> <!-- Crimson Sword*Elven Long Sword (no vendido por mercaderes vanilla) -->
+	<item id="2557" price="2870000" /> <!-- Elven Sword*Elven Long Sword (no vendido por mercaderes vanilla) -->
+	<item id="74" price="2870000" /> <!-- Katana (no vendido por mercaderes vanilla) -->
+	<item id="133" price="2870000" /> <!-- Raid Sword (no vendido por mercaderes vanilla) -->
+	<item id="73" price="2870000" /> <!-- Shamshir (no vendido por mercaderes vanilla) -->
+	<item id="131" price="2870000" /> <!-- Spirit Sword (no vendido por mercaderes vanilla) -->
+	<item id="227" price="2870000" /> <!-- Stiletto (no vendido por mercaderes vanilla) -->
+	<item id="2558" price="2870000" /> <!-- Sword of Revolution*Sword of Revolution (no vendido por mercaderes vanilla) -->
+	<item id="2559" price="3340000" /> <!-- Sword of Revolution*Elven Long Sword (no vendido por mercaderes vanilla) -->
+	<item id="2560" price="3820000" /> <!-- Elven Long Sword*Elven Long Sword (no vendido por mercaderes vanilla) -->
+	<item id="91897" price="4300000" /> <!-- Blinzlasher (no vendido por mercaderes vanilla) -->
+	<item id="75" price="4300000" /> <!-- Caliburs (no vendido por mercaderes vanilla) -->
+	<item id="233" price="4300000" /> <!-- Dark Screamer (no vendido por mercaderes vanilla) -->
+	<item id="231" price="4300000" /> <!-- Grace Dagger (no vendido por mercaderes vanilla) -->
+	<item id="91883" price="4300000" /> <!-- Immortal Edge (no vendido por mercaderes vanilla) -->
+	<item id="7882" price="4300000" /> <!-- Pa'agrian Sword (no vendido por mercaderes vanilla) -->
+	<item id="76" price="4300000" /> <!-- Sword of Delusion (no vendido por mercaderes vanilla) -->
+	<item id="134" price="4300000" /> <!-- Sword of Nightmare (no vendido por mercaderes vanilla) -->
+	<item id="77" price="4300000" /> <!-- Tsurugi (no vendido por mercaderes vanilla) -->
+	<item id="132" price="4300000" /> <!-- Ultimate Sword (no vendido por mercaderes vanilla) -->
+	<item id="2561" price="4780000" /> <!-- Stormbringer*Stormbringer (no vendido por mercaderes vanilla) -->
+	<item id="2563" price="5280000" /> <!-- Stormbringer*Katana (no vendido por mercaderes vanilla) -->
+	<item id="2565" price="5280000" /> <!-- Stormbringer*Raid Sword (no vendido por mercaderes vanilla) -->
+	<item id="2562" price="5280000" /> <!-- Stormbringer*Shamshir (no vendido por mercaderes vanilla) -->
+	<item id="2564" price="5280000" /> <!-- Stormbringer*Spirit Sword (no vendido por mercaderes vanilla) -->
+	<item id="91896" price="6130000" /> <!-- Admiral's Estoc (no vendido por mercaderes vanilla) -->
+	<item id="5286" price="6130000" /> <!-- Berserker Blade (no vendido por mercaderes vanilla) -->
+	<item id="228" price="6130000" /> <!-- Crystal Dagger (no vendido por mercaderes vanilla) -->
+	<item id="2582" price="6130000" /> <!-- Katana*Katana (no vendido por mercaderes vanilla) -->
+	<item id="2584" price="6130000" /> <!-- Katana*Raid Sword (no vendido por mercaderes vanilla) -->
+	<item id="2583" price="6130000" /> <!-- Katana*Spirit Sword (no vendido por mercaderes vanilla) -->
+	<item id="2599" price="6130000" /> <!-- Raid Sword*Raid Sword (no vendido por mercaderes vanilla) -->
+	<item id="91882" price="6130000" /> <!-- Saber Tooth (no vendido por mercaderes vanilla) -->
+	<item id="135" price="6130000" /> <!-- Samurai Long Sword (no vendido por mercaderes vanilla) -->
+	<item id="2573" price="6130000" /> <!-- Shamshir*Katana (no vendido por mercaderes vanilla) -->
+	<item id="2575" price="6130000" /> <!-- Shamshir*Raid Sword (no vendido por mercaderes vanilla) -->
+	<item id="2572" price="6130000" /> <!-- Shamshir*Shamshir (no vendido por mercaderes vanilla) -->
+	<item id="2574" price="6130000" /> <!-- Shamshir*Spirit Sword (no vendido por mercaderes vanilla) -->
+	<item id="2592" price="6130000" /> <!-- Spirit Sword*Raid Sword (no vendido por mercaderes vanilla) -->
+	<item id="2591" price="6130000" /> <!-- Spirit Sword*Spirit Sword (no vendido por mercaderes vanilla) -->
+</list>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/buylist.xsd">
+	<npcs>
+		<npc>50011</npc> <!-- GradeCShopMerchant.xml -->
+	</npcs>
+	<!-- Grado C magos: armas magicas (baculos, mazas, espadas y dagas misticas). Catalogo completo generado desde stats/items (crystal_type=C). -->
+	<item id="192" price="2290000" /> <!-- Crystal Staff (no vendido por mercaderes vanilla) -->
+	<item id="194" price="2290000" /> <!-- Heavy Doom Axe (no vendido por mercaderes vanilla) -->
+	<item id="191" price="2290000" /> <!-- Heavy Doom Hammer (no vendido por mercaderes vanilla) -->
+	<item id="7887" price="2290000" /> <!-- Mysterious Sword (no vendido por mercaderes vanilla) -->
+	<item id="193" price="2290000" /> <!-- Stick of Faith (no vendido por mercaderes vanilla) -->
+	<item id="195" price="2870000" /> <!-- Cursed Staff (no vendido por mercaderes vanilla) -->
+	<item id="325" price="2870000" /> <!-- Horn of Glory (no vendido por mercaderes vanilla) -->
+	<item id="242" price="2870000" /> <!-- Soulfire Dirk (no vendido por mercaderes vanilla) -->
+	<item id="201" price="4300000" /> <!-- Club of Nature (no vendido por mercaderes vanilla) -->
+	<item id="84" price="4300000" /> <!-- Homunkulus' Sword (no vendido por mercaderes vanilla) -->
+	<item id="198" price="4300000" /> <!-- Inferno Staff (no vendido por mercaderes vanilla) -->
+	<item id="202" price="4300000" /> <!-- Mace of Underworld (no vendido por mercaderes vanilla) -->
+	<item id="174" price="4300000" /> <!-- Nirvana Axe (no vendido por mercaderes vanilla) -->
+	<item id="199" price="4300000" /> <!-- Pa'agrio Hammer (no vendido por mercaderes vanilla) -->
+	<item id="197" price="4300000" /> <!-- Paradia Staff (no vendido por mercaderes vanilla) -->
+	<item id="200" price="4300000" /> <!-- Sage's Staff (no vendido por mercaderes vanilla) -->
+	<item id="196" price="4300000" /> <!-- Stick of Eternity (no vendido por mercaderes vanilla) -->
+	<item id="145" price="4300000" /> <!-- Sword of Whispering Death (no vendido por mercaderes vanilla) -->
+	<item id="203" price="4780000" /> <!-- Pa'agrio Axe (no vendido por mercaderes vanilla) -->
+	<item id="204" price="6130000" /> <!-- Deadman's Staff (no vendido por mercaderes vanilla) -->
+	<item id="206" price="6130000" /> <!-- Demon's Staff (no vendido por mercaderes vanilla) -->
+	<item id="7891" price="6130000" /> <!-- Ecliptic Axe (no vendido por mercaderes vanilla) -->
+	<item id="7888" price="6130000" /> <!-- Ecliptic Sword (no vendido por mercaderes vanilla) -->
+	<item id="205" price="6130000" /> <!-- Ghoul's Staff (no vendido por mercaderes vanilla) -->
+</list>

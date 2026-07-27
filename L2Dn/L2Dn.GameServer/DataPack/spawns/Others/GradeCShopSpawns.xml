@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/spawns.xsd">
+	<!-- NPC 50011 (GradeCShopMerchant.xml): mercader de equipo grado C; junto al shop D 50010 en Giran -->
+	<spawn name="GradeCShop">
+		<group>
+			<npc id="50011" x="83265" y="147780" z="-3467" heading="32000" respawnTime="60sec" />
+		</group>
+	</spawn>
+</list>

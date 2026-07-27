@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/buylist.xsd">
+	<npcs>
+		<npc>50011</npc> <!-- GradeCShopMerchant.xml -->
+	</npcs>
+	<!-- Grado C magos: sets de tunicas con sus piezas (guantes, botas, etc.). Catalogo completo generado desde stats/items (crystal_type=C). -->
+	<!-- ===== Set: Karmian Tunic ===== -->
+	<item id="439" price="379000" /> <!-- Karmian Tunic (no vendido por mercaderes vanilla) -->
+	<item id="471" price="237000" /> <!-- Karmian Stockings (no vendido por mercaderes vanilla) -->
+	<item id="2454" price="126000" /> <!-- Karmian Gloves (no vendido por mercaderes vanilla) -->
+	<!-- ===== Set: Demon's Tunic ===== -->
+	<item id="441" price="736000" /> <!-- Demon's Tunic (no vendido por mercaderes vanilla) -->
+	<item id="472" price="460000" /> <!-- Demon's Stockings (no vendido por mercaderes vanilla) -->
+	<item id="2459" price="245000" /> <!-- Demon's Gloves (no vendido por mercaderes vanilla) -->
+	<!-- ===== Set: Divine Tunic ===== -->
+	<item id="442" price="1070000" /> <!-- Divine Tunic (no vendido por mercaderes vanilla) -->
+	<item id="473" price="671000" /> <!-- Divine Stockings (no vendido por mercaderes vanilla) -->
+	<item id="2463" price="358000" /> <!-- Divine Gloves (no vendido por mercaderes vanilla) -->
+	<!-- ===== Piezas sin set con bonus, agrupadas por familia ===== -->
+	<item id="2430" price="126000" /> <!-- Karmian Boots (no vendido por mercaderes vanilla) -->
+	<item id="2435" price="245000" /> <!-- Demon's Boots (no vendido por mercaderes vanilla) -->
+	<item id="603" price="358000" /> <!-- Divine Boots (no vendido por mercaderes vanilla) -->
+	<item id="440" price="707000" /> <!-- Robe of Seal (no vendido por mercaderes vanilla) -->
+</list>

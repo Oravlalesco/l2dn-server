@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/buylist.xsd">
+	<npcs>
+		<npc>50011</npc> <!-- GradeCShopMerchant.xml -->
+	</npcs>
+	<!-- Grado C guerreros: sets de armadura pesada y ligera (piezas de cada set juntas). Catalogo completo generado desde stats/items (crystal_type=C). -->
+	<!-- ===== Set: Plated Leather Armor ===== -->
+	<item id="398" price="446000" /> <!-- Plated Leather Armor (no vendido por mercaderes vanilla) -->
+	<item id="418" price="279000" /> <!-- Plated Leather Gaiters (no vendido por mercaderes vanilla) -->
+	<item id="2431" price="126000" /> <!-- Plated Leather Boots (no vendido por mercaderes vanilla) -->
+	<!-- ===== Set: Reinforced Mithril Shirt ===== -->
+	<item id="397" price="379000" /> <!-- Reinforced Mithril Shirt (no vendido por mercaderes vanilla) -->
+	<item id="2387" price="237000" /> <!-- Reinforced Mithril Gaiters (no vendido por mercaderes vanilla) -->
+	<item id="62" price="126000" /> <!-- Reinforced Mithril Boots (no vendido por mercaderes vanilla) -->
+	<!-- ===== Set: Chain Mail Shirt ===== -->
+	<item id="354" price="505000" /> <!-- Chain Mail Shirt (no vendido por mercaderes vanilla) -->
+	<item id="381" price="316000" /> <!-- Chain Gaiters (no vendido por mercaderes vanilla) -->
+	<item id="2413" price="189000" /> <!-- Chain Hood (no vendido por mercaderes vanilla) -->
+	<item id="2495" price="133000" /> <!-- Chain Shield (no vendido por mercaderes vanilla) -->
+	<!-- ===== Set: Compound Armor ===== -->
+	<item id="60" price="1440000" /> <!-- Compound Armor (no vendido por mercaderes vanilla) -->
+	<item id="517" price="368000" /> <!-- Compound Helmet (no vendido por mercaderes vanilla) -->
+	<item id="107" price="258000" /> <!-- Compound Shield (no vendido por mercaderes vanilla) -->
+	<!-- ===== Set: Theca Leather Armor ===== -->
+	<item id="400" price="825000" /> <!-- Theca Leather Armor (no vendido por mercaderes vanilla) -->
+	<item id="420" price="516000" /> <!-- Theca Leather Gaiters (no vendido por mercaderes vanilla) -->
+	<item id="2436" price="275000" /> <!-- Theca Leather Boots (no vendido por mercaderes vanilla) -->
+	<!-- ===== Set: Drake Leather Armor ===== -->
+	<item id="401" price="1570000" /> <!-- Drake Leather Armor (no vendido por mercaderes vanilla) -->
+	<item id="2437" price="358000" /> <!-- Drake Leather Boots (no vendido por mercaderes vanilla) -->
+	<!-- ===== Set: Full Plate Armor ===== -->
+	<item id="356" price="2090000" /> <!-- Full Plate Armor (no vendido por mercaderes vanilla) -->
+	<item id="2414" price="536000" /> <!-- Full Plate Helmet (no vendido por mercaderes vanilla) -->
+	<item id="2497" price="375000" /> <!-- Full Plate Shield (no vendido por mercaderes vanilla) -->
+	<!-- ===== Piezas sin set con bonus, agrupadas por familia ===== -->
+	<item id="1120" price="123900" /> <!-- Pa'agrio Hand (no vendido por mercaderes vanilla) -->
+	<item id="2452" price="126000" /> <!-- Reinforced Mithril Gloves (no vendido por mercaderes vanilla) -->
+	<item id="631" price="133000" /> <!-- Eldarake (no vendido por mercaderes vanilla) -->
+	<item id="497" price="147000" /> <!-- Chain Helmet (no vendido por mercaderes vanilla) -->
+	<item id="2453" price="126000" /> <!-- Chain Gloves (no vendido por mercaderes vanilla) -->
+	<item id="2429" price="126000" /> <!-- Chain Boots (no vendido por mercaderes vanilla) -->
+	<item id="2455" price="149000" /> <!-- Plated Leather Gloves (no vendido por mercaderes vanilla) -->
+	<item id="1126" price="161000" /> <!-- Crimson Boots (no vendido por mercaderes vanilla) -->
+	<item id="2457" price="161000" /> <!-- Gloves of Seal (no vendido por mercaderes vanilla) -->
+	<item id="2433" price="126000" /> <!-- Boots of Seal (no vendido por mercaderes vanilla) -->
+	<item id="632" price="169000" /> <!-- Knight's Shield (no vendido por mercaderes vanilla) -->
+	<item id="498" price="206000" /> <!-- Steel Plate Helmet (no vendido por mercaderes vanilla) -->
+	<item id="500" price="242000" /> <!-- Great Helmet (no vendido por mercaderes vanilla) -->
+	<item id="1127" price="245000" /> <!-- Forgotten Boots (no vendido por mercaderes vanilla) -->
+	<item id="64" price="245000" /> <!-- Compound Boots (no vendido por mercaderes vanilla) -->
+	<item id="103" price="258000" /> <!-- Tower Shield (no vendido por mercaderes vanilla) -->
+	<item id="2460" price="275000" /> <!-- Theca Leather Gloves (no vendido por mercaderes vanilla) -->
+	<item id="609" price="275100" /> <!-- Gauntlets of Ghost (no vendido por mercaderes vanilla) -->
+	<item id="2461" price="358000" /> <!-- Drake Leather Gloves (no vendido por mercaderes vanilla) -->
+	<item id="2468" price="358000" /> <!-- Blessed Gloves (no vendido por mercaderes vanilla) -->
+	<item id="2462" price="358000" /> <!-- Full Plate Gauntlets (no vendido por mercaderes vanilla) -->
+	<item id="2438" price="358000" /> <!-- Full Plate Boots (no vendido por mercaderes vanilla) -->
+	<item id="1128" price="358000" /> <!-- Adamantite Boots (no vendido por mercaderes vanilla) -->
+	<item id="1149" price="368000" /> <!-- Shining Circlet (no vendido por mercaderes vanilla) -->
+	<item id="399" price="483000" /> <!-- Rind Leather Armor (no vendido por mercaderes vanilla) -->
+	<item id="419" price="302000" /> <!-- Rind Leather Gaiters (no vendido por mercaderes vanilla) -->
+	<item id="2458" price="161000" /> <!-- Rind Leather Gloves (no vendido por mercaderes vanilla) -->
+	<item id="2434" price="161000" /> <!-- Rind Leather Boots (no vendido por mercaderes vanilla) -->
+	<item id="499" price="536000" /> <!-- Mithril Helmet (no vendido por mercaderes vanilla) -->
+	<item id="608" price="245000" /> <!-- Mithril Gauntlets (no vendido por mercaderes vanilla) -->
+	<item id="355" price="644000" /> <!-- Dwarven Chain Mail Shirt (no vendido por mercaderes vanilla) -->
+	<item id="382" price="403000" /> <!-- Dwarven Chain Gaiters (no vendido por mercaderes vanilla) -->
+	<item id="2456" price="161000" /> <!-- Dwarven Chain Gloves (no vendido por mercaderes vanilla) -->
+	<item id="2496" price="156000" /> <!-- Dwarven Chain Shield (no vendido por mercaderes vanilla) -->
+	<item id="2432" price="126000" /> <!-- Dwarven Chain Boots (no vendido por mercaderes vanilla) -->
+</list>

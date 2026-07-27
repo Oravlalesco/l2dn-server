@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/buylist.xsd">
+	<npcs>
+		<npc>50011</npc> <!-- GradeCShopMerchant.xml -->
+	</npcs>
+	<!-- Grado C guerreros: blunts y mazas. Catalogo completo generado desde stats/items (crystal_type=C). -->
+	<item id="160" price="2290000" /> <!-- Battle Axe (no vendido por mercaderes vanilla) -->
+	<item id="89" price="2290000" /> <!-- Big Hammer (no vendido por mercaderes vanilla) -->
+	<item id="161" price="2290000" /> <!-- Silver Axe (no vendido por mercaderes vanilla) -->
+	<item id="173" price="2290000" /> <!-- Skull Graver (no vendido por mercaderes vanilla) -->
+	<item id="2502" price="2870000" /> <!-- Dwarven War Hammer (no vendido por mercaderes vanilla) -->
+	<item id="7898" price="4300000" /> <!-- Karik Horn (no vendido por mercaderes vanilla) -->
+	<item id="162" price="4300000" /> <!-- War Axe (no vendido por mercaderes vanilla) -->
+	<item id="7897" price="6130000" /> <!-- Dwarven Hammer (no vendido por mercaderes vanilla) -->
+	<item id="2503" price="6130000" /> <!-- Yaksa Mace (no vendido por mercaderes vanilla) -->
+</list>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/buylist.xsd">
+	<npcs>
+		<npc>50011</npc> <!-- GradeCShopMerchant.xml -->
+	</npcs>
+	<!-- Grado C guerreros: lanzas. Catalogo completo generado desde stats/items (crystal_type=C). -->
+	<item id="302" price="2290000" /> <!-- Body Slasher (no vendido por mercaderes vanilla) -->
+	<item id="298" price="2290000" /> <!-- Orcish Glaive (no vendido por mercaderes vanilla) -->
+	<item id="96" price="2290000" /> <!-- Scythe (no vendido por mercaderes vanilla) -->
+	<item id="94" price="2870000" /> <!-- Bec de Corbin (no vendido por mercaderes vanilla) -->
+	<item id="95" price="4300000" /> <!-- Poleaxe (no vendido por mercaderes vanilla) -->
+	<item id="301" price="4780000" /> <!-- scorpion (no vendido por mercaderes vanilla) -->
+	<item id="303" price="4780000" /> <!-- Widow Maker (no vendido por mercaderes vanilla) -->
+	<item id="299" price="6130000" /> <!-- Orcish Poleaxe (no vendido por mercaderes vanilla) -->
+</list>

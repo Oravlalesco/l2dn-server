@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/buylist.xsd">
+	<npcs>
+		<npc>50011</npc> <!-- GradeCShopMerchant.xml -->
+	</npcs>
+	<!-- Grado C guerreros: punos y otras armas. Catalogo completo generado desde stats/items (crystal_type=C). -->
+	<item id="1459" price="3000" /> <!-- C-grade Crystal (no vendido por mercaderes vanilla) -->
+	<item id="263" price="2290000" /> <!-- Chakram (no vendido por mercaderes vanilla) -->
+	<item id="4233" price="2870000" /> <!-- Knuckle Duster (no vendido por mercaderes vanilla) -->
+	<item id="265" price="4300000" /> <!-- Fisted Blade (no vendido por mercaderes vanilla) -->
+	<item id="266" price="6130000" /> <!-- Great Pata (no vendido por mercaderes vanilla) -->
+</list>

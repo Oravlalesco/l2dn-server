@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/buylist.xsd">
+	<npcs>
+		<npc>50011</npc> <!-- GradeCShopMerchant.xml -->
+	</npcs>
+	<!-- Grado C guerreros: arcos y proyectiles. Catalogo completo generado desde stats/items (crystal_type=C). -->
+	<item id="1342" price="5" /> <!-- Steel Arrow -->
+	<item id="32258" price="11490" /> <!-- Infinite Steel Bolt Container (no vendido por mercaderes vanilla) -->
+	<item id="32251" price="11490" /> <!-- Infinite Steel Quiver (no vendido por mercaderes vanilla) -->
+	<item id="281" price="2290000" /> <!-- Crystallized Ice Bow (no vendido por mercaderes vanilla) -->
+	<item id="282" price="2870000" /> <!-- Elemental Bow (no vendido por mercaderes vanilla) -->
+	<item id="285" price="2870000" /> <!-- Noble Elven Bow (no vendido por mercaderes vanilla) -->
+	<item id="283" price="4300000" /> <!-- Akat Longbow (no vendido por mercaderes vanilla) -->
+	<item id="286" price="6130000" /> <!-- Eminence Bow (no vendido por mercaderes vanilla) -->
+</list>
