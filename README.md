@@ -27,6 +27,7 @@ The instruction how to set up the client is [here](https://l2dn.readthedocs.io/e
 #### Other Documentation Pages
 - [Changelog](https://l2dn.readthedocs.io/en/latest/Changelog/)
 - [Test Plan](https://l2dn.readthedocs.io/en/latest/TestPlan/)
+- [Compatibilidad cliente/servidor Classic 447](L2Dn/Documentation/Classic447Compatibility.md)
 - [Tiendas NPC](L2Dn/Documentation/NpcShop.md)
 
 ---

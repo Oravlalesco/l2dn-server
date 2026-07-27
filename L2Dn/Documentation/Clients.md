@@ -1,3 +1,10 @@
+> **Nota para este repositorio:** la rama canónica es
+> **Classic 447/Shinemaker**, con `ServerType` y `ServerListType` en `Classic`.
+> Essence/Aden Seven Signs también utiliza protocolo 447, por lo que el número de
+> protocolo no identifica por sí solo la rama. Consultar
+> [Classic447Compatibility.md](Classic447Compatibility.md) antes de seleccionar un
+> cliente o importar datos.
+
 # Lineage 2 Main
 
 
