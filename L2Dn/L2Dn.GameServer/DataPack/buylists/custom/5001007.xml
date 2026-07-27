@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/buylist.xsd">
+	<npcs>
+		<npc>50010</npc> <!-- GradeDShopMerchant.xml -->
+	</npcs>
+	<!-- Grado D: joyeria (compartida entre guerreros y magos). Catalogo completo generado desde stats/items (crystal_type=D). -->
+	<item id="890" price="19800" /> <!-- Ring of Devotion -->
+	<item id="847" price="29590" /> <!-- Red Crescent -->
+	<item id="879" price="31240" /> <!-- Ring of Magic -->
+	<item id="910" price="39490" /> <!-- Necklace of Devotion -->
+	<item id="848" price="46860" /> <!-- Earring of Magic -->
+	<item id="880" price="47080" /> <!-- Black Pearl Ring -->
+	<item id="911" price="62480" /> <!-- Magic Necklace -->
+	<item id="881" price="68530" /> <!-- Elven Ring -->
+	<item id="849" price="70730" /> <!-- Tiger's Eye -->
+	<item id="882" price="80800" /> <!-- Mithril Ring (no vendido por mercaderes vanilla) -->
+	<item id="912" price="94270" /> <!-- Necklace of Old Forest -->
+	<item id="850" price="102740" /> <!-- Elven Earring -->
+	<item id="851" price="121000" /> <!-- Onyx Beast's Eye Earring (no vendido por mercaderes vanilla) -->
+	<item id="913" price="137500" /> <!-- Elven Necklace -->
+	<item id="914" price="162000" /> <!-- Dark Necklace (no vendido por mercaderes vanilla) -->
+</list>

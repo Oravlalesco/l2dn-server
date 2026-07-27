@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/buylist.xsd">
+	<npcs>
+		<npc>50010</npc> <!-- GradeDShopMerchant.xml -->
+	</npcs>
+	<!-- Grado D magos: sets de tunicas con sus piezas (guantes, botas, etc.). Catalogo completo generado desde stats/items (crystal_type=D). -->
+	<!-- ===== Set: Tunic of Knowledge ===== -->
+	<item id="436" price="167200" /> <!-- Tunic of Knowledge -->
+	<item id="469" price="104720" /> <!-- Stockings of Knowledge -->
+	<item id="2447" price="55880" /> <!-- Gloves of Knowledge -->
+	<!-- ===== Set: Mithril Tunic ===== -->
+	<item id="437" price="246400" /> <!-- Mithril Tunic -->
+	<item id="470" price="154000" /> <!-- Mithril Stockings -->
+	<item id="2450" price="74700" /> <!-- Elven Mithril Gloves (no vendido por mercaderes vanilla) -->
+	<!-- ===== Piezas sin set con bonus, agrupadas por familia ===== -->
+	<item id="2423" price="55880" /> <!-- Boots of Knowledge -->
+	<item id="467" price="68750" /> <!-- Dark Stockings -->
+	<item id="432" price="68860" /> <!-- Cursed Tunic -->
+	<item id="465" price="43010" /> <!-- Cursed Stockings -->
+	<item id="433" price="99900" /> <!-- Elven Tunic (no vendido por mercaderes vanilla) -->
+	<item id="466" price="62500" /> <!-- Elven Stockings (no vendido por mercaderes vanilla) -->
+	<item id="435" price="109890" /> <!-- Wizard Tunic -->
+	<item id="468" price="68750" /> <!-- Wizard Stockings -->
+	<item id="434" price="109890" /> <!-- White Tunic -->
+	<item id="2396" price="224000" /> <!-- Elven Mithril Tunic (no vendido por mercaderes vanilla) -->
+	<item id="2401" price="140000" /> <!-- Elven Mithril Stockings (no vendido por mercaderes vanilla) -->
+	<item id="2426" price="82170" /> <!-- Elven Mithril Boots -->
+	<item id="438" price="429000" /> <!-- Sage's Rags (no vendido por mercaderes vanilla) -->
+	<item id="2451" price="97800" /> <!-- Sage's Worn Gloves (no vendido por mercaderes vanilla) -->
+</list>

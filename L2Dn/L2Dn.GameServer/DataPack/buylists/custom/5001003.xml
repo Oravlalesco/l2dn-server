@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/buylist.xsd">
+	<npcs>
+		<npc>50010</npc> <!-- GradeDShopMerchant.xml -->
+	</npcs>
+	<!-- Grado D guerreros: arcos y proyectiles. Catalogo completo generado desde stats/items (crystal_type=D). -->
+	<item id="1341" price="3" /> <!-- Bone Arrow -->
+	<item id="32257" price="7320" /> <!-- Infinite Bone Bolt Container (no vendido por mercaderes vanilla) -->
+	<item id="32250" price="7320" /> <!-- Infinite Bone Quiver (no vendido por mercaderes vanilla) -->
+	<item id="274" price="449900" /> <!-- Reinforced Bow -->
+	<item id="277" price="708400" /> <!-- Dark Elven Bow -->
+	<item id="276" price="708400" /> <!-- Elven Bow -->
+	<item id="275" price="708400" /> <!-- Longbow -->
+	<item id="278" price="1063700" /> <!-- Gastraphetes -->
+	<item id="279" price="1540000" /> <!-- Reinforced Longbow -->
+	<item id="280" price="1800000" /> <!-- Light Bow (no vendido por mercaderes vanilla) -->
+</list>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/buylist.xsd">
+	<npcs>
+		<npc>50010</npc> <!-- GradeDShopMerchant.xml -->
+	</npcs>
+	<!-- Grado D guerreros: lanzas. Catalogo completo generado desde stats/items (crystal_type=D). -->
+	<item id="291" price="449900" /> <!-- Trident -->
+	<item id="295" price="708400" /> <!-- Dwarven Trident -->
+	<item id="292" price="708400" /> <!-- Pike -->
+	<item id="293" price="1063700" /> <!-- Battle Hammer -->
+	<item id="296" price="1063700" /> <!-- Dwarven Pike -->
+	<item id="294" price="1540000" /> <!-- War Pick -->
+	<item id="93" price="1540000" /> <!-- Winged Spear -->
+	<item id="297" price="1800000" /> <!-- Glaive (no vendido por mercaderes vanilla) -->
+</list>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/buylist.xsd">
+	<npcs>
+		<npc>50010</npc> <!-- GradeDShopMerchant.xml -->
+	</npcs>
+	<!-- Grado D guerreros: punos y otras armas. Catalogo completo generado desde stats/items (crystal_type=D). -->
+	<item id="1458" price="650" /> <!-- D-grade Crystal (no vendido por mercaderes vanilla) -->
+	<item id="258" price="449900" /> <!-- Bagh-Nakh -->
+	<item id="91881" price="449900" /> <!-- Talwar -->
+	<item id="91895" price="708400" /> <!-- Fleuret -->
+	<item id="91880" price="708400" /> <!-- Military Talwar -->
+	<item id="259" price="708400" /> <!-- Single-edged Jamadhr -->
+	<item id="91894" price="1063700" /> <!-- Estoc -->
+	<item id="91879" price="1063700" /> <!-- Field Sword -->
+	<item id="260" price="1063700" /> <!-- Triple-edged Jamadhr -->
+	<item id="261" price="1540000" /> <!-- Bich'Hwa -->
+	<item id="91893" price="1540000" /> <!-- Épée -->
+	<item id="91878" price="1400000" /> <!-- Katzbalger (no vendido por mercaderes vanilla) -->
+	<item id="91892" price="1800000" /> <!-- Grand Épée (no vendido por mercaderes vanilla) -->
+	<item id="262" price="1800000" /> <!-- Scallop Jamadhr (no vendido por mercaderes vanilla) -->
+</list>

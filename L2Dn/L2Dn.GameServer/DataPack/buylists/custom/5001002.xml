@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/buylist.xsd">
+	<npcs>
+		<npc>50010</npc> <!-- GradeDShopMerchant.xml -->
+	</npcs>
+	<!-- Grado D guerreros: blunts y mazas. Catalogo completo generado desde stats/items (crystal_type=D). -->
+	<item id="156" price="449900" /> <!-- Hand Axe -->
+	<item id="166" price="449900" /> <!-- Heavy Mace -->
+	<item id="167" price="409000" /> <!-- Scalpel (no vendido por mercaderes vanilla) -->
+	<item id="168" price="449900" /> <!-- Work Hammer -->
+	<item id="86" price="708400" /> <!-- Tomahawk -->
+	<item id="157" price="1063700" /> <!-- Spiked Club -->
+	<item id="172" price="1540000" /> <!-- Heavy Bone Club -->
+	<item id="7896" price="1540000" /> <!-- Lesser Giant's Hammer -->
+	<item id="88" price="1540000" /> <!-- Morning Star -->
+	<item id="169" price="1400000" /> <!-- Skull Breaker (no vendido por mercaderes vanilla) -->
+	<item id="158" price="1540000" /> <!-- Tarbar -->
+	<item id="159" price="1800000" /> <!-- Bonebreaker (no vendido por mercaderes vanilla) -->
+</list>
