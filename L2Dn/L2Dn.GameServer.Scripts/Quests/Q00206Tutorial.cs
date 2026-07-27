@@ -1,5 +1,6 @@
 ﻿using L2Dn.GameServer.Dto;
 using L2Dn.GameServer.Enums;
+using L2Dn.GameServer.InstanceManagers;
 using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Model.Events;
@@ -8,9 +9,11 @@ using L2Dn.GameServer.Model.Events.Impl.Players;
 using L2Dn.GameServer.Model.Holders;
 using L2Dn.GameServer.Model.Html;
 using L2Dn.GameServer.Model.Quests;
+using L2Dn.GameServer.Model.Quests.NewQuestData;
 using L2Dn.GameServer.Network.Enums;
 using L2Dn.GameServer.Network.OutgoingPackets;
-using L2Dn.Geometry;
+using L2Dn.GameServer.Network.OutgoingPackets.Quests;
+using L2Dn.GameServer.Scripts.Quests.DwarvenVillage;
 using L2Dn.Model;
 using L2Dn.Model.Enums;
 using Config = L2Dn.GameServer.Configuration.Config;
@@ -22,7 +25,6 @@ public sealed class Q00206Tutorial: Quest
 	private const string TUTORIAL_BYPASS = "Quest Q00206Tutorial ";
     private const int QUESTION_MARK_ID_1 = 1;
     private const int QUESTION_MARK_ID_2 = 5;
-    private const int QUESTION_MARK_ID_3 = 28;
 
     // Items
     private const int BLUE_GEM = 6353;
@@ -42,13 +44,36 @@ public sealed class Q00206Tutorial: Quest
         : base(206)
     {
 	    // TODO: think about state machine for quests
+        addStartNpc(NEWBIE_HELPER, SUPERVISOR); // required for QuestLink / "Quest" button → notifyTalk
         addTalkId(NEWBIE_HELPER, SUPERVISOR);
         addFirstTalkId(NEWBIE_HELPER, SUPERVISOR);
         addKillId(GREMLIN);
         registerQuestItems(BLUE_GEM);
     }
 
-    public override string onFirstTalk(Npc npc, Player player)
+    /// <summary>
+    /// Handles the HTML "Quest" button (npc_%objectId%_Quest). At memoState 4 this is the strip-mine
+    /// handoff and must run the same path as reward_2 (soulshots + offer 10071).
+    /// </summary>
+    public override string? onTalk(Npc npc, Player talker)
+    {
+	    QuestState? qs = getQuestState(talker, false);
+	    if (qs == null)
+	    {
+		    return getNoQuestMsg(talker);
+	    }
+
+	    if (npc.getId() == SUPERVISOR && qs.isMemoState(4) && !talker.isSimulatingTalking())
+	    {
+		    notifyEvent("reward_2", npc, talker);
+		    return null;
+	    }
+
+	    // Same dialogue as first-talk so the Quest button is never a dead end.
+	    return onFirstTalk(npc, talker);
+    }
+
+    public override string? onFirstTalk(Npc npc, Player player)
     {
 		QuestState? qs = getQuestState(player, false);
 		if (qs != null)
@@ -99,7 +124,7 @@ public sealed class Q00206Tutorial: Quest
 				}
 			}
 
-			// else supervisors
+			// Foreman Laferon — Essence: stay in strip mine for NewQuest 10071–10073
 			switch (qs.getMemoState())
 			{
 				case 0:
@@ -116,6 +141,12 @@ public sealed class Q00206Tutorial: Quest
 				case 5:
 				case 6:
 				{
+					// Pending ExQuest must not race Laferon's farewell HTML (window flashes <1s).
+					if (npc.getId() == SUPERVISOR && OfferPendingDwarvenStoryDialog(player))
+					{
+						return null;
+					}
+
 					return npc.getId() + "-4.html";
 				}
 			}
@@ -174,10 +205,13 @@ public sealed class Q00206Tutorial: Quest
                     playTutorialVoice(player, "tutorial_voice_026");
                 }
 
-                // There is no html window.
-                player.sendPacket(new TutorialShowQuestionMarkPacket(QUESTION_MARK_ID_3, 0));
-                player.teleToLocation(new Location(115575, -178014, -904, 9808));
+                // Delay ExQuestDialog so it is not raced against Laferon's open HTML.
+                startQuestTimer("offer_dwarven_story", TimeSpan.FromSeconds(1), null, player);
             }
+        }
+        else if (ev == "offer_dwarven_story")
+        {
+            OfferPendingDwarvenStoryDialog(player);
         }
         else if (ev == "close_tutorial")
         {
@@ -240,16 +274,6 @@ public sealed class Q00206Tutorial: Quest
 
 			    break;
 		    }
-		    case QUESTION_MARK_ID_3:
-		    {
-			    if (qs.isMemoState(5))
-			    {
-				    addRadar(ev.getPlayer(), 115575, -178014, -904);
-				    playSound(ev.getPlayer(), "ItemSound.quest_tutorial");
-			    }
-
-			    break;
-		    }
 	    }
     }
 
@@ -271,14 +295,113 @@ public sealed class Q00206Tutorial: Quest
             return;
 
         Player player = ev.getPlayer();
-        if (player.getLevel() > 6)
+        if (player.getClassId() != CharacterClass.DWARVEN_FIGHTER)
             return;
 
         QuestState? qs = getQuestState(player, true);
-        if (qs != null && qs.getMemoState() < 4 && player.getClassId() == CharacterClass.DWARVEN_FIGHTER)
+        if (qs == null)
+            return;
+
+        // Early tutorial: classic mark/timer.
+        if (qs.getMemoState() < 4 && player.getLevel() <= 6)
         {
             startQuestTimer("start_newbie_tutorial", TimeSpan.FromSeconds(5), null, player);
+            return;
         }
+
+        // Story chain recovery: EnterWorld skips specificStart (10071) and never re-sends END
+        // for DONE-but-not-COMPLETED states, so re-offer pending ExQuest dialogs after login.
+        if (qs.getMemoState() >= 5)
+        {
+            Ep30DwarvenItemCleanup.ReplaceSealedJewelry(player);
+            startQuestTimer("offer_dwarven_story", TimeSpan.FromSeconds(2), null, player);
+        }
+    }
+
+    /// <summary>
+    /// Re-offer / finish the first pending dwarven NewQuest for 10071–10079.
+    /// Returns true when an ExQuest action was taken (caller should not open NPC HTML).
+    /// </summary>
+    private static bool OfferPendingDwarvenStoryDialog(Player player)
+    {
+        Ep30DwarvenItemCleanup.ReplaceSealedJewelry(player);
+
+        int[] chain =
+        [
+            DwarvenNewbieIds.QuestOreFromTheStripMine,
+            DwarvenNewbieIds.QuestNewLifesLessons,
+            DwarvenNewbieIds.QuestStrengthOfSpirit,
+            DwarvenNewbieIds.QuestLearningToAutoHunt,
+            DwarvenNewbieIds.QuestBePrepared,
+            DwarvenNewbieIds.QuestUsefulPreparations,
+            DwarvenNewbieIds.QuestTimeToThinkAboutWeapons,
+            DwarvenNewbieIds.QuestWatchOut,
+            DwarvenNewbieIds.QuestDevelopingYourAbilities,
+        ];
+
+        foreach (int questId in chain)
+        {
+            Quest? quest = QuestManager.getInstance().getQuest(questId);
+            if (quest == null)
+            {
+                continue;
+            }
+
+            QuestState? state = player.getQuestState(quest.Name);
+            if (state == null)
+            {
+                if (quest.canStartQuest(player))
+                {
+                    player.sendPacket(new ExQuestDialogPacket(questId, QuestDialogType.ACCEPT));
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (state.isCompleted())
+            {
+                continue;
+            }
+
+            if (questId == DwarvenNewbieIds.QuestLearningToAutoHunt)
+            {
+                takeItems(player, DwarvenNewbieIds.ItemHerbRoots, -1);
+            }
+
+            // Prefer StoryQuest recovery: finishes when goal already met (count/DONE),
+            // otherwise re-shows START with the real progress (never fake 0/N).
+            if (quest is StoryQuest storyQuest)
+            {
+                storyQuest.RecoverPending(player);
+
+                // Strip-mine exit only if 10074 is still hunting (goal not met yet).
+                // Do not re-TELEPORT after kills — combat already left the player in Frozen Valley
+                // and a second TELEPORT/START feels like "kill 3 again".
+                QuestState? after = player.getQuestState(quest.Name);
+                if (questId == DwarvenNewbieIds.QuestLearningToAutoHunt &&
+                    after != null && !after.isCompleted() && after.getCount() == 0 &&
+                    !after.isCond(QuestCondType.DONE))
+                {
+                    quest.notifyEvent("TELEPORT", null, player);
+                }
+
+                return true;
+            }
+
+            if (state.isCond(QuestCondType.DONE))
+            {
+                quest.notifyEvent("COMPLETE", null, player);
+                return true;
+            }
+
+            player.sendPacket(new ExQuestNotificationPacket(state));
+            player.sendPacket(new ExQuestUiPacket(player));
+            player.sendPacket(new ExQuestDialogPacket(questId, QuestDialogType.START));
+            return true;
+        }
+
+        return false;
     }
 
     private void showTutorialHtml(Player player, string html)

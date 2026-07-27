@@ -24,6 +24,7 @@ using L2Dn.GameServer.Model.Skills;
 using L2Dn.GameServer.Model.Zones;
 using L2Dn.GameServer.Network.Enums;
 using L2Dn.GameServer.Network.OutgoingPackets;
+using L2Dn.GameServer.Network.OutgoingPackets.Quests;
 using L2Dn.GameServer.Utilities;
 using L2Dn.Geometry;
 using L2Dn.Model;
@@ -111,7 +112,7 @@ public class Quest: AbstractScript, IIdentifiable
         {
             addNewQuestConditions(_questData.getConditions(), null);
 
-            if (_questData.getQuestType() == 1)
+            if (_questData.getQuestType() == 1 && AutoRegisterNpcFirstTalk)
             {
                 if (_questData.getStartNpcId() > 0)
                 {
@@ -148,6 +149,12 @@ public class Quest: AbstractScript, IIdentifiable
 	protected void onLoad()
 	{
 	}
+
+	/**
+	 * When true (default), NewQuest type-1 scripts auto-register start/end NPC first-talk handlers.
+	 * Override to false when another script (e.g. a tutorial) must own that NPC's first-talk exclusively.
+	 */
+	protected virtual bool AutoRegisterNpcFirstTalk => true;
 
 	/**
 	 * The function onSave is, by default, called at shutdown, for all quests, by the QuestManager.<br>
@@ -3090,11 +3097,25 @@ public class Quest: AbstractScript, IIdentifiable
 
 	public void giveStoryBuffReward(Npc npc, Player player)
 	{
+		giveStoryBuffReward((Creature)npc, player);
+	}
+
+	/**
+	 * Applies the story-quest buff package. Uses the player as caster when no NPC is available
+	 * (e.g. ACCEPT from the quest UI without an NPC interaction).
+	 */
+	public void giveStoryBuffReward(Player player)
+	{
+		giveStoryBuffReward((Creature)player, player);
+	}
+
+	private void giveStoryBuffReward(Creature caster, Player player)
+	{
 		if (Config.General.ENABLE_STORY_QUEST_BUFF_REWARD)
 		{
 			foreach (SkillHolder holder in _storyQuestBuffs)
 			{
-				SkillCaster.triggerCast(npc, player, holder.getSkill());
+				SkillCaster.triggerCast(caster, player, holder.getSkill());
 			}
 		}
 	}
@@ -3148,44 +3169,61 @@ public class Quest: AbstractScript, IIdentifiable
 		}
 	}
 
-	public void teleportToQuestLocation(Player player, Location loc)
+	public bool teleportToQuestLocation(Player player, Location loc)
 	{
 		if (player.isDead())
 		{
 			player.sendPacket(SystemMessageId.DEAD_CHARACTERS_CANNOT_USE_TELEPORTS);
-			return;
+			return false;
 		}
 
 		// Players should not be able to teleport if in a special location.
 		if (player.getMovieHolder() != null || player.isFishing() || player.isInInstance() || player.isOnEvent() || player.isInOlympiadMode() || player.inObserverMode() || player.isInTraingCamp() || player.isInsideZone(ZoneId.TIMED_HUNTING))
 		{
 			player.sendPacket(SystemMessageId.YOU_CANNOT_TELEPORT_RIGHT_NOW);
-			return;
+			return false;
 		}
 
 		// Teleport in combat configuration.
 		if (!Config.Character.TELEPORT_WHILE_PLAYER_IN_COMBAT && (player.isInCombat() || player.isCastingNow()))
 		{
 			player.sendPacket(SystemMessageId.YOU_CANNOT_TELEPORT_WHILE_IN_COMBAT);
-			return;
+			return false;
 		}
 
 		// Karma related configurations.
 		if ((!Config.Character.ALT_GAME_KARMA_PLAYER_CAN_TELEPORT || !Config.Character.ALT_GAME_KARMA_PLAYER_CAN_USE_GK) && player.getReputation() < 0)
 		{
 			player.sendPacket(SystemMessageId.YOU_CANNOT_TELEPORT_RIGHT_NOW);
-			return;
+			return false;
 		}
 
 		// Cannot escape effect.
 		if (player.isAffected(EffectFlag.CANNOT_ESCAPE))
 		{
 			player.sendPacket(SystemMessageId.YOU_CANNOT_TELEPORT_RIGHT_NOW);
-			return;
+			return false;
 		}
 
 		player.abortCast();
 		player.stopMove(null);
 		player.teleToLocation(loc);
+		return true;
+	}
+
+	/**
+	 * Sends the quest window with the ACCEPT dialog for this quest.
+	 */
+	public void sendAcceptDialog(Player player)
+	{
+		player.sendPacket(new ExQuestDialogPacket(getId(), QuestDialogType.ACCEPT));
+	}
+
+	/**
+	 * Sends the quest window with the END (complete) dialog for this quest.
+	 */
+	public void sendEndDialog(Player player)
+	{
+		player.sendPacket(new ExQuestDialogPacket(getId(), QuestDialogType.END));
 	}
 }

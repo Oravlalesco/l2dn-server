@@ -943,13 +943,14 @@
 	</item>
 	<item id="98464" name="Herb Roots" type="EtcItem">
 		<!-- A somewhat useless ingredient, but dried and ground, these roots can be used to concoct a potion for a dangerous situation. Take it to a person who is looking for Herb Roots. -->
+		<!-- EP30 clients often lack this item id (shows Unknown and can crash InventoryUpdate). Destroyable so leftovers can be cleared. -->
 		<set name="icon" val="icon.etc_ginseng_gray_i00" />
 		<set name="default_action" val="NONE" />
 		<set name="immediate_effect" val="true" />
 		<set name="material" val="STEEL" />
 		<set name="is_tradable" val="false" />
 		<set name="is_dropable" val="false" />
-		<set name="is_destroyable" val="false" />
+		<set name="is_destroyable" val="true" />
 		<set name="is_depositable" val="false" />
 		<set name="is_sellable" val="false" />
 		<set name="is_stackable" val="true" />

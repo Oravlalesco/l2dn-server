@@ -22,6 +22,7 @@ using L2Dn.GameServer.Scripts.Handlers.TargetHandlers.AffectScopes;
 using L2Dn.GameServer.Scripts.Handlers.UserCommandHandlers;
 using L2Dn.GameServer.Scripts.Handlers.VoicedCommandHandlers;
 using L2Dn.GameServer.Scripts.Quests;
+using L2Dn.GameServer.Scripts.Quests.DwarvenVillage;
 using PlayerAction = L2Dn.GameServer.Scripts.Handlers.ActionHandlers.PlayerAction;
 using Single = L2Dn.GameServer.Scripts.Handlers.TargetHandlers.AffectScopes.Single;
 using Summon = L2Dn.GameServer.Scripts.Handlers.EffectHandlers.Summon;
@@ -1005,6 +1006,17 @@ public static class Scripts
         // Quests
         QuestManager questManager = QuestManager.getInstance();
         questManager.addQuest(new Q00206Tutorial());
+
+        // Dwarven newbie story chain (10071-10079). Stops before class-change quest 10080.
+        questManager.addQuest(new Q10071_OreFromTheStripMine());
+        questManager.addQuest(new Q10072_NewLifesLessons());
+        questManager.addQuest(new Q10073_StrengthOfSpirit());
+        questManager.addQuest(new Q10074_LearningToAutoHunt());
+        questManager.addQuest(new Q10075_BePrepared());
+        questManager.addQuest(new Q10076_UsefulPreparations());
+        questManager.addQuest(new Q10077_TimeToThinkAboutWeapons());
+        questManager.addQuest(new Q10078_WatchOut());
+        questManager.addQuest(new Q10079_DevelopingYourAbilities());
     }
 
     public static void RegisterScripts()

@@ -1,4 +1,5 @@
 using System.Xml.Linq;
+using L2Dn.Extensions;
 using L2Dn.GameServer.Data.Xml;
 using L2Dn.GameServer.Model.Items;
 using L2Dn.Utilities;
@@ -34,8 +35,27 @@ public class NewQuest
 		_startItemId = element.Attribute("startItemId").GetInt32(-1);
 
 		XElement? locationElement = element.Elements("locations").SingleOrDefault();
-		_location = new NewQuestLocation((locationElement?.Attribute("startLocationId")).GetInt32(0),
-			(locationElement?.Attribute("endLocationId")).GetInt32(0));
+		int startLocationId = 0;
+		int endLocationId = 0;
+		locationElement?.Elements("param").ForEach(el =>
+		{
+			string name = el.GetAttributeValueAsString("name");
+			switch (name)
+			{
+				case "startLocationId":
+				{
+					startLocationId = (int)el;
+					break;
+				}
+				case "endLocationId":
+				{
+					endLocationId = (int)el;
+					break;
+				}
+			}
+		});
+
+		_location = new NewQuestLocation(startLocationId, endLocationId);
 
 		XElement? conditionElement = element.Elements("conditions").SingleOrDefault();
 		_conditions = new NewQuestCondition(conditionElement);

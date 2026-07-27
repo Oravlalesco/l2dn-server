@@ -1,0 +1,37 @@
+---
+description: Crear o modificar quests modernas (NewQuest / StoryQuest) en L2Dn
+globs: L2Dn/L2Dn.GameServer.Scripts/Quests/**,L2Dn/L2Dn.GameServer/DataPack/NewQuestData.xml,L2Dn/L2Dn.GameServer/DataPack/TeleportListData.xml,L2Dn/L2Dn.GameServer.Model/Model/Quests/**
+alwaysApply: false
+---
+
+# L2Dn — Quests modernas (NewQuest)
+
+**Guía completa: `L2Dn/Documentation/Quests.md`** (leerla antes de crear/adaptar una quest).
+Piloto de referencia: cadena enana `10071`–`10079` en
+`L2Dn.GameServer.Scripts/Quests/DwarvenVillage/`, base `StoryQuest.cs`.
+
+## Reglas duras
+
+- Una quest jugable necesita **XML en `NewQuestData.xml` + clase C# registrada** en
+  `Scripts.RegisterQuests()`. Sin `addQuest`, el cliente puede mostrarla pero ACCEPT no hace nada.
+- Preferir heredar de `StoryQuest` (ACCEPT/TELEPORT/COMPLETE/onKill/onFirstTalk por datos).
+  Quests con cinemáticas/instancias: sobreescribir métodos `virtual`, no reinventar el motor.
+- **Sin números mágicos**: IDs de quest/NPC/monstruo/ítem van en constantes con nombre
+  (ej. `DwarvenNewbieIds`). Si un literal es inevitable, documentar origen (XML / spawn / packet).
+- Registrar en orden de cadena (la pre-quest debe existir en `QuestManager` al construir la siguiente).
+- IDs de `startLocationId` / `endLocationId` del XML deben existir en `TeleportListData.xml`.
+- **No** implementar quests de cambio de clase (`10080+` y equivalentes): eso lo hace
+  `PlayerClassChange` por nivel (20/40/76).
+- **Flujo Essence enano:** tutorial 206 → `reward_2` ofrece **10071 en el strip mine**
+  (sin teleport a aldea). Completar **10071–10073** junto a Laferon; salida del mine =
+  TELEPORT UI de **10074** (`startLocationId` 144). `10071` usa `specificStart=true` +
+  `AutoRegisterNpcFirstTalk => false`. No enviar al Newbie Guide `30601`.
+  `StoryQuest.onFirstTalk` no debe llamar `showChatWindow` si la quest no actúa.
+- **EP30:** `ExQuest*` no lleva prosa (System del cliente). Feedback con
+  `ExShowScreenMessage` en `StoryQuest`. No HTML junto a TELEPORT ExQuest.
+  Ciclo: goal → DONE → COMPLETE (packet o recovery) → Accept siguiente (sin auto-OnComplete en kill).
+  Evitar ítems 98464 / 98474–98478; usar clásicos o kill-count (ver `Quests.md`).
+- Compilar C#: `cd Docker; .\dev-publish.ps1; .\dev-restart.ps1 -Code`.
+  Solo DataPack XML: `.\dev-restart.ps1`.
+  El publish **debe** ser con `dev-publish.ps1` (copia `config.gameserver.docker.json`);
+  un `dotnet publish` manual puede dejar `localhost:2107` y romper auth.

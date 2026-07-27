@@ -19,17 +19,16 @@
 		<item id="44" count="1" enchantLevel="0" /> <!-- Leather Helmet -->
 	</collection>
 	<collection id="5" optionId="39035" category="2" completeCount="3"> <!-- Precious Jewelry -->
+		<!-- Sealed 98477/98478 removed: EP30 quest rewards use classic 878/909; cleanup deletes sealed leftovers. -->
 		<item id="909" count="1" enchantLevel="0" /> <!-- Blue Diamond Necklace -->
-		<item id="98478" count="1" enchantLevel="0" /> <!-- Blue Diamond Necklace - Sealed -->
 		<item id="878" count="1" enchantLevel="0" /> <!-- Blue Coral Ring -->
-		<item id="98477" count="1" enchantLevel="0" /> <!-- Blue Coral Ring - Sealed -->
 		<item id="846" count="1" enchantLevel="0" /> <!-- Coral Earring -->
 	</collection>
 	<collection id="6" optionId="39036" category="2" completeCount="3"> <!-- Wise Cat -->
+		<!-- Sealed 98476 removed: EP30 quest rewards use classic 877. -->
 		<item id="845" count="1" enchantLevel="0" /> <!-- Cat's Eye -->
 		<item id="908" count="1" enchantLevel="0" /> <!-- Necklace of Wisdom -->
 		<item id="877" count="1" enchantLevel="0" /> <!-- Ring of Wisdom -->
-		<item id="98476" count="1" enchantLevel="0" /> <!-- Ring of Wisdom - Sealed -->
 	</collection>
 	<collection id="7" optionId="39037" category="3" completeCount="4"> <!-- Bronze Age -->
 		<item id="26" count="1" enchantLevel="0" /> <!-- Bronze Breastplate -->
@@ -103,7 +102,6 @@
 		<item id="94931" count="1" enchantLevel="4" /> <!-- Scroll of Wisdom - Sealed -->
 		<item id="908" count="1" enchantLevel="0" /> <!-- Necklace of Wisdom -->
 		<item id="877" count="1" enchantLevel="0" /> <!-- Ring of Wisdom -->
-		<item id="98476" count="1" enchantLevel="0" /> <!-- Ring of Wisdom - Sealed -->
 	</collection>
 	<collection id="18" optionId="39048" category="3" completeCount="5"> <!-- Legacy of Giants I -->
 		<item id="7881" count="1" enchantLevel="4" /> <!-- Lesser Giant's Sword -->
@@ -4788,13 +4786,10 @@
 		<item id="98314" count="1" enchantLevel="10" /> <!-- Sealed Collection Book - Sealed -->
 	</collection>
 	<collection id="440" optionId="95425" category="3" completeCount="4"> <!-- Important Basics -->
-		<item id="98474" count="1" enchantLevel="0" /> <!-- Earring of Strength - Sealed -->
+		<!-- Sealed 98474–98477 removed: EP30 quest rewards / cleanup use classic IDs only. -->
 		<item id="114" count="1" enchantLevel="0" /> <!-- Earring of Strength -->
-		<item id="98475" count="1" enchantLevel="0" /> <!-- Earring of Wisdom - Sealed -->
 		<item id="115" count="1" enchantLevel="0" /> <!-- Earring of Wisdom -->
-		<item id="98476" count="1" enchantLevel="0" /> <!-- Ring of Wisdom - Sealed -->
 		<item id="877" count="1" enchantLevel="0" /> <!-- Ring of Wisdom -->
-		<item id="98477" count="1" enchantLevel="0" /> <!-- Blue Coral Ring - Sealed -->
 		<item id="878" count="1" enchantLevel="0" /> <!-- Blue Coral Ring -->
 	</collection>
 	<collection id="441" optionId="95426" category="3" completeCount="3"> <!-- First Step to Growth -->

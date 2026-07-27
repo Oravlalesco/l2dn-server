@@ -64,8 +64,14 @@
 	<teleport id="140" x="115190" y="-178176" z="-896" price="12000" /> <!-- Dwarven Village -->
 	<teleport id="142" x="139714" y="-177456" z="-1536" price="500" /> <!-- Abandoned Coal Mines -->
 	<teleport id="143" x="171946" y="-173352" z="3440" price="1650" /> <!-- Mithril Mines -->
+	<!-- id 144: NewQuestData dwarf chain startLocationId (Frozen Valley) -->
+	<teleport id="144" x="115448" y="-176280" z="-800" price="500" /> <!-- Frozen Valley (Dwarven Village outskirts) -->
 	<teleport id="145" x="124054" y="-200170" z="-3704" price="500" /> <!-- Western Mining Zone -->
 	<teleport id="146" x="169008" y="-208272" z="3496" price="1650" /> <!-- Eastern Mining Zone -->
+	<!-- Story-quest helper locations referenced by NewQuestData dwarf chain (10071–10079) -->
+	<teleport id="492" x="108593" y="-174041" z="-406" price="500" /> <!-- Foreman Laferon (Strip Mine) — NewQuestData start/endLocationId -->
+	<teleport id="493" x="116268" y="-177524" z="-914" price="500" /> <!-- Grocer Mion (Dwarven Village) — NewQuestData endLocationId -->
+	<teleport id="494" x="114990" y="-177294" z="-854" price="500" /> <!-- Head Priest Gerald (Dwarven Village) — NewQuestData endLocationId -->
 	<teleport id="181" x="147961" y="-55309" z="-2728" price="22500" /> <!-- Town of Goddard -->
 	<teleport id="184" x="144880" y="-113468" z="-2560" price="1650" /> <!-- Hot Springs -->
 	<teleport id="186" x="173494" y="-115521" z="-3760" price="15300" /> <!-- Forge Of The Gods -->

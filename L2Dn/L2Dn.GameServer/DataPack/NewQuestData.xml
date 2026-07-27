@@ -99,11 +99,11 @@
 		</conditions>
 		<rewards>
 			<items>
-				<item id="98474" count="1" />
-				<item id="98475" count="1" />
-				<item id="98476" count="1" />
-				<item id="98477" count="1" />
-				<item id="98478" count="1" />
+				<item id="114" count="1" />
+				<item id="115" count="1" />
+				<item id="877" count="1" />
+				<item id="878" count="1" />
+				<item id="909" count="1" />
 				<item id="91912" count="50" />
 			</items>
 			<param name="rewardLevel">15</param>
@@ -314,11 +314,11 @@
 		</conditions>
 		<rewards>
 			<items>
-				<item id="98474" count="1" />
-				<item id="98475" count="1" />
-				<item id="98476" count="1" />
-				<item id="98477" count="1" />
-				<item id="98478" count="1" />
+				<item id="114" count="1" />
+				<item id="115" count="1" />
+				<item id="877" count="1" />
+				<item id="878" count="1" />
+				<item id="909" count="1" />
 				<item id="91912" count="50" />
 			</items>
 			<param name="rewardLevel">15</param>
@@ -567,11 +567,11 @@
 		</conditions>
 		<rewards>
 			<items>
-				<item id="98474" count="1" />
-				<item id="98475" count="1" />
-				<item id="98476" count="1" />
-				<item id="98477" count="1" />
-				<item id="98478" count="1" />
+				<item id="114" count="1" />
+				<item id="115" count="1" />
+				<item id="877" count="1" />
+				<item id="878" count="1" />
+				<item id="909" count="1" />
 				<item id="91912" count="50" />
 			</items>
 			<param name="rewardLevel">15</param>
@@ -820,11 +820,11 @@
 		</conditions>
 		<rewards>
 			<items>
-				<item id="98474" count="1" />
-				<item id="98475" count="1" />
-				<item id="98476" count="1" />
-				<item id="98477" count="1" />
-				<item id="98478" count="1" />
+				<item id="114" count="1" />
+				<item id="115" count="1" />
+				<item id="877" count="1" />
+				<item id="878" count="1" />
+				<item id="909" count="1" />
 				<item id="91912" count="50" />
 			</items>
 			<param name="rewardLevel">15</param>
@@ -1035,11 +1035,11 @@
 		</conditions>
 		<rewards>
 			<items>
-				<item id="98474" count="1" />
-				<item id="98475" count="1" />
-				<item id="98476" count="1" />
-				<item id="98477" count="1" />
-				<item id="98478" count="1" />
+				<item id="114" count="1" />
+				<item id="115" count="1" />
+				<item id="877" count="1" />
+				<item id="878" count="1" />
+				<item id="909" count="1" />
 				<item id="91912" count="50" />
 			</items>
 			<param name="rewardLevel">15</param>
@@ -1250,11 +1250,11 @@
 		</conditions>
 		<rewards>
 			<items>
-				<item id="98474" count="1" />
-				<item id="98475" count="1" />
-				<item id="98476" count="1" />
-				<item id="98477" count="1" />
-				<item id="98478" count="1" />
+				<item id="114" count="1" />
+				<item id="115" count="1" />
+				<item id="877" count="1" />
+				<item id="878" count="1" />
+				<item id="909" count="1" />
 				<item id="91912" count="50" />
 			</items>
 			<param name="rewardLevel">15</param>
@@ -1372,6 +1372,9 @@
 			<param name="endLocationId">492</param>
 		</locations>
 		<conditions>
+			<!-- Offered by Q00206Tutorial reward_2 at Laferon; not on EnterWorld.
+			     specificStart only skips EnterWorld — Q10071 also addCondStart(tutorial memo >= 5). -->
+			<param name="specificStart">true</param>
 			<param name="classIds">53;54;56;55;57</param>
 		</conditions>
 		<goals>
@@ -1416,6 +1419,7 @@
 			<param name="goalString">Gremlins</param>
 		</goals>
 	</quest>
+	<!-- goalItemId 98464 (Herb Roots) omitted: EP30 client lacks that item id and InventoryUpdate crashes. -->
 	<quest id="10074" type="1" name="Learning to Auto-hunt" startNpcId="30528">
 		<locations>
 			<param name="startLocationId">144</param>
@@ -1430,9 +1434,8 @@
 			</items>
 		</rewards>
 		<goals>
-			<param name="goalItemId">98464</param>
 			<param name="goalCount">3</param>
-			<param name="goalString">Herb Roots</param>
+			<param name="goalString">Longtail Keltirs in the Frozen Valley</param>
 		</goals>
 	</quest>
 	<quest id="10075" type="1" name="Be Prepared">
@@ -1454,6 +1457,7 @@
 			<param name="goalString">Monsters in the Frozen Valley</param>
 		</goals>
 	</quest>
+	<!-- Rewards use classic jewelry IDs (114/115/877/878/909): EP30 lacks sealed 98474–98478. -->
 	<quest id="10076" type="1" name="Useful Preparations" endNpcId="30519">
 		<locations>
 			<param name="startLocationId">144</param>
@@ -1465,11 +1469,11 @@
 		</conditions>
 		<rewards>
 			<items>
-				<item id="98474" count="1" />
-				<item id="98475" count="1" />
-				<item id="98476" count="1" />
-				<item id="98477" count="1" />
-				<item id="98478" count="1" />
+				<item id="114" count="1" />
+				<item id="115" count="1" />
+				<item id="877" count="1" />
+				<item id="878" count="1" />
+				<item id="909" count="1" />
 				<item id="91912" count="50" />
 			</items>
 			<param name="rewardLevel">15</param>
@@ -1680,11 +1684,11 @@
 		</conditions>
 		<rewards>
 			<items>
-				<item id="98474" count="1" />
-				<item id="98475" count="1" />
-				<item id="98476" count="1" />
-				<item id="98477" count="1" />
-				<item id="98478" count="1" />
+				<item id="114" count="1" />
+				<item id="115" count="1" />
+				<item id="877" count="1" />
+				<item id="878" count="1" />
+				<item id="909" count="1" />
 				<item id="91912" count="50" />
 			</items>
 			<param name="rewardLevel">15</param>
@@ -1895,11 +1899,11 @@
 		</conditions>
 		<rewards>
 			<items>
-				<item id="98474" count="1" />
-				<item id="98475" count="1" />
-				<item id="98476" count="1" />
-				<item id="98477" count="1" />
-				<item id="98478" count="1" />
+				<item id="114" count="1" />
+				<item id="115" count="1" />
+				<item id="877" count="1" />
+				<item id="878" count="1" />
+				<item id="909" count="1" />
 				<item id="91912" count="50" />
 			</items>
 			<param name="rewardLevel">15</param>
@@ -2110,11 +2114,11 @@
 		</conditions>
 		<rewards>
 			<items>
-				<item id="98474" count="1" />
-				<item id="98475" count="1" />
-				<item id="98476" count="1" />
-				<item id="98477" count="1" />
-				<item id="98478" count="1" />
+				<item id="114" count="1" />
+				<item id="115" count="1" />
+				<item id="877" count="1" />
+				<item id="878" count="1" />
+				<item id="909" count="1" />
 				<item id="91912" count="50" />
 			</items>
 			<param name="rewardLevel">15</param>
@@ -2325,11 +2329,11 @@
 		</conditions>
 		<rewards>
 			<items>
-				<item id="98474" count="1" />
-				<item id="98475" count="1" />
-				<item id="98476" count="1" />
-				<item id="98477" count="1" />
-				<item id="98478" count="1" />
+				<item id="114" count="1" />
+				<item id="115" count="1" />
+				<item id="877" count="1" />
+				<item id="878" count="1" />
+				<item id="909" count="1" />
 				<item id="91912" count="50" />
 			</items>
 			<param name="rewardLevel">15</param>
