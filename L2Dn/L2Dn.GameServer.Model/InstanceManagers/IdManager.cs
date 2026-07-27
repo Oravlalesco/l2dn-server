@@ -155,13 +155,18 @@ public class IdManager
 		// Initialize.
 		try
 		{
-			// Collect already used ids.
+			// Collect already used ids. Char/item/clan/mail share one ObjectId pool — do NOT
+			// Distinct() before the loop: duplicates across tables must hit ReserveId twice so
+			// collisions are logged (Distinct hid every cross-table collision).
 			using GameServerDbContext ctx = DbFactory.Instance.CreateDbContext();
 			List<int> usedIds = ctx.Characters.Select(c => c.Id).Concat(ctx.Items.Select(i => i.ObjectId))
 				.Concat(ctx.Clans.Select(c => c.Id)).Concat(ctx.ItemsOnGround.Select(c => c.ObjectId))
-				.Concat(ctx.MailMessages.Select(c => c.MessageId)).ToList();
+				.Concat(ctx.MailMessages.Select(c => c.MessageId)).OrderBy(id => id).ToList();
 
-			// Register used ids.
+			int duplicatesSkipped = 0;
+
+			// Register used ids. Never abort the whole scan on one collision — that leaves
+			// most ObjectIds unreserved and new characters get starter gear that fails PK_Items.
 			foreach (int usedObjectId in usedIds)
 			{
 				if (usedObjectId < FIRST_OID)
@@ -170,7 +175,22 @@ public class IdManager
 					continue;
 				}
 
-				ReserveId(usedObjectId);
+				try
+				{
+					ReserveId(usedObjectId);
+				}
+				catch (InvalidOperationException)
+				{
+					duplicatesSkipped++;
+					LOGGER.Error("IdManager: Duplicate object ID " + usedObjectId +
+					             " already reserved (char/item/clan/mail collision). Fix DB data.");
+				}
+			}
+
+			if (duplicatesSkipped > 0)
+			{
+				LOGGER.Error("IdManager: Skipped " + duplicatesSkipped +
+				             " duplicate ID(s) during init. Starter items may still collide until data is fixed.");
 			}
 		}
 		catch (Exception e)
