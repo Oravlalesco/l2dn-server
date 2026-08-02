@@ -864,14 +864,40 @@
 		<effectPoint>1</effectPoint>
 	</skill>
 	<skill id="51396" toLevel="1" name="Scroll: 10,000 SP">
-		<icon>icon.skill0000</icon>
+		<icon>icon.etc_sp_scroll2_i00</icon>
+		<blockedInOlympiad>false</blockedInOlympiad>
+		<isMagic>2</isMagic> <!-- Static Skill -->
+		<itemConsumeCount>1</itemConsumeCount>
+		<itemConsumeId>91664</itemConsumeId> <!-- Scroll: 10,000 SP - Sealed -->
+		<magicLevel>1</magicLevel>
 		<operateType>A1</operateType>
 		<reuseDelay>500</reuseDelay>
+		<hitCancelTime>0</hitCancelTime>
+		<targetType>SELF</targetType>
+		<affectScope>SINGLE</affectScope>
+		<effects>
+			<effect name="GiveSp">
+				<sp>10000</sp>
+			</effect>
+		</effects>
 	</skill>
 	<skill id="51397" toLevel="1" name="Scroll: 100,000 SP">
-		<icon>icon.skill0000</icon>
+		<icon>icon.etc_sp_scroll3_i00</icon>
+		<blockedInOlympiad>false</blockedInOlympiad>
+		<isMagic>2</isMagic> <!-- Static Skill -->
+		<itemConsumeCount>1</itemConsumeCount>
+		<itemConsumeId>91665</itemConsumeId> <!-- Scroll: 100,000 SP - Sealed -->
+		<magicLevel>1</magicLevel>
 		<operateType>A1</operateType>
 		<reuseDelay>500</reuseDelay>
+		<hitCancelTime>0</hitCancelTime>
+		<targetType>SELF</targetType>
+		<affectScope>SINGLE</affectScope>
+		<effects>
+			<effect name="GiveSp">
+				<sp>100000</sp>
+			</effect>
+		</effects>
 	</skill>
 	<skill id="51398" toLevel="1" name="Sayha's Storm Lv. 1 (Event)">
 		<!-- For 20 min., Sayha's Grace Consumption +100%, Acquired XP/ SP +100%. Cooldown: 1 min. The effect remains after death. -->
