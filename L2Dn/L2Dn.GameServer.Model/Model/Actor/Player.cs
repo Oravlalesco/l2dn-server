@@ -3904,13 +3904,6 @@ public class Player: Playable
 
 	public Item? checkItemManipulation(int objectId, long count, string action)
 	{
-		// TODO: if we remove objects that are not visible from the World, we'll have to remove this check
-		if (World.getInstance().findObject(objectId) == null)
-		{
-			LOGGER.Info(ObjectId + ": player tried to " + action + " item not available in World");
-			return null;
-		}
-
 		Item? item = _inventory.getItemByObjectId(objectId);
 		if (item == null || item.getOwnerId() != ObjectId)
 		{
@@ -3944,6 +3937,24 @@ public class Player: Playable
 		// We cannot put a Weapon with Augmentation in WH while casting (Possible Exploit)
 		if (item.isAugmented() && isCastingNow())
 		{
+			return null;
+		}
+
+		World world = World.getInstance();
+		WorldObject? registeredObject = world.findObject(objectId);
+		if (registeredObject == null)
+		{
+			if (!world.addObject(item))
+			{
+				LOGGER.Warn($"{ObjectId}: player tried to {action} item {objectId}, but its World registration could not be restored");
+				return null;
+			}
+
+			LOGGER.Warn($"{ObjectId}: restored missing World registration while trying to {action} item {objectId} (itemId={item.getId()})");
+		}
+		else if (!ReferenceEquals(registeredObject, item))
+		{
+			LOGGER.Warn($"{ObjectId}: player tried to {action} item {objectId}, but World contains a different {registeredObject.GetType().Name} instance");
 			return null;
 		}
 

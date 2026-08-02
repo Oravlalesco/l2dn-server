@@ -3090,11 +3090,21 @@ public class Quest: AbstractScript, IIdentifiable
 
 	public void giveStoryBuffReward(Npc npc, Player player)
 	{
+		giveStoryBuffReward((Creature)npc, player);
+	}
+
+	public void giveStoryBuffReward(Player player)
+	{
+		giveStoryBuffReward((Creature)player, player);
+	}
+
+	private void giveStoryBuffReward(Creature caster, Player player)
+	{
 		if (Config.General.ENABLE_STORY_QUEST_BUFF_REWARD)
 		{
 			foreach (SkillHolder holder in _storyQuestBuffs)
 			{
-				SkillCaster.triggerCast(npc, player, holder.getSkill());
+				SkillCaster.triggerCast(caster, player, holder.getSkill());
 			}
 		}
 	}

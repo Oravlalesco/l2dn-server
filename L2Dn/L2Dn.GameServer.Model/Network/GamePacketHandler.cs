@@ -30,6 +30,7 @@ using L2Dn.GameServer.Network.IncomingPackets.NewCrest;
 using L2Dn.GameServer.Network.IncomingPackets.NewHenna;
 using L2Dn.GameServer.Network.IncomingPackets.NewSkillEnchant;
 using L2Dn.GameServer.Network.IncomingPackets.Pets;
+using L2Dn.GameServer.Network.IncomingPackets.Pk;
 using L2Dn.GameServer.Network.IncomingPackets.Pledges;
 using L2Dn.GameServer.Network.IncomingPackets.PrimeShop;
 using L2Dn.GameServer.Network.IncomingPackets.Quests;
@@ -404,6 +405,7 @@ public sealed class GamePacketHandler: PacketHandler<GameSession>
         /* D0:00FD */ RegisterPacket<RequestTargetActionMenuPacket>(IncomingPacketCodes.REQUEST_TARGET_ACTION_MENU);
 		/* D0:00FE */ RegisterPacket<ExSendSelectedQuestZoneIdPacket>(IncomingPacketCodes.EX_SEND_SELECTED_QUEST_ZONE_ID);
 		/* D0:00FF */ RegisterPacket<RequestAlchemySkillListPacket>(IncomingPacketCodes.REQUEST_ALCHEMY_SKILL_LIST);
+		/* D0:0103 */ RegisterPacket<ExSendClientIniPacket>(IncomingPacketCodes.EX_SEND_CLIENT_INI).WithAllowedStates(GameSessionState.CharacterScreen | GameSessionState.InGame);
 		/* D0:0104 */ RegisterPacket<ExRequestAutoFishPacket>(IncomingPacketCodes.REQUEST_EX_AUTO_FISH);
 		/* D0:0105 */ RegisterPacket<RequestVipAttendanceItemListPacket>(IncomingPacketCodes.REQUEST_VIP_ATTENDANCE_ITEM_LIST);
 		/* D0:0106 */ RegisterPacket<RequestVipAttendanceCheckPacket>(IncomingPacketCodes.REQUEST_VIP_ATTENDANCE_CHECK);
@@ -432,6 +434,7 @@ public sealed class GamePacketHandler: PacketHandler<GameSession>
 		/* D0:0156 */ RegisterPacket<ExElementalSpiritAbsorbInfoPacket>(IncomingPacketCodes.EX_ELEMENTAL_SPIRIT_ABSORB_INFO);
 		/* D0:0157 */ RegisterPacket<ExElementalSpiritAbsorbPacket>(IncomingPacketCodes.EX_ELEMENTAL_SPIRIT_ABSORB);
 		// 152
+		/* D0:015D */ RegisterPacket<ExUserBanInfoPacket>(IncomingPacketCodes.EX_USER_BAN_INFO).WithAllowedStates(GameSessionState.CharacterScreen | GameSessionState.InGame);
 		/* D0:015E */ RegisterPacket<ExInteractModifyPacket>(IncomingPacketCodes.EX_INTERACT_MODIFY);
 		/* D0:0160 */ RegisterPacket<ExUpgradeSystemNormalRequestPacket>(IncomingPacketCodes.EX_UPGRADE_SYSTEM_NORMAL_REQUEST);
         /* D0:0161 */ RegisterPacket<RequestPurchaseLimitShopItemListPacket>(IncomingPacketCodes.EX_PURCHASE_LIMIT_SHOP_ITEM_LIST);
@@ -484,6 +487,7 @@ public sealed class GamePacketHandler: PacketHandler<GameSession>
 		/* D0:01B2 */ RegisterPacket<ExRequestTeleportFavoriteListPacket>(IncomingPacketCodes.EX_TELEPORT_FAVORITES_LIST);
 		/* D0:01B3 */ RegisterPacket<ExRequestTeleportFavoritesUiTogglePacket>(IncomingPacketCodes.EX_TELEPORT_FAVORITES_UI_TOGGLE);
 		/* D0:01B4 */ RegisterPacket<ExRequestTeleportFavoritesAddDelPacket>(IncomingPacketCodes.EX_TELEPORT_FAVORITES_ADD_DEL);
+		/* D0:01BF */ RegisterPacket<RequestExPkPenaltyListPacket>(IncomingPacketCodes.EX_PK_PENALTY_LIST);
 		/* D0:01C1 */ RegisterPacket<RequestBlessOptionPutItemPacket>(IncomingPacketCodes.EX_BLESS_OPTION_PUT_ITEM);
 		/* D0:01C2 */ RegisterPacket<RequestBlessOptionEnchantPacket>(IncomingPacketCodes.EX_BLESS_OPTION_ENCHANT);
 		/* D0:01C3 */ RegisterPacket<RequestBlessOptionCancelPacket>(IncomingPacketCodes.EX_BLESS_OPTION_CANCEL);
@@ -538,6 +542,7 @@ public sealed class GamePacketHandler: PacketHandler<GameSession>
 		/* D0:021C */ RegisterPacket<RequestNewHennaPotenEnchantPacket>(IncomingPacketCodes.EX_NEW_HENNA_POTEN_ENCHANT);
 		/* D0:021D */ RegisterPacket<RequestNewHennaComposePacket>(IncomingPacketCodes.EX_NEW_HENNA_COMPOSE);
 		/* D0:021E */ RegisterPacket<RequestNewInvitePartyInquiryPacket>(IncomingPacketCodes.EX_REQUEST_INVITE_PARTY);
+		/* D0:021F */ RegisterPacket<ExItemUsableListPacket>(IncomingPacketCodes.EX_ITEM_USABLE_LIST);
 		/* D0:0222 */ RegisterPacket<RequestHuntPassInfoPacket>(IncomingPacketCodes.EX_L2PASS_INFO);
 		/* D0:0223 */ RegisterPacket<RequestHuntPassRewardPacket>(IncomingPacketCodes.EX_L2PASS_REQUEST_REWARD);
 		/* D0:0224 */ RegisterPacket<RequestHuntPassRewardAllPacket>(IncomingPacketCodes.EX_L2PASS_REQUEST_REWARD_ALL);

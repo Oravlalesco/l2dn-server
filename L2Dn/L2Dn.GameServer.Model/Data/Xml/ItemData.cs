@@ -1443,8 +1443,17 @@ public class ItemData: DataReaderBase
 			item.setItemLocation(ItemLocation.VOID);
 			item.setLastChange(ItemChangeType.REMOVED);
 
-			World.getInstance().removeObject(item);
-			IdManager.getInstance().releaseId(item.ObjectId);
+			World world = World.getInstance();
+			world.removeObject(item);
+			WorldObject? registeredObject = world.findObject(item.ObjectId);
+			if (registeredObject == null)
+			{
+				IdManager.getInstance().releaseId(item.ObjectId);
+			}
+			else
+			{
+				LOGGER.Error($"Refused to release objectId={item.ObjectId} while destroying itemId={item.getId()}: World contains a different {registeredObject.GetType().Name} instance.");
+			}
 
 			if ((Config.General.LOG_ITEMS && !Config.General.LOG_ITEMS_SMALL_LOG && !Config.General.LOG_ITEMS_IDS_ONLY) || (Config.General.LOG_ITEMS_SMALL_LOG && (item.isEquipable() || item.getId() == Inventory.ADENA_ID)) || (Config.General.LOG_ITEMS_IDS_ONLY && Config.General.LOG_ITEMS_IDS_LIST.Contains(item.getId())))
 			{

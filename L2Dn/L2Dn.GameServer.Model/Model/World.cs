@@ -34,6 +34,7 @@ public sealed class World
 
 	/** Map containing all visible objects. */
 	private static readonly Map<int, WorldObject> _allObjects = new();
+	private static readonly object _objectRegistryLock = new();
 
 	/** Map with the pets instances and their owner ID. */
 	private static readonly Map<int, Pet> _petsInstance = new();
@@ -58,17 +59,28 @@ public sealed class World
 	 * <li>Spawn a Creature (PC, NPC, Pet)</li>
 	 * </ul>
 	 * @param object
+	 * @return {@code true} when the object is registered or was already registered as the same instance
 	 */
-	public void addObject(WorldObject @object)
+	public bool addObject(WorldObject @object)
 	{
-		_allObjects.TryAdd(@object.ObjectId, @object);
+		WorldObject registeredObject;
+		lock (_objectRegistryLock)
+		{
+			registeredObject = _allObjects.GetOrAdd(@object.ObjectId, @object);
+		}
+
+		if (!ReferenceEquals(registeredObject, @object))
+		{
+			LOGGER.Error($"World object ID collision: objectId={@object.ObjectId}, registeredType={registeredObject.GetType().Name}, incomingType={@object.GetType().Name}.");
+			return false;
+		}
 
 		if (@object.isPlayer())
 		{
 			Player newPlayer = (Player)@object;
 			if (newPlayer.isTeleporting()) // TODO: Drop when we stop removing player from the world while teleporting.
 			{
-				return;
+				return true;
 			}
 
 			Player existingPlayer = _allPlayers.GetOrAdd(@object.ObjectId, newPlayer);
@@ -84,6 +96,8 @@ public sealed class World
 				addFactionPlayerToWorld(newPlayer);
 			}
 		}
+
+		return true;
 	}
 
 	/**
@@ -96,31 +110,56 @@ public sealed class World
 	 * <li>Remove NPC/PC/Pet from the world</li>
 	 * </ul>
 	 * @param object the object to remove
+	 * @return {@code true} when the exact object instance was removed
 	 */
-	public void removeObject(WorldObject @object)
+	public bool removeObject(WorldObject @object)
 	{
-		_allObjects.TryRemove(@object.ObjectId, out _);
+		lock (_objectRegistryLock)
+		{
+			if (!_allObjects.TryGetValue(@object.ObjectId, out WorldObject? registeredObject))
+			{
+				return false;
+			}
+
+			if (!ReferenceEquals(registeredObject, @object))
+			{
+				LOGGER.Warn($"Refused to remove a different World object instance: objectId={@object.ObjectId}, registeredType={registeredObject.GetType().Name}, requestedType={@object.GetType().Name}.");
+				return false;
+			}
+
+			_allObjects.TryRemove(@object.ObjectId, out _);
+		}
+
 		if (@object.isPlayer())
 		{
 			Player player = (Player) @object;
 			if (player.isTeleporting()) // TODO: Drop when we stop removing player from the world while teleporting.
 			{
-				return;
+				return true;
 			}
-			_allPlayers.TryRemove(@object.ObjectId, out _);
+
+			if (_allPlayers.TryGetValue(@object.ObjectId, out Player? registeredPlayer) &&
+				ReferenceEquals(registeredPlayer, player))
+			{
+				_allPlayers.TryRemove(@object.ObjectId, out _);
+			}
 
 			if (Config.FactionSystem.FACTION_SYSTEM_ENABLED)
 			{
-				if (player.isGood())
+				if (player.isGood() && _allGoodPlayers.TryGetValue(player.ObjectId, out Player? goodPlayer) &&
+					ReferenceEquals(goodPlayer, player))
 				{
 					_allGoodPlayers.TryRemove(player.ObjectId, out _);
 				}
-				else if (player.isEvil())
+				else if (player.isEvil() && _allEvilPlayers.TryGetValue(player.ObjectId, out Player? evilPlayer) &&
+					ReferenceEquals(evilPlayer, player))
 				{
 					_allEvilPlayers.TryRemove(player.ObjectId, out _);
 				}
 			}
 		}
+
+		return true;
 	}
 
 	/**
@@ -682,7 +721,7 @@ public sealed class World
 			Summon summon = (Summon) @object;
 			summon.unSummon(summon.getOwner());
 		}
-		else if (_allObjects.remove(@object.ObjectId) != null)
+		else if (removeObject(@object))
 		{
 			if (@object.isNpc())
 			{
