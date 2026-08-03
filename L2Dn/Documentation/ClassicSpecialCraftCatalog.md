@@ -1,78 +1,88 @@
-# Catálogo Special Craft — Classic 447
+# Tienda L-Coin y Special Craft — servidor Classic 447
 
-## Objetivo
+## Resultado de esta fase
 
-`DataPack/LimitShopCraft.xml` contiene únicamente productos reconocidos por el
-`LCoinShopProduct_Classic-eu.dat` activo en el cliente Classic 447/Shinemaker.
-El catálogo anterior contenía 355 recetas importadas de otra versión y ninguno
-de sus `ProductId` coincidía con los 43 registros del cliente activo.
+Los dos sistemas quedan separados según el tipo de tienda que envía el protocolo:
 
-La primera versión compatible publica 41 productos. Los productos `10069` y
-`10070` se reservan porque sus recompensas (`99041` y `99042`) no tienen una
-definición de ítem en el datapack actual.
+- `LimitShop.xml` (`shopType = 3`) contiene los 41 productos reconocidos por el
+  `LCoinShopProduct_Classic-eu.dat` actual.
+- `LimitShopCraft.xml` (`shopType = 4`) contiene 41 recetas propias de Special
+  Craft, organizadas por su categoría semántica.
+- `LimitShopClan.xml` (`shopType = 100`) no se modifica.
 
-## Cobertura
+Los productos `10069` y `10070` siguen excluidos de la tienda L-Coin porque sus
+recompensas (`99041` y `99042`) no existen en el datapack del servidor.
 
-| Categoría | Pestaña del cliente | Productos | Estado |
+## Categorías de Special Craft
+
+| Código | Pestaña | Recetas activas | Decisión |
 |---:|---|---:|---|
-| 0 | Special Weapons | 3 | Activa |
-| 1 | Spellbook | 8 | Activa |
-| 2 | Accessories | 7 | Activa |
-| 3 | Misc | 8 | Activa |
-| 4 | Blessing | 15 | Activa |
-| 5 | Event | 0 | Requiere parche del DAT |
+| 0 | Special Weapon | 0 | Reservada hasta definir una fuente real para los materiales de arma |
+| 2 | Spellbook | 4 | Cupones de 1–4 estrellas mediante Giran Seal |
+| 3 | Accessories | 14 | Intercambios determinísticos por paquetes +6 |
+| 4 | Misc | 11 | Pergaminos y conversión de piedras de augmentación |
+| 5 | Blessing | 12 | Combinación de dos accesorios +4/+5 equivalentes |
+| 6 | Event | 0 | Reservada para un evento con fecha y moneda activas |
 
-Los nombres de pestaña pertenecen a la interfaz de Special Craft. Algunos
-productos heredados del DAT no son semánticamente perfectos para su pestaña;
-cambiar su recompensa o categoría visual exige modificar el DAT y el XML en
-conjunto.
+La categoría `1` no corresponde a ninguna de las seis pestañas de Special Craft
+de este cliente y no se usa en `LimitShopCraft.xml`.
 
-## Economía inicial
+## Recetas activas
 
-El catálogo utiliza solamente recursos obtenibles y definidos en el servidor:
+### Spellbook
 
-- `57`: Adena, para utilidad permanente y progresión básica;
-- `91663`: L-Coin, para consumibles y progresión frecuente;
-- `92314`: Giran Seal, para encantamiento y recompensas de mayor valor.
+| ProductId | Resultado | Costo | Éxito | Resultado alternativo |
+|---:|---|---:|---:|---|
+| 4238 | Cupón de libro 1 estrella | 49 Giran Seal | 50% | 5 Giran Seal |
+| 4239 | Cupón de libro 2 estrellas | 60 Giran Seal | 30% | 6 Giran Seal |
+| 4240 | Cupón de libro 3 estrellas | 137 Giran Seal | 10% | 13 Giran Seal |
+| 4241 | Cupón de libro 4 estrellas | 1.208 Giran Seal | 5% | 120 Giran Seal |
 
-Se conservaron los costos ya presentes en el datapack cuando existía una
-equivalencia clara. Los demás valores forman una línea base conservadora y deben
-revisarse con telemetría real de adquisición y consumo.
+### Accessories
 
-Los límites visuales declarados por el cliente se replican en el servidor:
+Se activan catorce intercambios determinísticos: Hunter's Earring, Piercing
+Mask, Circlet of Hero, Talisman of Authority, Talisman of Eva, Talisman of
+Speed, Dragon Belt, Cloak of Protection y seis Agathions (Dragon Egg, Ignis,
+Nebula, Procella, Petram y Joy). Cada receta usa el paquete o kit base y Adena.
 
-- `10035`: 20 compras diarias;
-- `10066`, `10067`, `10068`: 1 compra diaria;
-- `10071`: 10 compras diarias;
-- `10073`: 2 compras totales por cuenta;
-- `10074`: 100 compras diarias;
-- `10124`–`10129`: 5 compras diarias.
+### Misc
 
-## Contrato cliente/servidor
+Se activan el pergamino estable de accesorios raros, la Incredible Upgrade
+Stone, el pergamino de accesorios y ocho conversiones de piedras de
+augmentación. Estas últimas tienen 15% de producir la piedra bendecida y 85% de
+devolver una de las dos piedras base consumidas.
 
-Para cada producto deben coincidir:
+### Blessing
 
-1. `ProductId`;
-2. categoría visual;
-3. ítem y cantidad producida;
-4. tipo y cantidad máxima de compra.
+Se activan conversiones +4 y +5 para Talisman of Aden, Talisman of Authority,
+Circlet of Hero, Dragon Belt, Talisman of Speed y Talisman of Eva. Cada receta
+consume exactamente dos objetos del mismo nivel de encantamiento y produce su
+versión bendecida.
 
-El servidor controla los ingredientes, cantidades, nivel permitido,
-probabilidades y aplicación efectiva de los límites. El cliente controla la
-categoría y la presentación del producto. Cambiar sólo uno de los lados puede
-mostrar una recompensa incorrecta o dejar el producto como no disponible.
+## Correcciones del flujo de compra
 
-Las claves de límites se guardan por `shopType` y `ProductId`, por ejemplo
-`LCSDailyCount4_10035`. Esto evita que dos productos con la misma recompensa, o
-dos tiendas diferentes, compartan accidentalmente el contador.
+- Los resultados aleatorios usan un único valor por intento y una distribución
+  acumulada. Antes cada rama ejecutaba un sorteo nuevo y alteraba las
+  probabilidades declaradas.
+- Los ingredientes repetidos se agrupan por `ItemId` y encantamiento antes de
+  validarlos y consumirlos.
+- La cantidad declarada de un ingrediente encantado se respeta; antes se
+  destruía sólo un objeto por intento.
+- Los puntos VIP se aplican una vez por compra y no una vez por ingrediente.
+- Los contadores de cuenta permanecen aislados por `shopType` y `ProductId`.
 
-## Extensión futura
+## Límite de esta fase: cliente
 
-Para poblar Event o reemplazar por completo los productos heredados:
+No se modifica ningún archivo del cliente. El DAT Classic 447 actual contiene
+los productos de la tienda L-Coin, pero no los ProductId restaurados para
+Special Craft. Por ello:
 
-1. editar `LCoinShopProduct_Classic-eu.dat`;
-2. asignar un `ProductId` único y categoría `0`–`5`;
-3. declarar la recompensa y el límite visual;
-4. crear la entrada idéntica en `LimitShopCraft.xml`;
-5. ejecutar `ClassicSpecialCraftCatalogTests`;
-6. probar listado, materiales, compra, límite y reinicio diario dentro del juego.
+- la tienda L-Coin puede alinearse inmediatamente con sus 41 registros actuales;
+- las nuevas recetas de Special Craft quedan cargadas y comprables en el
+  servidor, pero no aparecerán correctamente en la interfaz hasta una fase
+  posterior de cliente;
+- cambiar solamente `category` en el XML no mueve un producto entre pestañas,
+  porque la presentación y la categoría visual provienen del DAT.
+
+Cuando se aborde el cliente, cada registro deberá reproducir como mínimo el
+`ProductId`, la categoría, todos los resultados posibles y los límites del XML.

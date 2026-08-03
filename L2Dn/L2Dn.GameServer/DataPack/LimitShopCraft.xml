@@ -1,185 +1,210 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <list enabled="true" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="xsd/LimitShop.xsd">
 	<!--
-		Classic 447 (Shinemaker) Special Craft catalog.
+		Classic Special Craft server catalog.
 
-		Product IDs, categories and production items match the active
-		LCoinShopProduct_Classic-eu.dat. Ingredients and limits are controlled
-		by the server. Products 10069 and 10070 are intentionally excluded
-		because items 99041 and 99042 do not exist in this datapack.
+		Category contract used by the Special Craft window:
+		0 Special Weapon, 2 Spellbook, 3 Accessories, 4 Misc,
+		5 Blessing, 6 Event. Categories 0 and 6 intentionally have no active
+		products: the former still lacks an obtainable material loop and the
+		latter must only be enabled for a running event.
+
+		The current Classic 447 client does not contain these ProductIds. The
+		server is intentionally prepared first; displaying them is a separate
+		client patch phase.
 	-->
 
-	<!-- Category 0: Special Weapons / featured products. -->
-	<product id="10001" category="0">
-		<ingredient id="91663" count="1000" /> <!-- L-Coin -->
-		<production id="92020" /> <!-- Enchant Kit: Talisman of Eva -->
+	<!-- Category 2: Spellbook. Giran Seal attempts with a partial seal refund. -->
+	<product id="4238" category="2">
+		<ingredient id="92314" count="49" /> <!-- Giran Seal -->
+		<production id="97175" count="1" chance="50.0" id2="92314" count2="5" chance2="50.0" /> <!-- Spellbook Coupon - 1 Star -->
 	</product>
-	<product id="10002" category="0">
-		<ingredient id="91663" count="800" /> <!-- L-Coin -->
-		<production id="91767" /> <!-- Enchant Kit: Talisman of Aden -->
+	<product id="4239" category="2">
+		<ingredient id="92314" count="60" /> <!-- Giran Seal -->
+		<production id="97176" count="1" chance="30.0" id2="92314" count2="6" chance2="70.0" /> <!-- Spellbook Coupon - 2 Stars -->
 	</product>
-	<product id="10060" category="0">
-		<ingredient id="92314" count="50" /> <!-- Giran Seal -->
-		<production id="94214" /> <!-- Mark of Maestro (Time-limited) -->
+	<product id="4240" category="2">
+		<ingredient id="92314" count="137" /> <!-- Giran Seal -->
+		<production id="97177" count="1" chance="10.0" id2="92314" count2="13" chance2="90.0" /> <!-- Spellbook Coupon - 3 Stars -->
 	</product>
-
-	<!-- Category 1: Spellbook / character progression. -->
-	<product id="10021" category="1">
-		<ingredient id="91663" count="800" /> <!-- L-Coin -->
-		<production id="91032" /> <!-- Fire Spirit Evolution Stone -->
-	</product>
-	<product id="10022" category="1">
-		<ingredient id="91663" count="800" /> <!-- L-Coin -->
-		<production id="91033" /> <!-- Wind Spirit Evolution Stone -->
-	</product>
-	<product id="10023" category="1">
-		<ingredient id="91663" count="800" /> <!-- L-Coin -->
-		<production id="91034" /> <!-- Earth Spirit Evolution Stone -->
-	</product>
-	<product id="10024" category="1">
-		<ingredient id="91663" count="800" /> <!-- L-Coin -->
-		<production id="91031" /> <!-- Water Spirit Evolution Stone -->
-	</product>
-	<product id="10061" category="1">
-		<ingredient id="92314" count="80" /> <!-- Giran Seal -->
-		<production id="22223" /> <!-- Stable Scroll: Enchant A-grade Weapon -->
-	</product>
-	<product id="10062" category="1">
-		<ingredient id="92314" count="40" /> <!-- Giran Seal -->
-		<production id="49486" /> <!-- Stable Scroll: Enchant B-grade Weapon -->
-	</product>
-	<product id="10063" category="1">
-		<ingredient id="92314" count="40" /> <!-- Giran Seal -->
-		<production id="22224" /> <!-- Stable Scroll: Enchant A-grade Armor -->
-	</product>
-	<product id="10064" category="1">
-		<ingredient id="92314" count="20" /> <!-- Giran Seal -->
-		<production id="49485" /> <!-- Stable Scroll: Enchant B-grade Armor -->
+	<product id="4241" category="2">
+		<ingredient id="92314" count="1208" /> <!-- Giran Seal -->
+		<production id="97178" count="1" chance="5.0" id2="92314" count2="120" chance2="95.0" /> <!-- Spellbook Coupon - 4 Stars -->
 	</product>
 
-	<!-- Category 2: Accessories / utility consumables. -->
-	<product id="10012" category="2">
-		<ingredient id="91663" count="300" /> <!-- L-Coin -->
-		<production id="90404" /> <!-- My Teleport Book -->
-	</product>
-	<product id="10013" category="2">
-		<ingredient id="91663" count="20" /> <!-- L-Coin -->
-		<production id="90405" /> <!-- My Teleport Scroll -->
-	</product>
-	<product id="10014" category="2">
-		<ingredient id="91663" count="20" /> <!-- L-Coin -->
-		<production id="91689" /> <!-- Blessed Scroll of Escape -->
-	</product>
-	<product id="10042" category="2">
-		<ingredient id="91663" count="50" /> <!-- L-Coin -->
-		<production id="90519" /> <!-- Shining Scroll of Mood Melody -->
-	</product>
-	<product id="10043" category="2">
-		<ingredient id="91663" count="100" /> <!-- L-Coin -->
-		<production id="90183" /> <!-- Chef's Fish Stew - Victory -->
-	</product>
-	<product id="10044" category="2">
-		<ingredient id="91663" count="350" /> <!-- L-Coin -->
-		<production id="49081" /> <!-- XP Growth Scroll -->
-	</product>
-	<product id="10011" category="2">
-		<ingredient id="91663" count="20" /> <!-- L-Coin -->
-		<production id="91641" /> <!-- Sayha's Blessing -->
-	</product>
-
-	<!-- Category 3: Misc / permanent utility. -->
-	<product id="10018" category="3">
-		<ingredient id="92314" count="10" /> <!-- Giran Seal -->
-		<production id="92006" /> <!-- Inventory Expansion Ticket Lv.3 -->
-	</product>
-	<product id="10019" category="3">
-		<ingredient id="92314" count="20" /> <!-- Giran Seal -->
-		<production id="92007" /> <!-- Inventory Expansion Ticket Lv.4 -->
-	</product>
-	<product id="10020" category="3">
-		<ingredient id="92314" count="40" /> <!-- Giran Seal -->
-		<production id="92008" /> <!-- Inventory Expansion Ticket Lv.5 -->
-	</product>
-	<product id="10025" category="3">
-		<ingredient id="57" count="5000000" /> <!-- Adena -->
-		<production id="32253" /> <!-- Infinite Mithril Quiver -->
-	</product>
-	<product id="10026" category="3">
-		<ingredient id="57" count="3000000" /> <!-- Adena -->
-		<production id="32252" /> <!-- Infinite Silver Quiver -->
-	</product>
-	<product id="10027" category="3">
-		<ingredient id="57" count="2000000" /> <!-- Adena -->
-		<production id="32251" /> <!-- Infinite Steel Quiver -->
-	</product>
-	<product id="10028" category="3">
+	<!-- Category 3: Accessories. Deterministic +6 package exchanges. -->
+	<product id="4557" category="3">
+		<ingredient id="98941" count="28" /> <!-- Package: Hunter's Earring -->
 		<ingredient id="57" count="1000000" /> <!-- Adena -->
-		<production id="32250" /> <!-- Infinite Bone Quiver -->
+		<production id="100015" /> <!-- Package: +6 Hunter's Earring -->
 	</product>
-	<product id="10065" category="3">
-		<ingredient id="92314" count="100" /> <!-- Giran Seal -->
-		<production id="32254" /> <!-- Infinite Quiver of Light -->
+	<product id="4217" category="3">
+		<ingredient id="97266" count="285" /> <!-- Enchant Kit: Piercing Mask -->
+		<ingredient id="57" count="1000000" /> <!-- Adena -->
+		<production id="98030" /> <!-- Package: +6 Piercing Mask -->
+	</product>
+	<product id="2020" category="3">
+		<ingredient id="94168" count="285" /> <!-- Enchant Kit: Circlet of Hero -->
+		<ingredient id="57" count="500000" /> <!-- Adena -->
+		<production id="96926" /> <!-- Package: +6 Circlet of Hero -->
+	</product>
+	<product id="1971" category="3">
+		<ingredient id="93330" count="1" /> <!-- Enchant Kit: Talisman of Authority -->
+		<ingredient id="57" count="500000" /> <!-- Adena -->
+		<production id="97954" /> <!-- +6 Talisman of Authority Pack -->
+	</product>
+	<product id="2021" category="3">
+		<ingredient id="92020" count="285" /> <!-- Enchant Kit: Talisman of Eva -->
+		<ingredient id="57" count="500000" /> <!-- Adena -->
+		<production id="92456" /> <!-- +6 Talisman of Eva Pack -->
+	</product>
+	<product id="2022" category="3">
+		<ingredient id="93685" count="180" /> <!-- Enchant Kit: Talisman of Speed -->
+		<ingredient id="57" count="500000" /> <!-- Adena -->
+		<production id="92465" /> <!-- +6 Talisman of Speed Pack -->
+	</product>
+	<product id="2023" category="3">
+		<ingredient id="91864" count="285" /> <!-- Dragon Belt Pack -->
+		<ingredient id="57" count="500000" /> <!-- Adena -->
+		<production id="93728" /> <!-- +6 Dragon Belt Pack -->
+	</product>
+	<product id="2024" category="3">
+		<ingredient id="93303" count="17" /> <!-- Package: Cloak of Protection -->
+		<ingredient id="57" count="300000" /> <!-- Adena -->
+		<production id="97229" /> <!-- Package: +6 Cloak of Protection -->
+	</product>
+	<product id="4218" category="3">
+		<ingredient id="98240" count="9" /> <!-- Package: Agathion Dragon Egg -->
+		<ingredient id="57" count="1000000" /> <!-- Adena -->
+		<production id="98852" /> <!-- Package: +6 Agathion Dragon Egg -->
+	</product>
+	<product id="2025" category="3">
+		<ingredient id="93134" count="9" /> <!-- Package: Agathion Ignis -->
+		<ingredient id="57" count="300000" /> <!-- Adena -->
+		<production id="98184" /> <!-- Package: +6 Agathion Ignis -->
+	</product>
+	<product id="2026" category="3">
+		<ingredient id="93135" count="9" /> <!-- Package: Agathion Nebula -->
+		<ingredient id="57" count="300000" /> <!-- Adena -->
+		<production id="98185" /> <!-- Package: +6 Agathion Nebula -->
+	</product>
+	<product id="2027" category="3">
+		<ingredient id="93136" count="9" /> <!-- Package: Agathion Procella -->
+		<ingredient id="57" count="300000" /> <!-- Adena -->
+		<production id="98186" /> <!-- Package: +6 Agathion Procella -->
+	</product>
+	<product id="2028" category="3">
+		<ingredient id="93137" count="9" /> <!-- Package: Agathion Petram -->
+		<ingredient id="57" count="300000" /> <!-- Adena -->
+		<production id="98187" /> <!-- Package: +6 Agathion Petram -->
+	</product>
+	<product id="2029" category="3">
+		<ingredient id="93138" count="9" /> <!-- Package: Agathion Joy -->
+		<ingredient id="57" count="300000" /> <!-- Adena -->
+		<production id="98853" /> <!-- Package: +6 Agathion Joy -->
 	</product>
 
-	<!-- Category 4: Blessing / limited progression. -->
-	<product id="10016" category="4">
-		<ingredient id="92314" count="2" /> <!-- Giran Seal -->
-		<production id="92004" /> <!-- Inventory Expansion Ticket Lv.1 -->
+	<!-- Category 4: Misc. Scrolls and augmenting-stone conversion. -->
+	<product id="4267" category="4">
+		<ingredient id="92314" count="70" /> <!-- Giran Seal -->
+		<production id="97860" /> <!-- Stable Scroll: Enchant Rare Accessories -->
 	</product>
-	<product id="10017" category="4">
-		<ingredient id="92314" count="5" /> <!-- Giran Seal -->
-		<production id="92005" /> <!-- Inventory Expansion Ticket Lv.2 -->
+	<product id="4268" category="4">
+		<ingredient id="92314" count="281" /> <!-- Giran Seal -->
+		<production id="98040" /> <!-- Incredible Upgrade Stone -->
 	</product>
-	<product id="10035" category="4">
-		<ingredient id="91663" count="20" /> <!-- L-Coin -->
-		<production id="91641" accountDailyLimit="20" /> <!-- Sayha's Blessing -->
+	<product id="1344" category="4">
+		<ingredient id="57" count="2000" /> <!-- Adena -->
+		<production id="98611" /> <!-- Scroll: Enchant Accessories -->
 	</product>
-	<product id="10066" category="4">
-		<ingredient id="91663" count="1000" /> <!-- L-Coin -->
-		<production id="92020" accountDailyLimit="1" /> <!-- Enchant Kit: Talisman of Eva -->
-	</product>
-	<product id="10067" category="4">
-		<ingredient id="91663" count="800" /> <!-- L-Coin -->
-		<production id="91767" accountDailyLimit="1" /> <!-- Enchant Kit: Talisman of Aden -->
-	</product>
-	<product id="10068" category="4">
-		<ingredient id="92314" count="25" /> <!-- Giran Seal -->
-		<production id="94208" accountDailyLimit="1" /> <!-- Scroll of Blessing -->
-	</product>
-	<product id="10071" category="4">
-		<ingredient id="91663" count="100" /> <!-- L-Coin -->
-		<production id="94377" accountDailyLimit="10" /> <!-- Supply Pouch -->
-	</product>
-	<product id="10073" category="4">
-		<ingredient id="57" count="5000000" /> <!-- Adena -->
-		<production id="94781" accountBuyLimit="2" /> <!-- Growth Rune Lv.1 -->
-	</product>
-	<product id="10074" category="4">
+	<product id="3350" category="4">
+		<ingredient id="97787" count="2" /> <!-- Augmenting Stone: Special Equipment -->
 		<ingredient id="57" count="1000000" /> <!-- Adena -->
-		<production id="94780" accountDailyLimit="100" /> <!-- Growth Rune Fragment -->
+		<production id="97789" chance="15.0" id2="97787" chance2="85.0" /> <!-- Blessed Augmenting Stone: Special Equipment -->
 	</product>
-	<product id="10124" category="4">
-		<ingredient id="92314" count="15" /> <!-- Giran Seal -->
-		<production id="93406" accountDailyLimit="5" /> <!-- Scroll: Enchant B-grade Weapon -->
+	<product id="3351" category="4">
+		<ingredient id="97788" count="2" /> <!-- Augmenting Stone: Special Equipment (Sealed) -->
+		<ingredient id="57" count="1000000" /> <!-- Adena -->
+		<production id="97790" chance="15.0" id2="97788" chance2="85.0" /> <!-- Blessed Augmenting Stone: Special Equipment (Sealed) -->
 	</product>
-	<product id="10125" category="4">
-		<ingredient id="92314" count="10" /> <!-- Giran Seal -->
-		<production id="93407" accountDailyLimit="5" /> <!-- Scroll: Enchant B-grade Armor -->
+	<product id="3352" category="4">
+		<ingredient id="94186" count="2" /> <!-- Augmenting Stone: Weapon -->
+		<ingredient id="57" count="1000000" /> <!-- Adena -->
+		<production id="97439" chance="15.0" id2="94186" chance2="85.0" /> <!-- Blessed Augmenting Stone: Weapon -->
 	</product>
-	<product id="10126" category="4">
-		<ingredient id="92314" count="8" /> <!-- Giran Seal -->
-		<production id="93408" accountDailyLimit="5" /> <!-- Scroll: Enchant C-grade Weapon -->
+	<product id="3353" category="4">
+		<ingredient id="94210" count="2" /> <!-- Augmenting Stone: Weapon (Sealed) -->
+		<ingredient id="57" count="1000000" /> <!-- Adena -->
+		<production id="97444" chance="15.0" id2="94210" chance2="85.0" /> <!-- Blessed Augmenting Stone: Weapon (Sealed) -->
 	</product>
-	<product id="10127" category="4">
-		<ingredient id="92314" count="5" /> <!-- Giran Seal -->
-		<production id="93409" accountDailyLimit="5" /> <!-- Scroll: Enchant C-grade Armor -->
+	<product id="3354" category="4">
+		<ingredient id="94188" count="2" /> <!-- Augmenting Stone: Armor -->
+		<ingredient id="57" count="1000000" /> <!-- Adena -->
+		<production id="97440" chance="15.0" id2="94188" chance2="85.0" /> <!-- Blessed Augmenting Stone: Armor -->
 	</product>
-	<product id="10128" category="4">
-		<ingredient id="92314" count="3" /> <!-- Giran Seal -->
-		<production id="93410" accountDailyLimit="5" /> <!-- Scroll: Enchant D-grade Weapon -->
+	<product id="3355" category="4">
+		<ingredient id="94212" count="2" /> <!-- Augmenting Stone: Armor (Sealed) -->
+		<ingredient id="57" count="1000000" /> <!-- Adena -->
+		<production id="97445" chance="15.0" id2="94212" chance2="85.0" /> <!-- Blessed Augmenting Stone: Armor (Sealed) -->
 	</product>
-	<product id="10129" category="4">
-		<ingredient id="92314" count="2" /> <!-- Giran Seal -->
-		<production id="93411" accountDailyLimit="5" /> <!-- Scroll: Enchant D-grade Armor -->
+	<product id="3356" category="4">
+		<ingredient id="94423" count="2" /> <!-- Augmenting Stone: Accessory -->
+		<ingredient id="57" count="1000000" /> <!-- Adena -->
+		<production id="97442" chance="15.0" id2="94423" chance2="85.0" /> <!-- Blessed Augmenting Stone: Accessory -->
+	</product>
+	<product id="3357" category="4">
+		<ingredient id="94424" count="2" /> <!-- Augmenting Stone: Accessory (Sealed) -->
+		<ingredient id="57" count="1000000" /> <!-- Adena -->
+		<production id="97447" chance="15.0" id2="94424" chance2="85.0" /> <!-- Blessed Augmenting Stone: Accessory (Sealed) -->
+	</product>
+
+	<!-- Category 5: Blessing. Combine two equal +4/+5 items deterministically. -->
+	<product id="4182" category="5">
+		<ingredient id="91745" enchant="4" count="2" /> <!-- +4 Talisman of Aden -->
+		<production id="98723" /> <!-- Package: +4 Blessed Talisman of Aden -->
+	</product>
+	<product id="4183" category="5">
+		<ingredient id="91745" enchant="5" count="2" /> <!-- +5 Talisman of Aden -->
+		<production id="98724" /> <!-- Package: +5 Blessed Talisman of Aden -->
+	</product>
+	<product id="4009" category="5">
+		<ingredient id="91061" enchant="4" count="2" /> <!-- +4 Talisman of Authority -->
+		<production id="98713" /> <!-- Package: +4 Blessed Talisman of Authority -->
+	</product>
+	<product id="4010" category="5">
+		<ingredient id="91061" enchant="5" count="2" /> <!-- +5 Talisman of Authority -->
+		<production id="98714" /> <!-- Package: +5 Blessed Talisman of Authority -->
+	</product>
+	<product id="3701" category="5">
+		<ingredient id="94166" enchant="4" count="2" /> <!-- +4 Circlet of Hero -->
+		<production id="98205" enchant="4" /> <!-- +4 Blessed Circlet of Hero -->
+	</product>
+	<product id="3702" category="5">
+		<ingredient id="94166" enchant="5" count="2" /> <!-- +5 Circlet of Hero -->
+		<production id="98205" enchant="5" /> <!-- +5 Blessed Circlet of Hero -->
+	</product>
+	<product id="1203" category="5">
+		<ingredient id="91862" enchant="4" count="2" /> <!-- +4 Dragon Belt -->
+		<production id="94621" enchant="4" /> <!-- +4 Blessed Dragon Belt -->
+	</product>
+	<product id="1204" category="5">
+		<ingredient id="91862" enchant="5" count="2" /> <!-- +5 Dragon Belt -->
+		<production id="94621" enchant="5" /> <!-- +5 Blessed Dragon Belt -->
+	</product>
+	<product id="2879" category="5">
+		<ingredient id="92403" enchant="4" count="2" /> <!-- +4 Talisman of Speed -->
+		<production id="97563" /> <!-- Package: +4 Blessed Talisman of Speed -->
+	</product>
+	<product id="2880" category="5">
+		<ingredient id="92403" enchant="5" count="2" /> <!-- +5 Talisman of Speed -->
+		<production id="97564" /> <!-- Package: +5 Blessed Talisman of Speed -->
+	</product>
+	<product id="2886" category="5">
+		<ingredient id="92018" enchant="4" count="2" /> <!-- +4 Talisman of Eva -->
+		<production id="97573" /> <!-- Package: +4 Blessed Talisman of Eva -->
+	</product>
+	<product id="2887" category="5">
+		<ingredient id="92018" enchant="5" count="2" /> <!-- +5 Talisman of Eva -->
+		<production id="97574" /> <!-- Package: +5 Blessed Talisman of Eva -->
 	</product>
 </list>

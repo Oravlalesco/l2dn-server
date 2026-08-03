@@ -6,12 +6,11 @@ namespace L2Dn.GameServer.StaticData.Tests;
 
 public sealed class ClassicSpecialCraftCatalogTests
 {
-    private static readonly CatalogProduct[] ExpectedProducts =
+    private static readonly StoreProduct[] ExpectedStoreProducts =
     [
         new(10001, 0, 91663, 1000, 92020),
         new(10002, 0, 91663, 800, 91767),
         new(10060, 0, 92314, 50, 94214),
-
         new(10021, 1, 91663, 800, 91032),
         new(10022, 1, 91663, 800, 91033),
         new(10023, 1, 91663, 800, 91034),
@@ -20,7 +19,6 @@ public sealed class ClassicSpecialCraftCatalogTests
         new(10062, 1, 92314, 40, 49486),
         new(10063, 1, 92314, 40, 22224),
         new(10064, 1, 92314, 20, 49485),
-
         new(10012, 2, 91663, 300, 90404),
         new(10013, 2, 91663, 20, 90405),
         new(10014, 2, 91663, 20, 91689),
@@ -28,7 +26,6 @@ public sealed class ClassicSpecialCraftCatalogTests
         new(10043, 2, 91663, 100, 90183),
         new(10044, 2, 91663, 350, 49081),
         new(10011, 2, 91663, 20, 91641),
-
         new(10018, 3, 92314, 10, 92006),
         new(10019, 3, 92314, 20, 92007),
         new(10020, 3, 92314, 40, 92008),
@@ -37,7 +34,6 @@ public sealed class ClassicSpecialCraftCatalogTests
         new(10027, 3, 57, 2000000, 32251),
         new(10028, 3, 57, 1000000, 32250),
         new(10065, 3, 92314, 100, 32254),
-
         new(10016, 4, 92314, 2, 92004),
         new(10017, 4, 92314, 5, 92005),
         new(10035, 4, 91663, 20, 91641, DailyLimit: 20),
@@ -56,34 +52,36 @@ public sealed class ClassicSpecialCraftCatalogTests
     ];
 
     [Fact]
-    public void Catalog_matches_the_active_classic_client_product_manifest()
+    public void LCoin_store_matches_the_active_classic_client_products()
     {
-        CatalogProduct[] products = LoadProducts();
+        StoreProduct[] products = LoadStoreProducts();
 
-        products.Should().Equal(ExpectedProducts);
+        products.Should().Equal(ExpectedStoreProducts);
         products.Select(product => product.ProductId).Should().OnlyHaveUniqueItems();
         products.Should().NotContain(product => product.ProductionId == 99041 || product.ProductionId == 99042);
     }
 
     [Fact]
-    public void Catalog_populates_every_supported_tab_and_reserves_event_for_a_client_patch()
+    public void Special_craft_uses_the_semantic_classic_categories()
     {
-        LoadProducts()
-            .GroupBy(product => product.Category)
-            .ToDictionary(group => group.Key, group => group.Count())
-            .Should()
-            .BeEquivalentTo(new Dictionary<int, int>
+        XElement[] products = LoadProductElements("LimitShopCraft.xml");
+
+        products.GroupBy(ProductCategory).ToDictionary(group => group.Key, group => group.Count())
+            .Should().BeEquivalentTo(new Dictionary<int, int>
             {
-                [0] = 3,
-                [1] = 8,
-                [2] = 7,
-                [3] = 8,
-                [4] = 15,
+                [2] = 4,  // Spellbook
+                [3] = 14, // Accessories
+                [4] = 11, // Misc
+                [5] = 12, // Blessing
             });
+
+        products.Select(ProductId).Should().OnlyHaveUniqueItems();
+        products.Should().NotContain(product =>
+            ProductCategory(product) == 0 || ProductCategory(product) == 6);
     }
 
     [Fact]
-    public void Every_catalog_item_exists_in_the_server_datapack()
+    public void Every_store_and_craft_item_exists_in_the_server_datapack()
     {
         HashSet<int> itemIds = Directory
             .EnumerateFiles(DataPackPath("stats", "items"), "*.xml")
@@ -91,11 +89,50 @@ public sealed class ClassicSpecialCraftCatalogTests
             .Select(item => (int)item.Attribute("id")!)
             .ToHashSet();
 
-        ExpectedProducts
-            .SelectMany(product => new[] { product.IngredientId, product.ProductionId })
-            .Distinct()
-            .Should()
-            .OnlyContain(itemId => itemIds.Contains(itemId));
+        XElement[] products =
+        [
+            .. LoadProductElements("LimitShop.xml"),
+            .. LoadProductElements("LimitShopCraft.xml"),
+        ];
+
+        products.SelectMany(ReferencedItemIds).Distinct().Should().OnlyContain(itemId => itemIds.Contains(itemId));
+    }
+
+    [Fact]
+    public void Every_random_craft_declares_a_complete_probability_distribution()
+    {
+        XElement[] randomProductions = LoadProductElements("LimitShopCraft.xml")
+            .Select(product => product.Element("production")!)
+            .Where(production => production.Attribute("id2") != null)
+            .ToArray();
+
+        randomProductions.Should().HaveCount(12);
+        foreach (XElement production in randomProductions)
+        {
+            double[] chances = Enumerable.Range(1, 4)
+                .Select(index => index == 1 ? "chance" : $"chance{index}")
+                .Select(name => (double?)production.Attribute(name))
+                .Where(chance => chance.HasValue)
+                .Select(chance => chance!.Value)
+                .ToArray();
+
+            chances.Sum().Should().BeApproximately(100, 0.0001,
+                $"product {production.Parent!.Attribute("id")!.Value} must cover one weighted roll");
+        }
+    }
+
+    [Fact]
+    public void Blessing_recipes_require_two_items_at_the_declared_enchant()
+    {
+        XElement[] blessingProducts = LoadProductElements("LimitShopCraft.xml")
+            .Where(product => ProductCategory(product) == 5)
+            .ToArray();
+
+        blessingProducts.Should().HaveCount(12);
+        blessingProducts.Select(product => product.Elements("ingredient").Single())
+            .Should().OnlyContain(ingredient =>
+                (long)ingredient.Attribute("count")! == 2 &&
+                ((int)ingredient.Attribute("enchant")! == 4 || (int)ingredient.Attribute("enchant")! == 5));
     }
 
     [Fact]
@@ -108,23 +145,43 @@ public sealed class ClassicSpecialCraftCatalogTests
             .Should().NotBe(AccountVariables.getLCoinShopProductDailyCountName(4, 10067));
     }
 
-    private static CatalogProduct[] LoadProducts() => XDocument
-        .Load(DataPackPath("LimitShopCraft.xml"))
-        .Root!
-        .Elements("product")
+    private static StoreProduct[] LoadStoreProducts() => LoadProductElements("LimitShop.xml")
         .Select(product =>
         {
             XElement ingredient = product.Elements("ingredient").Single();
-            XElement production = product.Elements("production").Single();
-            return new CatalogProduct(
-                (int)product.Attribute("id")!,
-                (int)product.Attribute("category")!,
+            XElement production = product.Element("production")!;
+            return new StoreProduct(
+                ProductId(product),
+                ProductCategory(product),
                 (int)ingredient.Attribute("id")!,
                 (long)ingredient.Attribute("count")!,
                 (int)production.Attribute("id")!,
                 (int?)production.Attribute("accountDailyLimit") ?? 0,
                 (int?)production.Attribute("accountBuyLimit") ?? 0);
         })
+        .ToArray();
+
+    private static IEnumerable<int> ReferencedItemIds(XElement product)
+    {
+        foreach (XElement ingredient in product.Elements("ingredient"))
+            yield return (int)ingredient.Attribute("id")!;
+
+        XElement production = product.Element("production")!;
+        yield return (int)production.Attribute("id")!;
+        for (int index = 2; index <= 5; index++)
+        {
+            if ((int?)production.Attribute($"id{index}") is { } itemId)
+                yield return itemId;
+        }
+    }
+
+    private static int ProductId(XElement product) => (int)product.Attribute("id")!;
+    private static int ProductCategory(XElement product) => (int)product.Attribute("category")!;
+
+    private static XElement[] LoadProductElements(string fileName) => XDocument
+        .Load(DataPackPath(fileName))
+        .Root!
+        .Elements("product")
         .ToArray();
 
     private static string DataPackPath(params string[] segments)
@@ -142,7 +199,7 @@ public sealed class ClassicSpecialCraftCatalogTests
         throw new DirectoryNotFoundException("Could not locate the GameServer DataPack from the test output directory.");
     }
 
-    private sealed record CatalogProduct(
+    private sealed record StoreProduct(
         int ProductId,
         int Category,
         int IngredientId,
