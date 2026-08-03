@@ -10,3 +10,7 @@ bin
 
 # Docker dev publish output (generado por dev-publish*.ps1)
 Docker/publish/
+
+# Reproducible client tooling downloads and generated DAT artifacts
+tools/client/downloads/
+tools/client/output/

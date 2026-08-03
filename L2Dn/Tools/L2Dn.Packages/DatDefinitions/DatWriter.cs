@@ -10,9 +10,14 @@ public static class DatWriter
     {
         // TODO: for now, I write only non-encrypted data, use l2encdec to encrypt
         using FileStream stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
+        Write(stream, obj, isSafePackage);
+    }
+
+    public static void Write(Stream stream, object obj, bool isSafePackage = true)
+    {
         DatBinaryWriter writer = new DatBinaryWriter(stream);
         WriteObject(writer, obj);
-        
+
         if (isSafePackage)
             writer.WriteString("SafePackage");
     }

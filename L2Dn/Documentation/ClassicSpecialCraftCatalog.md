@@ -71,18 +71,15 @@ versión bendecida.
 - Los puntos VIP se aplican una vez por compra y no una vez por ingrediente.
 - Los contadores de cuenta permanecen aislados por `shopType` y `ProductId`.
 
-## Límite de esta fase: cliente
+## Integración de cliente
 
-No se modifica ningún archivo del cliente. El DAT Classic 447 actual contiene
-los productos de la tienda L-Coin, pero no los ProductId restaurados para
-Special Craft. Por ello:
+La fase de cliente está documentada en
+[ClassicSpecialCraftClient.md](ClassicSpecialCraftClient.md). La tabla correcta
+es `PurchaseLimitCraft_Classic-eu.dat`, no `LCoinShopProduct_Classic-eu.dat`.
+El generador importa los 41 registros equivalentes del DAT ClassicAden incluido
+en el mismo cliente, valida ProductId, categoría, resultados, probabilidades,
+encantamientos y niveles contra este XML, y genera un DAT Classic verificable.
 
-- la tienda L-Coin puede alinearse inmediatamente con sus 41 registros actuales;
-- las nuevas recetas de Special Craft quedan cargadas y comprables en el
-  servidor, pero no aparecerán correctamente en la interfaz hasta una fase
-  posterior de cliente;
-- cambiar solamente `category` en el XML no mueve un producto entre pestañas,
-  porque la presentación y la categoría visual provienen del DAT.
-
-Cuando se aborde el cliente, cada registro deberá reproducir como mínimo el
-`ProductId`, la categoría, todos los resultados posibles y los límites del XML.
+Los ingredientes permanecen exclusivamente en el XML del servidor y se envían
+a la interfaz por protocolo. Las pestañas se conservan en
+`PurchaseLimitCraftCategory_Classic.dat` sin modificaciones.
