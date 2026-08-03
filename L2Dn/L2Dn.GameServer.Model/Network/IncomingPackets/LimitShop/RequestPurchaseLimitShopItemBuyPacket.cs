@@ -108,21 +108,13 @@ public struct RequestPurchaseLimitShopItemBuyPacket: IIncomingPacket<GameSession
 		player.addRequest(new PrimeShopRequest(player));
 
 		// Check limits.
+		int remainingInfo = 0;
 		if (_product.getAccountDailyLimit() > 0) // Sale period.
 		{
-			long amount = _product.getAccountDailyLimit() * _amount;
-			if (amount < 1)
-			{
-				player.sendPacket(SystemMessageId.INCORRECT_ITEM_COUNT_2);
-				player.removeRequest<PrimeShopRequest>();
-				player.sendPacket(new ExPurchaseLimitShopItemResultPacket(false, _shopIndex, _productId, 0,
-					new List<LimitShopRandomCraftReward>()));
-
-				return ValueTask.CompletedTask;
-			}
-
-			if (player.getAccountVariables()
-				    .Get(AccountVariables.LCOIN_SHOP_PRODUCT_DAILY_COUNT + _product.getProductionId(), 0) >= amount)
+			string countName = AccountVariables.getLCoinShopProductDailyCountName(_shopIndex, _product.getId());
+			long currentCount = player.getAccountVariables().Get(countName, 0);
+			remainingInfo = (int)Math.Max(_product.getAccountDailyLimit() - currentCount, 0);
+			if (_amount > remainingInfo)
 			{
 				player.sendMessage("You have reached your daily limit."); // TODO: Retail system message?
 				player.removeRequest<PrimeShopRequest>();
@@ -134,17 +126,10 @@ public struct RequestPurchaseLimitShopItemBuyPacket: IIncomingPacket<GameSession
 		}
 		else if (_product.getAccountMontlyLimit() > 0)
 		{
-			long amount = _product.getAccountMontlyLimit() * _amount;
-			if (amount < 1)
-			{
-				player.sendPacket(SystemMessageId.INCORRECT_ITEM_COUNT_2);
-				player.removeRequest<PrimeShopRequest>();
-				player.sendPacket(new ExPurchaseLimitShopItemResultPacket(false, _shopIndex, _productId, 0,
-					new List<LimitShopRandomCraftReward>()));
-
-				return ValueTask.CompletedTask;
-			}
-			if (player.getAccountVariables().Get(AccountVariables.LCOIN_SHOP_PRODUCT_MONTLY_COUNT + _product.getProductionId(), 0) >= amount)
+			string countName = AccountVariables.getLCoinShopProductMontlyCountName(_shopIndex, _product.getId());
+			long currentCount = player.getAccountVariables().Get(countName, 0);
+			remainingInfo = (int)Math.Max(_product.getAccountMontlyLimit() - currentCount, 0);
+			if (_amount > remainingInfo)
 			{
 				player.sendMessage("You have reached your montly limit.");
 				player.removeRequest<PrimeShopRequest>();
@@ -157,18 +142,10 @@ public struct RequestPurchaseLimitShopItemBuyPacket: IIncomingPacket<GameSession
 		}
 		else if (_product.getAccountBuyLimit() > 0) // Count limit.
 		{
-			long amount = _product.getAccountBuyLimit() * _amount;
-			if (amount < 1)
-			{
-				player.sendPacket(SystemMessageId.INCORRECT_ITEM_COUNT_2);
-				player.removeRequest<PrimeShopRequest>();
-				player.sendPacket(new ExPurchaseLimitShopItemResultPacket(false, _shopIndex, _productId, 0,
-					new List<LimitShopRandomCraftReward>()));
-
-				return ValueTask.CompletedTask;
-			}
-
-			if (player.getAccountVariables().Get(AccountVariables.LCOIN_SHOP_PRODUCT_COUNT + _product.getProductionId(), 0) >= amount)
+			string countName = AccountVariables.getLCoinShopProductCountName(_shopIndex, _product.getId());
+			long currentCount = player.getAccountVariables().Get(countName, 0);
+			remainingInfo = (int)Math.Max(_product.getAccountBuyLimit() - currentCount, 0);
+			if (_amount > remainingInfo)
 			{
 				player.sendMessage("You cannot buy any more of this item."); // TODO: Retail system message?
 				player.removeRequest<PrimeShopRequest>();
@@ -180,10 +157,6 @@ public struct RequestPurchaseLimitShopItemBuyPacket: IIncomingPacket<GameSession
 		}
 
 		// Check existing items.
-		int remainingInfo = Math.Max(0,
-			Math.Max(_product.getAccountBuyLimit(),
-				Math.Max(_product.getAccountDailyLimit(), _product.getAccountMontlyLimit())));
-
 		for (int i = 0; i < _product.getIngredientIds().Length; i++)
 		{
 			if (_product.getIngredientIds()[i] == 0)
@@ -477,26 +450,22 @@ public struct RequestPurchaseLimitShopItemBuyPacket: IIncomingPacket<GameSession
 		// Update account variables.
 		if (_product.getAccountDailyLimit() > 0)
 		{
+			string countName = AccountVariables.getLCoinShopProductDailyCountName(_shopIndex, _product.getId());
 			player.getAccountVariables()
-				.Set(AccountVariables.LCOIN_SHOP_PRODUCT_DAILY_COUNT + _product.getProductionId(),
-					player.getAccountVariables()
-						.Get(AccountVariables.LCOIN_SHOP_PRODUCT_DAILY_COUNT + _product.getProductionId(), 0) +
-					_amount);
+				.Set(countName, player.getAccountVariables().Get(countName, 0) + _amount);
 		}
 
 		if (_product.getAccountMontlyLimit() > 0)
 		{
+			string countName = AccountVariables.getLCoinShopProductMontlyCountName(_shopIndex, _product.getId());
 			player.getAccountVariables()
-				.Set(AccountVariables.LCOIN_SHOP_PRODUCT_MONTLY_COUNT + _product.getProductionId(),
-					player.getAccountVariables()
-						.Get(AccountVariables.LCOIN_SHOP_PRODUCT_MONTLY_COUNT + _product.getProductionId(), 0) +
-					_amount);
+				.Set(countName, player.getAccountVariables().Get(countName, 0) + _amount);
 		}
 		else if (_product.getAccountBuyLimit() > 0)
 		{
-			player.getAccountVariables().Set(AccountVariables.LCOIN_SHOP_PRODUCT_COUNT + _product.getProductionId(),
-				player.getAccountVariables()
-					.Get(AccountVariables.LCOIN_SHOP_PRODUCT_COUNT + _product.getProductionId(), 0) + _amount);
+			string countName = AccountVariables.getLCoinShopProductCountName(_shopIndex, _product.getId());
+			player.getAccountVariables().Set(countName,
+				player.getAccountVariables().Get(countName, 0) + _amount);
 		}
 
 		player.sendPacket(new ExPurchaseLimitShopItemResultPacket(true, _shopIndex, _productId,

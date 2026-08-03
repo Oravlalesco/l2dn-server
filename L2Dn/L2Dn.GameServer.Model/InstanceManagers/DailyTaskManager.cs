@@ -609,12 +609,12 @@ public class DailyTaskManager
 
 	private void resetDailyLimitShopData()
 	{
-		foreach (LimitShopProductHolder holder in LimitShopData.getInstance().getProducts())
+		foreach ((int shopType, LimitShopProductHolder holder) in getLimitShopProducts())
 		{
 			// Update data for offline players.
 			try
 			{
-				string name = AccountVariables.LCOIN_SHOP_PRODUCT_DAILY_COUNT + holder.getProductionId();
+				string name = AccountVariables.getLCoinShopProductDailyCountName(shopType, holder.getId());
 				using GameServerDbContext ctx = DbFactory.Instance.CreateDbContext();
 				ctx.AccountVariables.Where(v => v.Name == name).ExecuteDelete();
 			}
@@ -626,7 +626,8 @@ public class DailyTaskManager
 			// Update data for online players.
 			foreach (Player player in World.getInstance().getPlayers())
 			{
-				player.getAccountVariables().Remove(AccountVariables.LCOIN_SHOP_PRODUCT_DAILY_COUNT + holder.getProductionId());
+				player.getAccountVariables().Remove(
+					AccountVariables.getLCoinShopProductDailyCountName(shopType, holder.getId()));
 				player.getAccountVariables().storeMe();
 			}
 		}
@@ -635,12 +636,12 @@ public class DailyTaskManager
 
 	private void resetMontlyLimitShopData()
 	{
-		foreach (LimitShopProductHolder holder in LimitShopData.getInstance().getProducts())
+		foreach ((int shopType, LimitShopProductHolder holder) in getLimitShopProducts())
 		{
 			// Update data for offline players.
 			try
 			{
-				string name = AccountVariables.LCOIN_SHOP_PRODUCT_MONTLY_COUNT + holder.getProductionId();
+				string name = AccountVariables.getLCoinShopProductMontlyCountName(shopType, holder.getId());
 				using GameServerDbContext ctx = DbFactory.Instance.CreateDbContext();
 				ctx.AccountVariables.Where(v => v.Name == name).ExecuteDelete();
 			}
@@ -651,11 +652,24 @@ public class DailyTaskManager
 			// Update data for online players.
 			foreach (Player player in World.getInstance().getPlayers())
 			{
-				player.getAccountVariables().Remove(AccountVariables.LCOIN_SHOP_PRODUCT_MONTLY_COUNT + holder.getProductionId());
+				player.getAccountVariables().Remove(
+					AccountVariables.getLCoinShopProductMontlyCountName(shopType, holder.getId()));
 				player.getAccountVariables().storeMe();
 			}
 		}
 		LOGGER.Info("LimitShopData has been reset.");
+	}
+
+	private static IEnumerable<(int ShopType, LimitShopProductHolder Product)> getLimitShopProducts()
+	{
+		foreach (LimitShopProductHolder product in LimitShopData.getInstance().getProducts())
+			yield return (3, product);
+
+		foreach (LimitShopProductHolder product in LimitShopCraftData.getInstance().getProducts())
+			yield return (4, product);
+
+		foreach (LimitShopProductHolder product in LimitShopClanData.getInstance().getProducts())
+			yield return (100, product);
 	}
 
 	private void resetHuntPass()

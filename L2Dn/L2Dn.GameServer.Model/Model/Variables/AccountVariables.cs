@@ -17,6 +17,15 @@ public class AccountVariables: AbstractVariables<DbAccountVariable>
     public const string VIP_EXPIRATION = "VipExpiration";
     public const string VIP_ITEM_BOUGHT = "Vip_Item_Bought";
 
+    public static string getLCoinShopProductCountName(int shopType, int productId) =>
+        $"{LCOIN_SHOP_PRODUCT_COUNT}{shopType}_{productId}";
+
+    public static string getLCoinShopProductDailyCountName(int shopType, int productId) =>
+        $"{LCOIN_SHOP_PRODUCT_DAILY_COUNT}{shopType}_{productId}";
+
+    public static string getLCoinShopProductMontlyCountName(int shopType, int productId) =>
+        $"{LCOIN_SHOP_PRODUCT_MONTLY_COUNT}{shopType}_{productId}";
+
     private readonly int _accountId;
 
     public AccountVariables(int accountId)

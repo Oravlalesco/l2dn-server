@@ -52,35 +52,41 @@ public readonly struct ExPurchaseLimitShopItemListNewPacket: IOutgoingPacket
 			// Check limits.
 			if (product.getAccountDailyLimit() > 0) // Sale period.
 			{
-				if (_player.getAccountVariables().Get(AccountVariables.LCOIN_SHOP_PRODUCT_DAILY_COUNT + product.getProductionId(), 0) >= product.getAccountDailyLimit())
+				string countName = AccountVariables.getLCoinShopProductDailyCountName(_shopType, product.getId());
+				if (_player.getAccountVariables().Get(countName, 0) >= product.getAccountDailyLimit())
 				{
 					writer.WriteInt32(0);
 				}
 				else
 				{
-					writer.WriteInt32(product.getAccountDailyLimit() - _player.getAccountVariables().Get(AccountVariables.LCOIN_SHOP_PRODUCT_DAILY_COUNT + product.getProductionId(), 0));
+					writer.WriteInt32(product.getAccountDailyLimit() -
+					                  _player.getAccountVariables().Get(countName, 0));
 				}
 			}
 			else if (product.getAccountMontlyLimit() > 0)
 			{
-				if (_player.getAccountVariables().Get(AccountVariables.LCOIN_SHOP_PRODUCT_MONTLY_COUNT + product.getProductionId(), 0) >= product.getAccountMontlyLimit())
+				string countName = AccountVariables.getLCoinShopProductMontlyCountName(_shopType, product.getId());
+				if (_player.getAccountVariables().Get(countName, 0) >= product.getAccountMontlyLimit())
 				{
 					writer.WriteInt32(0);
 				}
 				else
 				{
-					writer.WriteInt32(product.getAccountMontlyLimit() - _player.getAccountVariables().Get(AccountVariables.LCOIN_SHOP_PRODUCT_MONTLY_COUNT + product.getProductionId(), 0));
+					writer.WriteInt32(product.getAccountMontlyLimit() -
+					                  _player.getAccountVariables().Get(countName, 0));
 				}
 			}
 			else if (product.getAccountBuyLimit() > 0) // Count limit.
 			{
-				if (_player.getAccountVariables().Get(AccountVariables.LCOIN_SHOP_PRODUCT_COUNT + product.getProductionId(), 0) >= product.getAccountBuyLimit())
+				string countName = AccountVariables.getLCoinShopProductCountName(_shopType, product.getId());
+				if (_player.getAccountVariables().Get(countName, 0) >= product.getAccountBuyLimit())
 				{
 					writer.WriteInt32(0);
 				}
 				else
 				{
-					writer.WriteInt32(product.getAccountBuyLimit() - _player.getAccountVariables().Get(AccountVariables.LCOIN_SHOP_PRODUCT_COUNT + product.getProductionId(), 0));
+					writer.WriteInt32(product.getAccountBuyLimit() -
+					                  _player.getAccountVariables().Get(countName, 0));
 				}
 			}
 			else // No account limits.
