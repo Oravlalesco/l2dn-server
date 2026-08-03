@@ -156,26 +156,34 @@ public struct RequestPurchaseLimitShopItemBuyPacket: IIncomingPacket<GameSession
 			}
 		}
 
-		// Check existing items.
+		// Merge equal ingredients before validating or consuming them. Several
+		// Special Craft recipes require two items with the same ID and enchant.
+		Dictionary<(int ItemId, int Enchant), long> ingredients = new();
 		for (int i = 0; i < _product.getIngredientIds().Length; i++)
 		{
-			if (_product.getIngredientIds()[i] == 0)
-			{
+			int ingredientId = _product.getIngredientIds()[i];
+			if (ingredientId == 0)
 				continue;
-			}
-			if (_product.getIngredientIds()[i] == Inventory.ADENA_ID)
+
+			(int ItemId, int Enchant) key = (ingredientId, _product.getIngredientEnchants()[i]);
+			ingredients[key] = ingredients.GetValueOrDefault(key) + _product.getIngredientQuantities()[i] * _amount;
+		}
+
+		// Check existing items.
+		foreach (((int ingredientId, int enchant), long amount) in ingredients)
+		{
+			if (amount < 1)
 			{
-				long amount = _product.getIngredientQuantities()[i] * _amount;
-				if (amount < 1)
-				{
-					player.sendPacket(SystemMessageId.INCORRECT_ITEM_COUNT_2);
-					player.removeRequest<PrimeShopRequest>();
-					player.sendPacket(new ExPurchaseLimitShopItemResultPacket(false, _shopIndex, _productId,
-						remainingInfo, new List<LimitShopRandomCraftReward>()));
+				player.sendPacket(SystemMessageId.INCORRECT_ITEM_COUNT_2);
+				player.removeRequest<PrimeShopRequest>();
+				player.sendPacket(new ExPurchaseLimitShopItemResultPacket(false, _shopIndex, _productId,
+					remainingInfo, new List<LimitShopRandomCraftReward>()));
 
-					return ValueTask.CompletedTask;
-				}
+				return ValueTask.CompletedTask;
+			}
 
+			if (ingredientId == Inventory.ADENA_ID)
+			{
 				if (player.getAdena() < amount)
 				{
 					player.sendPacket(SystemMessageId.INCORRECT_ITEM_COUNT_2);
@@ -186,19 +194,8 @@ public struct RequestPurchaseLimitShopItemBuyPacket: IIncomingPacket<GameSession
 					return ValueTask.CompletedTask;
 				}
 			}
-			else if (_product.getIngredientIds()[i] == (int)SpecialItemType.HONOR_COINS)
+			else if (ingredientId == (int)SpecialItemType.HONOR_COINS)
 			{
-				long amount = _product.getIngredientQuantities()[i] * _amount;
-				if (amount < 1)
-				{
-					player.sendPacket(SystemMessageId.INCORRECT_ITEM_COUNT_2);
-					player.removeRequest<PrimeShopRequest>();
-					player.sendPacket(new ExPurchaseLimitShopItemResultPacket(false, _shopIndex, _productId,
-						remainingInfo, new List<LimitShopRandomCraftReward>()));
-
-					return ValueTask.CompletedTask;
-				}
-
 				if (player.getHonorCoins() < amount)
 				{
 					player.sendPacket(SystemMessageId.INCORRECT_ITEM_COUNT_2);
@@ -209,19 +206,8 @@ public struct RequestPurchaseLimitShopItemBuyPacket: IIncomingPacket<GameSession
 					return ValueTask.CompletedTask;
 				}
 			}
-			else if (_product.getIngredientIds()[i] == (int)SpecialItemType.PC_CAFE_POINTS)
+			else if (ingredientId == (int)SpecialItemType.PC_CAFE_POINTS)
 			{
-				long amount = _product.getIngredientQuantities()[i] * _amount;
-				if (amount < 1)
-				{
-					player.sendPacket(SystemMessageId.INCORRECT_ITEM_COUNT_2);
-					player.removeRequest<PrimeShopRequest>();
-					player.sendPacket(new ExPurchaseLimitShopItemResultPacket(false, _shopIndex, _productId,
-						remainingInfo, new List<LimitShopRandomCraftReward>()));
-
-					return ValueTask.CompletedTask;
-				}
-
 				if (player.getPcCafePoints() < amount)
 				{
 					player.sendPacket(SystemMessageId.INCORRECT_ITEM_COUNT_2);
@@ -234,20 +220,7 @@ public struct RequestPurchaseLimitShopItemBuyPacket: IIncomingPacket<GameSession
 			}
 			else
 			{
-				long amount = _product.getIngredientQuantities()[i] * _amount;
-				if (amount < 1)
-				{
-					player.sendPacket(SystemMessageId.INCORRECT_ITEM_COUNT_2);
-					player.removeRequest<PrimeShopRequest>();
-					player.sendPacket(new ExPurchaseLimitShopItemResultPacket(false, _shopIndex, _productId,
-						remainingInfo, new List<LimitShopRandomCraftReward>()));
-
-					return ValueTask.CompletedTask;
-				}
-
-				if (player.getInventory().getInventoryItemCount(_product.getIngredientIds()[i],
-					    _product.getIngredientEnchants()[i] == 0 ? -1 : _product.getIngredientEnchants()[i], true) <
-				    amount)
+				if (player.getInventory().getInventoryItemCount(ingredientId, enchant == 0 ? -1 : enchant, true) < amount)
 				{
 					player.sendPacket(SystemMessageId.INCORRECT_ITEM_COUNT_2);
 					player.removeRequest<PrimeShopRequest>();
@@ -260,191 +233,69 @@ public struct RequestPurchaseLimitShopItemBuyPacket: IIncomingPacket<GameSession
 		}
 
 		// Remove items.
-		for (int i = 0; i < _product.getIngredientIds().Length; i++)
+		foreach (((int ingredientId, int enchant), long amount) in ingredients)
 		{
-			if (_product.getIngredientIds()[i] == 0)
+			if (ingredientId == Inventory.ADENA_ID)
 			{
-				continue;
+				player.reduceAdena("LCoinShop", amount, player, true);
 			}
-			if (_product.getIngredientIds()[i] == Inventory.ADENA_ID)
+			else if (ingredientId == (int)SpecialItemType.HONOR_COINS)
 			{
-				player.reduceAdena("LCoinShop", _product.getIngredientQuantities()[i] * _amount, player, true);
+				player.setHonorCoins(player.getHonorCoins() - amount);
 			}
-			else if (_product.getIngredientIds()[i] == (int)SpecialItemType.HONOR_COINS)
+			else if (ingredientId == (int)SpecialItemType.PC_CAFE_POINTS)
 			{
-				player.setHonorCoins(player.getHonorCoins() - _product.getIngredientQuantities()[i] * _amount);
-			}
-			else if (_product.getIngredientIds()[i] == (int)SpecialItemType.PC_CAFE_POINTS)
-			{
-				int newPoints = (int) (player.getPcCafePoints() - _product.getIngredientQuantities()[i] * _amount);
+				int newPoints = (int)(player.getPcCafePoints() - amount);
 				player.setPcCafePoints(newPoints);
-				player.sendPacket(new ExPcCafePointInfoPacket(player.getPcCafePoints(), (int) -(_product.getIngredientQuantities()[i] * _amount), 1));
+				player.sendPacket(new ExPcCafePointInfoPacket(player.getPcCafePoints(), (int)-amount, 1));
 			}
 			else
 			{
-				if (_product.getIngredientEnchants()[i] > 0)
+				if (enchant > 0)
 				{
-					int count = 0;
-					ICollection<Item> items = player.getInventory().getAllItemsByItemId(_product.getIngredientIds()[i], _product.getIngredientEnchants()[i]);
+					long remaining = amount;
+					ICollection<Item> items = player.getInventory().getAllItemsByItemId(ingredientId, enchant);
 					foreach (Item item in items)
 					{
-						if (count == _amount)
-						{
+						if (remaining == 0)
 							break;
-						}
-						count++;
-						player.destroyItem("LCoinShop", item, player, true);
+
+						long itemCount = Math.Min(item.getCount(), remaining);
+						player.destroyItem("LCoinShop", item, itemCount, player, true);
+						remaining -= itemCount;
 					}
 				}
 				else
 				{
-					long amount = _product.getIngredientQuantities()[i] * _amount;
-					if (amount < 1)
-					{
-						player.sendPacket(SystemMessageId.INCORRECT_ITEM_COUNT_2);
-						player.removeRequest<PrimeShopRequest>();
-						player.sendPacket(new ExPurchaseLimitShopItemResultPacket(false, _shopIndex, _productId, remainingInfo, new List<LimitShopRandomCraftReward>()));
-						return ValueTask.CompletedTask;
-					}
-
-					player.destroyItemByItemId("LCoinShop", _product.getIngredientIds()[i], amount, player, true);
+					player.destroyItemByItemId("LCoinShop", ingredientId, amount, player, true);
 				}
 			}
-
-			if (Config.VipSystem.VIP_SYSTEM_L_SHOP_AFFECT)
-			{
-				player.updateVipPoints(_amount);
-			}
 		}
+
+		if (Config.VipSystem.VIP_SYSTEM_L_SHOP_AFFECT)
+			player.updateVipPoints(_amount);
 
 		// Reward.
 		Map<int, LimitShopRandomCraftReward> rewards = new();
-		if (_product.getProductionId2() > 0)
+		for (int i = 0; i < _amount; i++)
 		{
-			LimitShopProductHolder product = _product;
-			for (int i = 0; i < _amount; i++)
+			LimitShopRewardOutcome? selectedOutcome = LimitShopRewardSelector.Select(_product, Rnd.get(100d));
+			if (selectedOutcome is not { } outcome)
+				continue;
+
+			rewards.GetOrAdd(outcome.Index,
+				_ => new LimitShopRandomCraftReward(outcome.ItemId, 0, outcome.Index)).Count += (int)outcome.Count;
+
+			Item? item = player.addItem("LCoinShop", outcome.ItemId, outcome.Count, outcome.Enchant, player, true);
+			if (item == null)
 			{
-				if (Rnd.get(100) < _product.getChance())
-				{
-					rewards.GetOrAdd(0, _ => new LimitShopRandomCraftReward(product.getProductionId(), 0, 0))
-						.Count += (int)_product.getCount();
-
-					Item? item = player.addItem("LCoinShop", _product.getProductionId(), _product.getCount(),
-						_product.getEnchant(), player, true);
-
-                    if (item == null)
-                    {
-                        player.sendPacket(SystemMessageId.YOUR_INVENTORY_IS_FULL); // TODO: atomic inventory update
-                        return ValueTask.CompletedTask;
-                    }
-
-					if (_product.isAnnounce())
-					{
-						Broadcast.toAllOnlinePlayers(new ExItemAnnouncePacket(player, item,
-							ExItemAnnouncePacket.SPECIAL_CREATION));
-					}
-				}
-				else if (Rnd.get(100) < _product.getChance2() || _product.getProductionId3() == 0)
-				{
-					rewards.GetOrAdd(1, _ => new LimitShopRandomCraftReward(product.getProductionId2(), 0, 1))
-						.Count += (int)_product.getCount2();
-
-					Item? item = player.addItem("LCoinShop", _product.getProductionId2(), _product.getCount2(), player,
-						true);
-
-                    if (item == null)
-                    {
-                        player.sendPacket(SystemMessageId.YOUR_INVENTORY_IS_FULL); // TODO: atomic inventory update
-                        return ValueTask.CompletedTask;
-                    }
-
-					if (_product.isAnnounce2())
-					{
-						Broadcast.toAllOnlinePlayers(new ExItemAnnouncePacket(player, item,
-							ExItemAnnouncePacket.SPECIAL_CREATION));
-					}
-				}
-				else if (Rnd.get(100) < _product.getChance3() || _product.getProductionId4() == 0)
-				{
-					rewards.GetOrAdd(2, _ => new LimitShopRandomCraftReward(product.getProductionId3(), 0, 2))
-						.Count += (int)_product.getCount3();
-
-					Item? item = player.addItem("LCoinShop", _product.getProductionId3(), _product.getCount3(), player,
-						true);
-
-                    if (item == null)
-                    {
-                        player.sendPacket(SystemMessageId.YOUR_INVENTORY_IS_FULL); // TODO: atomic inventory update
-                        return ValueTask.CompletedTask;
-                    }
-
-					if (_product.isAnnounce3())
-					{
-						Broadcast.toAllOnlinePlayers(new ExItemAnnouncePacket(player, item,
-							ExItemAnnouncePacket.SPECIAL_CREATION));
-					}
-				}
-				else if (Rnd.get(100) < _product.getChance4() || _product.getProductionId5() == 0)
-				{
-					rewards.GetOrAdd(3, _ => new LimitShopRandomCraftReward(product.getProductionId4(), 0, 3))
-						.Count += (int)_product.getCount4();
-
-					Item? item = player.addItem("LCoinShop", _product.getProductionId4(), _product.getCount4(), player,
-						true);
-
-                    if (item == null)
-                    {
-                        player.sendPacket(SystemMessageId.YOUR_INVENTORY_IS_FULL); // TODO: atomic inventory update
-                        return ValueTask.CompletedTask;
-                    }
-
-					if (_product.isAnnounce4())
-					{
-						Broadcast.toAllOnlinePlayers(new ExItemAnnouncePacket(player, item,
-							ExItemAnnouncePacket.SPECIAL_CREATION));
-					}
-				}
-				else if (_product.getProductionId5() > 0)
-				{
-					rewards.GetOrAdd(4, _ => new LimitShopRandomCraftReward(product.getProductionId5(), 0, 4))
-						.Count += (int)_product.getCount5();
-
-					Item? item = player.addItem("LCoinShop", _product.getProductionId5(), _product.getCount5(), player,
-						true);
-
-                    if (item == null)
-                    {
-                        player.sendPacket(SystemMessageId.YOUR_INVENTORY_IS_FULL); // TODO: atomic inventory update
-                        return ValueTask.CompletedTask;
-                    }
-
-					if (_product.isAnnounce5())
-					{
-						Broadcast.toAllOnlinePlayers(new ExItemAnnouncePacket(player, item,
-							ExItemAnnouncePacket.SPECIAL_CREATION));
-					}
-				}
+				player.sendPacket(SystemMessageId.YOUR_INVENTORY_IS_FULL); // TODO: atomic inventory update
+				return ValueTask.CompletedTask;
 			}
-		}
-		else if (Rnd.get(100) < _product.getChance())
-		{
-			rewards.put(0,
-				new LimitShopRandomCraftReward(_product.getProductionId(), (int)(_product.getCount() * _amount), 0));
 
-			Item? item = player.addItem("LCoinShop", _product.getProductionId(), _product.getCount() * _amount,
-				_product.getEnchant(), player, true);
-
-            if (item == null)
-            {
-                player.sendPacket(SystemMessageId.YOUR_INVENTORY_IS_FULL); // TODO: atomic inventory update
-                return ValueTask.CompletedTask;
-            }
-
-			if (_product.isAnnounce())
-			{
+			if (outcome.Announce)
 				Broadcast.toAllOnlinePlayers(new ExItemAnnouncePacket(player, item,
 					ExItemAnnouncePacket.SPECIAL_CREATION));
-			}
 		}
 
 		// Update account variables.
