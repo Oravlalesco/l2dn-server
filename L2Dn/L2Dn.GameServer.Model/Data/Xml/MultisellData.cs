@@ -68,6 +68,7 @@ public class MultisellData: DataReaderBase
 
 			foreach (XmlMultiSellListItem itemEntry in multiSellList.Items)
 			{
+				bool invalidEntry = false;
 				long totalPrice = 0;
 				int lastIngredientId = 0;
 				long lastIngredientCount = 0;
@@ -86,13 +87,17 @@ public class MultisellData: DataReaderBase
 						_logger.Warn("Invalid ingredient id or count for itemId: " + ingredient.getId() +
 						             ", count: " + ingredient.getCount() + " in list: " + listId);
 
-						continue;
+						invalidEntry = true;
+						break;
 					}
 
 					ingredients.Add(ingredient);
 					lastIngredientId = ingredientEntry.ItemId;
 					lastIngredientCount = ingredientEntry.Count;
 				}
+
+				if (invalidEntry)
+					continue;
 
 				double totalChance = 0;
 				foreach (XmlMultiSellListProduct productEntry in itemEntry.Products)
@@ -144,7 +149,8 @@ public class MultisellData: DataReaderBase
 						_logger.Warn("Invalid product id or count for itemId: " + product.getId() + ", count: " +
 						             product.getCount() + " in list: " + listId);
 
-						continue;
+						invalidEntry = true;
+						break;
 					}
 
 					products.Add(product);
@@ -158,6 +164,12 @@ public class MultisellData: DataReaderBase
 						else
 							totalPrice += item.getReferencePrice() / 2 * product.getCount();
 					}
+				}
+
+				if (invalidEntry || ingredients.Count == 0 || products.Count == 0)
+				{
+					_logger.Warn($"Skipped invalid or empty entry {entryCounter} in multisell {listId}.");
+					continue;
 				}
 
 				if (totalChance > 100)

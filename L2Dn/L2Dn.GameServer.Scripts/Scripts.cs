@@ -1,7 +1,9 @@
 ﻿using L2Dn.GameServer.Configuration;
 using L2Dn.GameServer.Handlers;
 using L2Dn.GameServer.InstanceManagers;
+using L2Dn.GameServer.Model.GameAssistant;
 using L2Dn.GameServer.Scripts.AI.Players;
+using L2Dn.GameServer.Scripts.AI.Others;
 using L2Dn.GameServer.Scripts.AI.Teleporters;
 using L2Dn.GameServer.Scripts.Handlers.ActionHandlers;
 using L2Dn.GameServer.Scripts.Handlers.ActionShiftHandlers;
@@ -100,6 +102,7 @@ public static class Scripts
         bypassHandler.registerHandler(new EnsoulWindow());
         bypassHandler.registerHandler(new FindPvP());
         bypassHandler.registerHandler(new Freight());
+        bypassHandler.registerHandler(new GameAssistant());
         bypassHandler.registerHandler(new ItemAuctionLink());
         bypassHandler.registerHandler(new Link());
         bypassHandler.registerHandler(new Multisell());
@@ -955,6 +958,7 @@ public static class Scripts
         adminCommandHandler.registerHandler(new AdminMissingHtmls());
         adminCommandHandler.registerHandler(new AdminMobGroup());
         adminCommandHandler.registerHandler(new AdminOlympiad());
+        adminCommandHandler.registerHandler(new AdminPremiumItem());
         adminCommandHandler.registerHandler(new AdminOnline());
         adminCommandHandler.registerHandler(new AdminPathNode());
         adminCommandHandler.registerHandler(new AdminPcCafePoints());
@@ -1009,6 +1013,8 @@ public static class Scripts
 
     public static void RegisterScripts()
     {
+        _ = ItemMultisellData.getInstance();
+        ScriptManager.AddScript(new GameAssistantNpc());
         ScriptManager.AddScript(new PlayerClassChange());
         ScriptManager.AddScript(new TeleportToRaceTrack());
     }

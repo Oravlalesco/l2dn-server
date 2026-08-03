@@ -5709,7 +5709,7 @@ public class Player: Playable
 	 * Select the Warehouse to be used in next activity.
 	 * @param warehouse
 	 */
-	public void setActiveWarehouse(ItemContainer warehouse)
+	public void setActiveWarehouse(ItemContainer? warehouse)
 	{
 		_activeWarehouse = warehouse;
 	}

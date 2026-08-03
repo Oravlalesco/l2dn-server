@@ -1,5 +1,6 @@
 ﻿using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
+using L2Dn.GameServer.Model.GameAssistant;
 using L2Dn.GameServer.Network.Enums;
 using L2Dn.GameServer.Network.OutgoingPackets;
 using L2Dn.GameServer.Utilities;
@@ -25,10 +26,7 @@ public struct RequestWithdrawPremiumItemPacket: IIncomingPacket<GameSession>
     public ValueTask ProcessAsync(Connection connection, GameSession session)
     {
         Player? player = session.Player;
-        if (player == null)
-            return ValueTask.CompletedTask;
-
-        if (_itemCount <= 0)
+        if (player == null || !Config.GameAssistant.GAME_ASSISTANT_ENABLED)
             return ValueTask.CompletedTask;
 
         if (player.ObjectId != _charId)
@@ -37,42 +35,22 @@ public struct RequestWithdrawPremiumItemPacket: IIncomingPacket<GameSession>
             return ValueTask.CompletedTask;
         }
 
-        if (player.getPremiumItemList().Count == 0)
+        PremiumItemClaimResult result = PremiumItemService.getInstance().Claim(player, _itemNum, _itemCount);
+        switch (result)
         {
-            Util.handleIllegalPlayerAction(player, "[RequestWithDrawPremiumItem] Player: " + player.getName() + " try to get item with empty list!", Config.General.DEFAULT_PUNISH);
-            return ValueTask.CompletedTask;
-        }
-
-        if (player.getWeightPenalty() >= 3 || !player.isInventoryUnder90(false))
-        {
-            player.sendPacket(SystemMessageId.YOU_CANNOT_RECEIVE_THE_DIMENSIONAL_ITEM_BECAUSE_YOU_HAVE_EXCEED_YOUR_INVENTORY_WEIGHT_QUANTITY_LIMIT);
-            return ValueTask.CompletedTask;
-        }
-
-        if (player.isProcessingTransaction())
-        {
-            player.sendPacket(SystemMessageId.ITEMS_FROM_GAME_ASSISTANTS_CANNOT_BE_EXCHANGED);
-            return ValueTask.CompletedTask;
-        }
-
-        PremiumItem? item = player.getPremiumItemList().get(_itemNum);
-        if (item == null)
-            return ValueTask.CompletedTask;
-
-        if (item.getCount() < _itemCount)
-            return ValueTask.CompletedTask;
-
-        long itemsLeft = item.getCount() - _itemCount;
-        player.addItem("PremiumItem", item.getItemId(), _itemCount, player.getTarget(), true);
-        if (itemsLeft > 0)
-        {
-            item.updateCount(itemsLeft);
-            player.updatePremiumItem(_itemNum, itemsLeft);
-        }
-        else
-        {
-            player.getPremiumItemList().remove(_itemNum);
-            player.deletePremiumItem(_itemNum);
+            case PremiumItemClaimResult.InventoryFull:
+            case PremiumItemClaimResult.WeightExceeded:
+                player.sendPacket(SystemMessageId.YOU_CANNOT_RECEIVE_THE_DIMENSIONAL_ITEM_BECAUSE_YOU_HAVE_EXCEED_YOUR_INVENTORY_WEIGHT_QUANTITY_LIMIT);
+                return ValueTask.CompletedTask;
+            case PremiumItemClaimResult.TransactionInProgress:
+                player.sendPacket(SystemMessageId.ITEMS_FROM_GAME_ASSISTANTS_CANNOT_BE_EXCHANGED);
+                return ValueTask.CompletedTask;
+            case PremiumItemClaimResult.InvalidCount:
+                player.sendPacket(SystemMessageId.INCORRECT_ITEM_COUNT_2);
+                return ValueTask.CompletedTask;
+            case not PremiumItemClaimResult.Success:
+                player.sendMessage("The premium item could not be received. Please try again.");
+                return ValueTask.CompletedTask;
         }
 
         if (player.getPremiumItemList().Count == 0)

@@ -24,12 +24,13 @@ public struct SendWareHouseWithDrawListPacket: IIncomingPacket<GameSession>
         if (count <= 0 || count > Config.Character.MAX_ITEM_IN_PACKET || count * BATCH_LENGTH != reader.Length)
             return;
 
-        _items = new ItemHolder[count];
+		HashSet<int> objectIds = [];
+		_items = new ItemHolder[count];
         for (int i = 0; i < count; i++)
         {
             int objId = reader.ReadInt32();
             long cnt = reader.ReadInt64();
-            if (objId < 1 || cnt < 0)
+			if (objId < 1 || cnt <= 0 || !objectIds.Add(objId))
             {
                 _items = null;
                 return;
@@ -48,6 +49,9 @@ public struct SendWareHouseWithDrawListPacket: IIncomingPacket<GameSession>
 		if (player == null)
 			return ValueTask.CompletedTask;
 
+		if (player.hasItemRequest() || player.isProcessingTransaction())
+			return ValueTask.CompletedTask;
+
 		// TODO: flood protection
 		// if (!client.getFloodProtectors().canPerformTransaction())
 		// {
@@ -58,6 +62,12 @@ public struct SendWareHouseWithDrawListPacket: IIncomingPacket<GameSession>
 		ItemContainer? warehouse = player.getActiveWarehouse();
 		if (warehouse == null)
 			return ValueTask.CompletedTask;
+
+		bool clearFreight = warehouse is PlayerFreight;
+		try
+		{
+			if (clearFreight && !Config.GameAssistant.GAME_ASSISTANT_ENABLED)
+				return ValueTask.CompletedTask;
 
 		if (!(warehouse is PlayerWarehouse) && !player.getAccessLevel().AllowTransaction)
 		{
@@ -95,14 +105,24 @@ public struct SendWareHouseWithDrawListPacket: IIncomingPacket<GameSession>
 				return ValueTask.CompletedTask;
 			}
 
-			weight += i.getCount() * item.getTemplate().getWeight();
-			if (!item.isStackable())
+			try
 			{
-				slots += i.getCount();
+				weight = checked(weight + i.getCount() * item.getTemplate().getWeight());
 			}
-			else if (player.getInventory().getItemByItemId(item.getId()) == null)
+			catch (OverflowException)
 			{
-				slots++;
+				return ValueTask.CompletedTask;
+			}
+			try
+			{
+				if (!item.isStackable())
+					slots = checked(slots + i.getCount());
+				else if (player.getInventory().getItemByItemId(item.getId()) == null)
+					slots = checked(slots + 1);
+			}
+			catch (OverflowException)
+			{
+				return ValueTask.CompletedTask;
 			}
 		}
 
@@ -121,6 +141,7 @@ public struct SendWareHouseWithDrawListPacket: IIncomingPacket<GameSession>
 		}
 
 		// Proceed to the transfer
+		List<(Item Item, long Count)> movedItems = new(_items.Length);
 		foreach (ItemHolder i in _items)
 		{
 			Item? oldItem = warehouse.getItemByObjectId(i.getId());
@@ -129,23 +150,66 @@ public struct SendWareHouseWithDrawListPacket: IIncomingPacket<GameSession>
 				PacketLogger.Instance.Warn("Error withdrawing a warehouse object for char " + player.getName() +
 				                           " (olditem == null)");
 
+				RollbackWithdrawals(player, warehouse, movedItems);
 				return ValueTask.CompletedTask;
 			}
 
-			Item? newItem = warehouse.transferItem(warehouse.getName(), i.getId(), i.getCount(), player.getInventory(),
-				player, player.getLastFolkNPC());
+			Item? newItem;
+			try
+			{
+				newItem = warehouse.transferItem(warehouse.getName(), i.getId(), i.getCount(), player.getInventory(),
+					player, player.getLastFolkNPC());
+			}
+			catch (Exception e)
+			{
+				PacketLogger.Instance.Error($"Error withdrawing warehouse item for {player}: {e}");
+				RollbackWithdrawals(player, warehouse, movedItems);
+				return ValueTask.CompletedTask;
+			}
 
 			if (newItem == null)
 			{
 				PacketLogger.Instance.Warn("Error withdrawing a warehouse object for char " + player.getName() +
 				                           " (newitem == null)");
 
+				RollbackWithdrawals(player, warehouse, movedItems);
 				return ValueTask.CompletedTask;
 			}
+
+			movedItems.Add((newItem, i.getCount()));
 		}
 
 		// Send updated item list to the player
 		player.sendItemList();
 		return ValueTask.CompletedTask;
+		}
+		finally
+		{
+			if (clearFreight && ReferenceEquals(player.getActiveWarehouse(), warehouse))
+				player.setActiveWarehouse(null);
+		}
     }
+
+	private static void RollbackWithdrawals(Player player, ItemContainer warehouse,
+		List<(Item Item, long Count)> movedItems)
+	{
+		bool success = true;
+		foreach ((Item item, long count) in movedItems.AsEnumerable().Reverse())
+		{
+			try
+			{
+				Item? restored = player.getInventory().transferItem("WarehouseRollback", item.ObjectId, count,
+					warehouse, player, null);
+				success &= restored != null;
+			}
+			catch (Exception e)
+			{
+				success = false;
+				PacketLogger.Instance.Error($"Warehouse rollback for {player} failed: {e}");
+			}
+		}
+
+		player.sendItemList();
+		PacketLogger.Instance.Warn($"Warehouse withdrawal for {player} was rolled back. Success={success}.");
+	}
 }

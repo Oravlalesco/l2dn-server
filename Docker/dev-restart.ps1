@@ -17,8 +17,14 @@ $files += "docker-compose.dev.yml"
 $compose = $files | ForEach-Object { "-f"; $_ }
 
 if ($Migrate) {
+    # Avoid racing live character/premium-item writes while applying schema/data migrations.
+    docker compose @compose stop l2dn-gameserver
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
     docker compose @compose run --rm l2dn-gameserver /App/L2Dn.GameServer -UpdateDatabase
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 docker compose @compose up -d --force-recreate l2dn-gameserver
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host "Gameserver restarted (dev mode)."

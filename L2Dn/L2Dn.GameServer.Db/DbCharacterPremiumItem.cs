@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace L2Dn.GameServer.Db;
 
+[Index(nameof(CharacterId), nameof(ItemNumber), IsUnique = true)]
 [PrimaryKey(nameof(CharacterId), nameof(ItemNumber), nameof(ItemId))]
 public class DbCharacterPremiumItem
 {

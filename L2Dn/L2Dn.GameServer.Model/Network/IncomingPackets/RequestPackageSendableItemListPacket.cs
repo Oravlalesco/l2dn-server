@@ -1,5 +1,6 @@
 ﻿using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Network.OutgoingPackets;
+using Config = L2Dn.GameServer.Configuration.Config;
 using L2Dn.Network;
 using L2Dn.Packets;
 
@@ -18,6 +19,10 @@ public struct RequestPackageSendableItemListPacket: IIncomingPacket<GameSession>
     {
         Player? player = session.Player;
         if (player == null)
+            return ValueTask.CompletedTask;
+
+        if (!Config.GameAssistant.GAME_ASSISTANT_ENABLED || _objectId == player.ObjectId ||
+            !player.getAccountChars().ContainsKey(_objectId))
             return ValueTask.CompletedTask;
 
         player.sendPacket(new PackageSendableListPacket(1, player, _objectId));

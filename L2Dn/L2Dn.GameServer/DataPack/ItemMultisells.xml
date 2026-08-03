@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<itemMultisells>
+	<route itemId="90907" listId="20000" enabled="true" />
+	<route itemId="49487" listId="20001" enabled="true" />
+	<route itemId="98206" listId="20002" enabled="false" />
+	<route itemId="98044" listId="20003" enabled="false" />
+	<route itemId="98440" listId="20004" enabled="false" />
+	<route itemId="98441" listId="20005" enabled="false" />
+	<route itemId="98443" listId="20006" enabled="false" />
+	<route itemId="99512" listId="20007" enabled="false" />
+	<route itemId="99511" listId="20008" enabled="false" />
+</itemMultisells>

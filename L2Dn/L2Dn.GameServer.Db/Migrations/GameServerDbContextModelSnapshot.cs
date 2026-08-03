@@ -714,6 +714,9 @@ namespace L2Dn.GameServer.Db.Migrations
 
                     b.HasKey("CharacterId", "ItemNumber", "ItemId");
 
+                    b.HasIndex("CharacterId", "ItemNumber")
+                        .IsUnique();
+
                     b.ToTable("CharacterPremiumItems");
                 });
 

@@ -29,6 +29,8 @@ if (args is ["-UpdateDatabase"])
     {
         logger.Info("Updating database...");
         DbFactory.UpdateDatabase(ServerConfig.Instance.Database);
+        logger.Info("Database update completed.");
+        return;
     }
     catch (Exception exception)
     {

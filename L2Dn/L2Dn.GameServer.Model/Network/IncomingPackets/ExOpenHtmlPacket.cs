@@ -1,6 +1,7 @@
 ﻿using L2Dn.GameServer.Cache;
 using L2Dn.GameServer.Data;
 using L2Dn.GameServer.Model.Actor;
+using L2Dn.GameServer.Model.GameAssistant;
 using L2Dn.GameServer.Model.Html;
 using L2Dn.GameServer.Network.Enums;
 using L2Dn.GameServer.Network.OutgoingPackets;
@@ -43,9 +44,10 @@ public struct ExOpenHtmlPacket: IIncomingPacket<GameSession>
             {
                 if (Config.GameAssistant.GAME_ASSISTANT_ENABLED)
                 {
-                    HtmlContent htmlContent = HtmlContent.LoadFromFile("scripts/ai/others/GameAssistant/32478.html", player);
-                    connection.Send(new ExPremiumManagerShowHtmlPacket(htmlContent));
+                    GameAssistantUi.ShowMain(player);
                 }
+                else
+                    GameAssistantUi.ShowError(player, "Game Assistant is temporarily unavailable.");
 
                 break;
             }
