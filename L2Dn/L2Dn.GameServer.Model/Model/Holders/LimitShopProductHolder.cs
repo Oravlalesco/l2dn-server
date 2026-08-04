@@ -35,13 +35,14 @@ public class LimitShopProductHolder
 	private readonly int _accountDailyLimit;
 	private readonly int _accountMontlyLimit;
 	private readonly int _accountBuyLimit;
+	private readonly bool _refundAdenaOnFailure;
 
 	public LimitShopProductHolder(int id, int category, int minLevel, int maxLevel, int[] ingredientIds,
 		long[] ingredientQuantities, int[] ingredientEnchants, int productionId, long count, float chance,
 		bool announce, int enchant, int productionId2, long count2, float chance2, bool announce2, int productionId3,
 		long count3, float chance3, bool announce3, int productionId4, long count4, float chance4, bool announce4,
 		int productionId5, long count5, bool announce5, int accountDailyLimit, int accountMontlyLimit,
-		int accountBuyLimit)
+		int accountBuyLimit, bool refundAdenaOnFailure = false)
 	{
 		_id = id;
 		_category = category;
@@ -73,6 +74,7 @@ public class LimitShopProductHolder
 		_accountDailyLimit = accountDailyLimit;
 		_accountMontlyLimit = accountMontlyLimit;
 		_accountBuyLimit = accountBuyLimit;
+		_refundAdenaOnFailure = refundAdenaOnFailure;
 	}
 
 	public int getId()
@@ -223,5 +225,10 @@ public class LimitShopProductHolder
 	public int getAccountBuyLimit()
 	{
 		return _accountBuyLimit;
+	}
+
+	public bool isRefundAdenaOnFailure()
+	{
+		return _refundAdenaOnFailure;
 	}
 }

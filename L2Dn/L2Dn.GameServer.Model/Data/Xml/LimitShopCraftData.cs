@@ -84,6 +84,7 @@ public class LimitShopCraftData: DataReaderBase
 		int accountDailyLimit = 0;
 		int accountMontlyLimit = 0;
 		int accountBuyLimit = 0;
+		bool refundAdenaOnFailure = false;
 
 		element.Elements("ingredient").ForEach(el =>
 		{
@@ -139,6 +140,7 @@ public class LimitShopCraftData: DataReaderBase
 			accountDailyLimit = el.Attribute("accountDailyLimit").GetInt32(0);
 			accountMontlyLimit = el.Attribute("accountMontlyLimit").GetInt32(0);
 			accountBuyLimit = el.Attribute("accountBuyLimit").GetInt32(0);
+			refundAdenaOnFailure = el.Attribute("refundAdenaOnFailure").GetBoolean(false);
 
 			ItemTemplate? item = ItemData.getInstance().getTemplate(productionId);
 			if (item == null)
@@ -148,7 +150,8 @@ public class LimitShopCraftData: DataReaderBase
 		_products.Add(new LimitShopProductHolder(id, category, minLevel, maxLevel, ingredientIds, ingredientQuantities,
 			ingredientEnchants, productionId, count, chance, announce, enchant, productionId2, count2, chance2,
 			announce2, productionId3, count3, chance3, announce3, productionId4, count4, chance4, announce4,
-			productionId5, count5, announce5, accountDailyLimit, accountMontlyLimit, accountBuyLimit));
+			productionId5, count5, announce5, accountDailyLimit, accountMontlyLimit, accountBuyLimit,
+			refundAdenaOnFailure));
 	}
 
 	public LimitShopProductHolder? getProduct(int id)

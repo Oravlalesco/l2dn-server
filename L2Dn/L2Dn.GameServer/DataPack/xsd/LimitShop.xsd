@@ -43,6 +43,7 @@
 											<xs:attribute type="xs:int" name="accountDailyLimit" use="optional"/>
 											<xs:attribute type="xs:int" name="accountMontlyLimit" use="optional"/>
 											<xs:attribute type="xs:int" name="accountBuyLimit" use="optional"/>
+											<xs:attribute type="xs:boolean" name="refundAdenaOnFailure" use="optional"/>
 										</xs:extension>
 									</xs:simpleContent>
 								</xs:complexType>

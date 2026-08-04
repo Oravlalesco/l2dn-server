@@ -1315,6 +1315,12 @@
 				<group chance="30">
 					<item id="49580" min="1" max="1" chance="100" /> <!-- Baium's Ring Lv. 1 -->
 				</group>
+				<group chance="100">
+					<item id="95782" min="125" max="200" chance="100" /> <!-- Frost Lord's Weapon Crystal -->
+				</group>
+				<group chance="20">
+					<item id="95781" min="1" max="1" chance="100" /> <!-- Black Frozen Core -->
+				</group>
 				<group chance="3">
 					<item id="49683" min="1" max="1" chance="100" /> <!-- Talisman of Baium -->
 				</group>
@@ -1947,6 +1953,12 @@
 					<item id="91550" min="1" max="1" chance="100" /> <!-- Frintezza's Necklace Lv. 1 -->
 				</group>
 				<group chance="100">
+					<item id="95782" min="75" max="125" chance="100" /> <!-- Frost Lord's Weapon Crystal -->
+				</group>
+				<group chance="10">
+					<item id="95781" min="1" max="1" chance="100" /> <!-- Black Frozen Core -->
+				</group>
+				<group chance="100">
 					<item id="8619" min="1" max="2" chance="100" /> <!-- Ancient Book: Divine Inspiration (Original Language) -->
 				</group>
 				<group chance="50">
@@ -2444,6 +2456,12 @@
 				</group>
 				<group chance="30">
 					<item id="90992" min="1" max="1" chance="100" /> <!-- Antharas' Earring Lv. 1 -->
+				</group>
+				<group chance="100">
+					<item id="95782" min="200" max="300" chance="100" /> <!-- Frost Lord's Weapon Crystal -->
+				</group>
+				<group chance="30">
+					<item id="95781" min="1" max="1" chance="100" /> <!-- Black Frozen Core -->
 				</group>
 				<group chance="100">
 					<item id="91547" min="1" max="1" chance="100" /> <!-- Special Weapon Varnish (A-grade) -->

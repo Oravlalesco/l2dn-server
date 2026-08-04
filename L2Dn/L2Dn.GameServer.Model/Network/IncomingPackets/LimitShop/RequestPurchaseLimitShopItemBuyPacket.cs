@@ -159,11 +159,15 @@ public struct RequestPurchaseLimitShopItemBuyPacket: IIncomingPacket<GameSession
 		// Merge equal ingredients before validating or consuming them. Several
 		// Special Craft recipes require two items with the same ID and enchant.
 		Dictionary<(int ItemId, int Enchant), long> ingredients = new();
+		long adenaPerAttempt = 0;
 		for (int i = 0; i < _product.getIngredientIds().Length; i++)
 		{
 			int ingredientId = _product.getIngredientIds()[i];
 			if (ingredientId == 0)
 				continue;
+
+			if (ingredientId == Inventory.ADENA_ID)
+				adenaPerAttempt += _product.getIngredientQuantities()[i];
 
 			(int ItemId, int Enchant) key = (ingredientId, _product.getIngredientEnchants()[i]);
 			ingredients[key] = ingredients.GetValueOrDefault(key) + _product.getIngredientQuantities()[i] * _amount;
@@ -280,6 +284,12 @@ public struct RequestPurchaseLimitShopItemBuyPacket: IIncomingPacket<GameSession
 		for (int i = 0; i < _amount; i++)
 		{
 			LimitShopRewardOutcome? selectedOutcome = LimitShopRewardSelector.Select(_product, Rnd.get(100d));
+			if (_product.isRefundAdenaOnFailure() &&
+				(selectedOutcome is null || selectedOutcome.Value.Index != 0) && adenaPerAttempt > 0)
+			{
+				player.addAdena("SpecialCraftFailureRefund", adenaPerAttempt, player, true);
+			}
+
 			if (selectedOutcome is not { } outcome)
 				continue;
 

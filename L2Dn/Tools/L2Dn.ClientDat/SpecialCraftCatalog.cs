@@ -1,11 +1,12 @@
 using System.Globalization;
 using System.Xml.Linq;
 using L2Dn.Packages.DatDefinitions.Definitions;
+using L2Dn.Packages.DatDefinitions.Definitions.Enums;
 
 namespace L2Dn.ClientDat;
 
 internal sealed record SpecialCraftServerProduct(ushort ProductId, byte Category, short LevelMin, short LevelMax,
-    IReadOnlyList<SpecialCraftServerOutcome> Outcomes);
+    string ProductName, IReadOnlyList<SpecialCraftServerOutcome> Outcomes);
 
 internal sealed record SpecialCraftServerOutcome(uint ItemId, uint Count, float Probability, uint Enchant);
 
@@ -15,8 +16,10 @@ internal static class SpecialCraftCatalog
 
     public static IReadOnlyList<SpecialCraftServerProduct> ReadServerProducts(string path)
     {
-        XDocument document = XDocument.Load(Path.GetFullPath(path), LoadOptions.SetLineInfo);
+        string fullPath = Path.GetFullPath(path);
+        XDocument document = XDocument.Load(fullPath, LoadOptions.SetLineInfo);
         XElement root = document.Root ?? throw new InvalidDataException("LimitShopCraft.xml has no root element.");
+        Dictionary<uint, string> itemNames = ReadItemNames(fullPath);
         List<SpecialCraftServerProduct> result = new();
         foreach (XElement product in root.Elements("product"))
         {
@@ -27,11 +30,18 @@ internal static class SpecialCraftCatalog
             XElement production = product.Element("production")
                 ?? throw new InvalidDataException($"Product {productId} has no production element.");
             IReadOnlyList<SpecialCraftServerOutcome> outcomes = ReadOutcomes(productId, production);
+            SpecialCraftServerOutcome primaryOutcome = outcomes[0];
+            if (!itemNames.TryGetValue(primaryOutcome.ItemId, out string? itemName))
+                throw new InvalidDataException($"Product {productId} references unnamed item {primaryOutcome.ItemId}.");
+
+            string productName = primaryOutcome.Enchant > 0
+                ? $"+{primaryOutcome.Enchant} {itemName}"
+                : itemName;
             int ingredientCount = product.Elements("ingredient").Count();
             if (ingredientCount is < 1 or > 5)
                 throw new InvalidDataException($"Product {productId} must have between one and five ingredients.");
 
-            result.Add(new SpecialCraftServerProduct(productId, category, levelMin, levelMax, outcomes));
+            result.Add(new SpecialCraftServerProduct(productId, category, levelMin, levelMax, productName, outcomes));
         }
 
         ushort[] duplicates = result.GroupBy(product => product.ProductId).Where(group => group.Count() > 1)
@@ -45,15 +55,35 @@ internal static class SpecialCraftCatalog
     public static PurchaseLimitCraftV7 Build(PurchaseLimitCraftV7 baseData, PurchaseLimitCraftV7 donorData,
         NpcString npcStrings, IReadOnlyList<SpecialCraftServerProduct> serverProducts)
     {
+        Dictionary<ushort, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> baseRecords = baseData.Records
+            .Where(record => record.ShopIndex == specialCraftShopIndex)
+            .ToDictionary(record => record.ProductId);
         Dictionary<ushort, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> donorRecords = donorData.Records
             .Where(record => record.ShopIndex == specialCraftShopIndex)
             .ToDictionary(record => record.ProductId);
+        Dictionary<byte, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> categoryTemplates = BuildCategoryTemplates(
+            baseRecords, donorRecords);
         List<PurchaseLimitCraftV7.PurchaseLimitCraftRecord> selectedRecords = new(serverProducts.Count);
         foreach (SpecialCraftServerProduct product in serverProducts)
         {
-            if (!donorRecords.TryGetValue(product.ProductId, out PurchaseLimitCraftV7.PurchaseLimitCraftRecord? record))
-                throw new InvalidDataException($"Product {product.ProductId} is missing from the ClassicAden donor DAT.");
+            PurchaseLimitCraftV7.PurchaseLimitCraftRecord template;
+            if (baseRecords.TryGetValue(product.ProductId, out PurchaseLimitCraftV7.PurchaseLimitCraftRecord? baseRecord) &&
+                baseRecord.Category == product.Category)
+            {
+                template = baseRecord;
+            }
+            else if (donorRecords.TryGetValue(product.ProductId,
+                         out PurchaseLimitCraftV7.PurchaseLimitCraftRecord? donorRecord) &&
+                     donorRecord.Category == product.Category)
+            {
+                template = donorRecord;
+            }
+            else if (!categoryTemplates.TryGetValue(product.Category, out template!))
+            {
+                throw new InvalidDataException($"No client template exists for Special Craft category {product.Category}.");
+            }
 
+            PurchaseLimitCraftV7.PurchaseLimitCraftRecord record = CreateRecord(template, product);
             VerifyRecord(record, product);
             selectedRecords.Add(record);
         }
@@ -94,6 +124,10 @@ internal static class SpecialCraftCatalog
                 throw new InvalidDataException($"Server ProductId {product.ProductId} is missing from the client DAT.");
 
             VerifyRecord(record, product);
+            if (!string.Equals(record.ProductName, product.ProductName, StringComparison.Ordinal))
+                throw new InvalidDataException($"Product {product.ProductId} has a different client/server name.");
+            if (record.KeepOption != 0 || record.KeepOptionFees.Length != 0)
+                throw new InvalidDataException($"Product {product.ProductId} must not advertise unsupported option succession.");
             if (!npcStringIds.Contains(record.CategorySub))
                 throw new InvalidDataException($"Product {product.ProductId} references missing NpcString {record.CategorySub}.");
         }
@@ -168,6 +202,101 @@ internal static class SpecialCraftCatalog
         if (Math.Abs(outcomes.Sum(outcome => outcome.Probability) - 100) > 0.001f)
             throw new InvalidDataException($"Product {productId} outcome chances do not total 100%.");
         return outcomes;
+    }
+
+    private static Dictionary<byte, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> BuildCategoryTemplates(
+        IReadOnlyDictionary<ushort, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> baseRecords,
+        IReadOnlyDictionary<ushort, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> donorRecords)
+    {
+        Dictionary<byte, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> result = new();
+        AddTemplate(result, baseRecords, 10083, 0); // Frost Lord weapons.
+        AddTemplate(result, donorRecords, 4238, 2); // Spellbooks.
+        AddTemplate(result, baseRecords, 10043, 3); // Rare accessories.
+        AddTemplate(result, baseRecords, 10001, 4); // General crafting materials.
+        AddTemplate(result, donorRecords, 1203, 5); // Blessings.
+        return result;
+    }
+
+    private static void AddTemplate(Dictionary<byte, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> templates,
+        IReadOnlyDictionary<ushort, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> records, ushort productId,
+        byte category)
+    {
+        if (!records.TryGetValue(productId, out PurchaseLimitCraftV7.PurchaseLimitCraftRecord? record) ||
+            record.Category != category)
+        {
+            throw new InvalidDataException($"Client template ProductId {productId} for category {category} is missing.");
+        }
+
+        templates.Add(category, record);
+    }
+
+    private static PurchaseLimitCraftV7.PurchaseLimitCraftRecord CreateRecord(
+        PurchaseLimitCraftV7.PurchaseLimitCraftRecord template, SpecialCraftServerProduct product)
+    {
+        uint primaryRank = template.BuyItems.FirstOrDefault()?.ProductRank ?? 0;
+        PurchaseLimitCraftV7.PurchaseLimitCraftBuyItem[] outcomes = product.Outcomes
+            .Select((outcome, index) => new PurchaseLimitCraftV7.PurchaseLimitCraftBuyItem
+            {
+                ItemClassId = outcome.ItemId,
+                Count = outcome.Count,
+                Probability = outcome.Probability,
+                Enchant = outcome.Enchant,
+                ProductRank = index == 0 ? primaryRank : 0,
+                IsLimitServer = 0,
+            })
+            .ToArray();
+
+        return new PurchaseLimitCraftV7.PurchaseLimitCraftRecord
+        {
+            ShopIndex = specialCraftShopIndex,
+            ProductId = product.ProductId,
+            Category = product.Category,
+            CategorySub = template.CategorySub,
+            MarkType = template.MarkType,
+            MaxBuyCount = template.MaxBuyCount,
+            ProductName = product.ProductName,
+            ProductItem = product.Outcomes[0].ItemId,
+            ProductEnchant = product.Outcomes[0].Enchant,
+            BuyItems = outcomes,
+            LevelMin = product.LevelMin,
+            LevelMax = product.LevelMax,
+            LimitType = 0,
+            ResetType = LCoinResetType.Always,
+            LimitServerBuyCountMax = 0,
+            RequirementBuySkills = Array.Empty<uint>(),
+            KeepOptionFees = Array.Empty<PurchaseLimitCraftV7.PurchaseLimitCraftKeepOptionFee>(),
+            KeepOption = 0,
+            AutomaticType = 0,
+        };
+    }
+
+    private static Dictionary<uint, string> ReadItemNames(string catalogPath)
+    {
+        string dataPackDirectory = Path.GetDirectoryName(catalogPath)
+            ?? throw new InvalidDataException("LimitShopCraft.xml has no parent directory.");
+        string itemDirectory = Path.Combine(dataPackDirectory, "stats", "items");
+        if (!Directory.Exists(itemDirectory))
+            throw new DirectoryNotFoundException($"Server item directory not found: {itemDirectory}");
+
+        Dictionary<uint, string> names = new();
+        foreach (string itemFile in Directory.EnumerateFiles(itemDirectory, "*.xml"))
+        {
+            XElement? root = XDocument.Load(itemFile).Root;
+            if (root == null)
+                continue;
+
+            foreach (XElement item in root.Elements("item"))
+            {
+                XAttribute? id = item.Attribute("id");
+                XAttribute? name = item.Attribute("name");
+                if (id == null || name == null)
+                    continue;
+
+                names[ParseUInt(id)] = name.Value;
+            }
+        }
+
+        return names;
     }
 
     private static int GetInt(XElement element, string name, int defaultValue)

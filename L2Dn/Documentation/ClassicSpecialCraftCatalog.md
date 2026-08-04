@@ -1,85 +1,122 @@
 # Tienda L-Coin y Special Craft — servidor Classic 447
 
-## Resultado de esta fase
+## Resultado
 
-Los dos sistemas quedan separados según el tipo de tienda que envía el protocolo:
+El catálogo queda alineado con los objetos y árboles de habilidades que existen
+en este datapack:
 
-- `LimitShop.xml` (`shopType = 3`) contiene los 41 productos reconocidos por el
-  `LCoinShopProduct_Classic-eu.dat` actual.
-- `LimitShopCraft.xml` (`shopType = 4`) contiene 41 recetas propias de Special
-  Craft, organizadas por su categoría semántica.
-- `LimitShopClan.xml` (`shopType = 100`) no se modifica.
+- `LimitShop.xml` conserva sus 41 productos y ya no usa Giran Seal (`92314`):
+  los productos propios de la tienda cuestan L-Coin y los pergaminos comunes,
+  Adena.
+- `LimitShopCraft.xml` contiene 184 recetas reproducibles, repartidas entre las
+  cinco categorías permanentes de la interfaz.
+- Event queda vacío deliberadamente. No se publica una receta sin evento,
+  calendario y fuente de moneda activos.
+- Todos los ingredientes y resultados están definidos en `stats/items`, y todos
+  los libros ofrecidos son consumidos por los árboles activos de tercera clase.
 
-Los productos `10069` y `10070` siguen excluidos de la tienda L-Coin porque sus
-recompensas (`99041` y `99042`) no existen en el datapack del servidor.
+El archivo completo se regenera con:
 
-## Categorías de Special Craft
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\server\Build-ClassicSpecialCraftCatalog.ps1
+```
 
-| Código | Pestaña | Recetas activas | Decisión |
+## Distribución
+
+| Categoría | Pestaña | Recetas | Contenido |
 |---:|---|---:|---|
-| 0 | Special Weapon | 0 | Reservada hasta definir una fuente real para los materiales de arma |
-| 2 | Spellbook | 4 | Cupones de 1–4 estrellas mediante Giran Seal |
-| 3 | Accessories | 14 | Intercambios determinísticos por paquetes +6 |
-| 4 | Misc | 11 | Pergaminos y conversión de piedras de augmentación |
-| 5 | Blessing | 12 | Combinación de dos accesorios +4/+5 equivalentes |
-| 6 | Event | 0 | Reservada para un evento con fecha y moneda activas |
+| 0 | Special Weapon | 12 | Paquetes de las doce armas Frost Lord |
+| 2 | Spellbook | 87 | Todos los libros de tercera clase usados por el servidor |
+| 3 | Accessories | 28 | Siete cadenas completas de accesorios de raid, Lv. 2–5 |
+| 4 | Misc | 15 | Tabletas, Elixir, tintes, augmentación y pergamino estable |
+| 5 | Blessing | 42 | Seis familias bendecidas, desde +4 hasta +10 |
+| 6 | Event | 0 | Reservada para eventos temporales reales |
 
-La categoría `1` no corresponde a ninguna de las seis pestañas de Special Craft
-de este cliente y no se usa en `LimitShopCraft.xml`.
+La categoría interna `1` no representa ninguna pestaña de esta versión del
+cliente y no se utiliza.
 
-## Recetas activas
+## Special Weapon
 
-### Spellbook
+Cada receta es determinística y consume:
 
-| ProductId | Resultado | Costo | Éxito | Resultado alternativo |
-|---:|---|---:|---:|---|
-| 4238 | Cupón de libro 1 estrella | 49 Giran Seal | 50% | 5 Giran Seal |
-| 4239 | Cupón de libro 2 estrellas | 60 Giran Seal | 30% | 6 Giran Seal |
-| 4240 | Cupón de libro 3 estrellas | 137 Giran Seal | 10% | 13 Giran Seal |
-| 4241 | Cupón de libro 4 estrellas | 1.208 Giran Seal | 5% | 120 Giran Seal |
+- 1 Black Frozen Core (`95781`);
+- 1.500 Frost Lord's Weapon Crystal (`95782`).
 
-### Accessories
+Los resultados son los paquetes `95823`–`95833` y `95835`, uno para cada tipo
+de arma Frost Lord. Para que el circuito sea obtenible dentro del juego, los
+materiales se incorporan a raids ya existentes:
 
-Se activan catorce intercambios determinísticos: Hunter's Earring, Piercing
-Mask, Circlet of Hero, Talisman of Authority, Talisman of Eva, Talisman of
-Speed, Dragon Belt, Cloak of Protection y seis Agathions (Dragon Egg, Ignis,
-Nebula, Procella, Petram y Joy). Cada receta usa el paquete o kit base y Adena.
+| Raid | NPC | Cristales garantizados | Probabilidad del core |
+|---|---:|---:|---:|
+| Scarlet van Halisha / Frintezza | 29047 | 75–125 | 10% |
+| Baium | 29020 | 125–200 | 20% |
+| Antharas | 29068 | 200–300 | 30% |
 
-### Misc
+## Spellbook
 
-Se activan el pergamino estable de accesorios raros, la Incredible Upgrade
-Stone, el pergamino de accesorios y ocho conversiones de piedras de
-augmentación. Estas últimas tienen 15% de producir la piedra bendecida y 85% de
-devolver una de las dos piedras base consumidas.
+Se publican 87 libros, con resultados `90046`–`90135`, excepto `90052`,
+`90074` y `90132`. Esas exclusiones no son consumidas por los árboles activos.
+Cada libro cuesta 31 Magical Tablet (`90045`) y 100.000 Adena. Las recetas usan
+ProductId propios del servidor (`20000`–`20086`) y el generador crea sus
+registros de cliente correspondientes.
 
-### Blessing
+La pestaña se conecta con Misc: una Magical Tablet se fabrica con 20 fragmentos
+de Fire, Water, Wind o Earth (`91040`, `91039`, `91041`, `91042`) más 200.000
+Adena.
 
-Se activan conversiones +4 y +5 para Talisman of Aden, Talisman of Authority,
-Circlet of Hero, Dragon Belt, Talisman of Speed y Talisman of Eva. Cada receta
-consume exactamente dos objetos del mismo nivel de encantamiento y produce su
-versión bendecida.
+## Accessories
 
-## Correcciones del flujo de compra
+Hay cuatro etapas para Frintezza, Antharas, Baium, Zaken, Queen Ant, Orfen y
+Core:
 
-- Los resultados aleatorios usan un único valor por intento y una distribución
-  acumulada. Antes cada rama ejecutaba un sorteo nuevo y alteraba las
-  probabilidades declaradas.
-- Los ingredientes repetidos se agrupan por `ItemId` y encantamiento antes de
-  validarlos y consumirlos.
-- La cantidad declarada de un ingrediente encantado se respeta; antes se
-  destruía sólo un objeto por intento.
-- Los puntos VIP se aplican una vez por compra y no una vez por ingrediente.
-- Los contadores de cuenta permanecen aislados por `shopType` y `ProductId`.
+| Etapa | Materiales | Resultado |
+|---|---|---|
+| Lv. 2 | 2 accesorios base + 5.000.000 Adena | Lv. 2, 100% |
+| Lv. 3 | 2 accesorios Lv. 2 + 20.000.000 Adena | Lv. 3, 100% |
+| Lv. 4 | 2 accesorios Lv. 3 + 100.000.000 Adena | Lv. 4, 100% |
+| Lv. 5 | 1 accesorio Lv. 4 + 1 base + tarifa | Lv. 5 con 3–4% |
 
-## Integración de cliente
+La tarifa Lv. 5 es 300.000.000 Adena para Frintezza, Antharas y Baium, y
+150.000.000 para Zaken, Queen Ant, Orfen y Core. Si falla el intento, el servidor
+devuelve el accesorio Lv. 4 y reembolsa la tarifa de Adena; el accesorio base sí
+se consume. Esta regla se declara con `refundAdenaOnFailure="true"` y se procesa
+en el flujo de compra, no como una recompensa ficticia del catálogo.
 
-La fase de cliente está documentada en
-[ClassicSpecialCraftClient.md](ClassicSpecialCraftClient.md). La tabla correcta
-es `PurchaseLimitCraft_Classic-eu.dat`, no `LCoinShopProduct_Classic-eu.dat`.
-El generador importa los 41 registros equivalentes del DAT ClassicAden incluido
-en el mismo cliente, valida ProductId, categoría, resultados, probabilidades,
-encantamientos y niveles contra este XML, y genera un DAT Classic verificable.
+La sucesión de opciones del cliente se desactiva (`keep_option = 0`) porque el
+servidor todavía no implementa ese protocolo. Así no se ofrece una promesa que
+el servidor no pueda cumplir.
 
-Los ingredientes permanecen exclusivamente en el XML del servidor y se envían
-a la interfaz por protocolo. Las pestañas se conservan en
-`PurchaseLimitCraftCategory_Classic.dat` sin modificaciones.
+## Misc
+
+| Recetas | Requisito | Resultado |
+|---:|---|---|
+| 4 | 20 fragmentos elementales + 200.000 Adena | 1 Magical Tablet |
+| 1 | 10 Elixir Powder | 5% Elixir; 95% devolución de 7 polvos |
+| 1 | 5 Dye Powder + 500.000 Adena | 8% ×3 / 67% ×1 Enhanced Dye Powder; 25% devolución de 2 polvos |
+| 8 | 2 piedras de augmentación + 1.000.000 Adena | 15% piedra bendecida; 85% devolución de 1 piedra base |
+| 1 | 5 Scroll: Enchant Rare Accessories + 1.000 L-Coin + 10.000.000 Adena | Stable Scroll: Enchant Rare Accessories |
+
+Todas las probabilidades constituyen una única distribución de 100%; el flujo
+del servidor realiza un solo sorteo por intento.
+
+## Blessing
+
+Las seis familias son Dragon Belt, Talisman of Speed, Talisman of Eva, Circlet
+of Hero, Talisman of Authority y Talisman of Aden. Para cada nivel de +4 a +10,
+la receta consume dos objetos base con exactamente ese encantamiento y entrega
+la variante bendecida correspondiente. Son 7 niveles por 6 familias: 42 recetas
+determinísticas.
+
+## Event
+
+No hay recetas permanentes. Cuando exista un evento concreto debe agregarse como
+un cambio autocontenido: período de vigencia, fuente del material, límites,
+premios, probabilidades, entrada de cliente y prueba que impida que quede activo
+fuera de fecha.
+
+## Invariantes verificadas
+
+Las pruebas automatizadas fijan el número de recetas por pestaña, ausencia total
+de Giran Seal, existencia de cada ItemId, correspondencia con los skill trees,
+fuentes de Frost Lord, fórmulas de accesorios, rangos +4–+10 y suma de todas las
+probabilidades. El DAT se verifica además contra el XML después de cifrarlo.
