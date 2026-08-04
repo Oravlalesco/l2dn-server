@@ -2,20 +2,21 @@
 
 ## Qué archivo controla la ventana
 
-Special Craft no se define en `LCoinShopProduct_Classic-eu.dat`. La interfaz usa:
+Special Craft no se define en `LCoinShopProduct_Classic-eu.dat`. Según el perfil
+activo del cliente, la interfaz usa la familia `Classic` o `ClassicAden` de:
 
-- `system/eu/PurchaseLimitCraft_Classic-eu.dat`: productos, resultados,
+- `system/eu/PurchaseLimitCraft_<variante>-eu.dat`: productos, resultados,
   probabilidades, categorías y límites visuales;
 - `system/eu/PurchaseLimitCraftCategory_Classic.dat`: las pestañas;
 - `system/eu/NpcString_Classic-eu.dat`: textos referenciados por
   `category_sub`;
-- `system/eu/L2GameDataName.dat` y `ItemName_Classic-eu.dat`: cadenas e índices
-  de los nombres de los ítems;
-- `system/eu/EtcItemgrp_Classic.dat`, `Armorgrp_Classic.dat` y
-  `Weapongrp_Classic.dat`: iconos y recursos visuales;
-- `system/eu/item_baseinfo_Classic.dat`, `AdditionalItemGrp_Classic.dat` e
-  `ItemStatData_Classic.dat`: ficha base, metadata adicional y estadísticas que
-  permiten al cliente materializar correctamente cada ítem.
+- `system/eu/L2GameDataName.dat` y `ItemName_<variante>-eu.dat`: cadenas e
+  índices de los nombres de los ítems;
+- `system/eu/EtcItemgrp_<variante>.dat`, `Armorgrp_<variante>.dat` y
+  `Weapongrp_<variante>.dat`: iconos y recursos visuales;
+- `system/eu/item_baseinfo_<variante>.dat`, `AdditionalItemGrp_<variante>.dat`
+  e `ItemStatData_<variante>.dat`: ficha base, metadata adicional y
+  estadísticas que permiten al cliente materializar correctamente cada ítem.
 
 Los ingredientes pertenecen al servidor. `LimitShopCraft.xml` los envía por
 protocolo, con un máximo de cinco por receta. El DAT y el XML deben coincidir en
@@ -41,6 +42,13 @@ ingleses de `stats/items` y agrega cadenas al final de `L2GameDataName` sin
 desplazar ningún índice existente.
 La verificación cubre los 201 ItemId distintos usados tanto como resultado como
 ingrediente y falla si cualquiera queda incompleto.
+
+Las capturas de prueba demostraron que este cliente 447 carga la familia
+`ClassicAden`: el ProductId 4238 seguía mostrando exactamente el cupón de
+Spellbook y Giran Seal del DAT Aden original, aunque el servidor ya enviaba
+Magical Tablet y Adena. Por eso el bundle genera e instala ambas familias. Aden
+también importa 7 ítems ausentes desde Classic y corrige sus propios índices de
+nombre.
 
 El resultado contiene exactamente:
 
@@ -74,21 +82,16 @@ powershell -ExecutionPolicy Bypass -File .\tools\client\Build-ClassicSpecialCraf
 El comando no modifica el cliente. Produce un paquete inseparable:
 
 - `tools/client/output/L2GameDataName.dat`;
-- `tools/client/output/PurchaseLimitCraft_Classic-eu.dat`;
-- `tools/client/output/ItemName_Classic-eu.dat`;
-- `tools/client/output/EtcItemgrp_Classic.dat`;
-- `tools/client/output/Armorgrp_Classic.dat`;
-- `tools/client/output/Weapongrp_Classic.dat`;
-- `tools/client/output/item_baseinfo_Classic.dat`;
-- `tools/client/output/AdditionalItemGrp_Classic.dat`;
-- `tools/client/output/ItemStatData_Classic.dat`;
-- `tools/client/output/PurchaseLimitCraft_Classic-eu.json`, manifiesto legible
-  de los 184 registros.
+- ocho DAT para `Classic` y los mismos ocho para `ClassicAden`:
+  `PurchaseLimitCraft`, `ItemName`, `EtcItemgrp`, `Armorgrp`, `Weapongrp`,
+  `item_baseinfo`, `AdditionalItemGrp` e `ItemStatData`;
+- manifiestos legibles `PurchaseLimitCraft_Classic-eu.json` y
+  `PurchaseLimitCraft_ClassicAden-eu.json`, cada uno con 184 registros.
 
-La verificación vuelve a abrir el DAT generado y exige igualdad exacta con el
+La verificación vuelve a abrir ambas familias y exige igualdad exacta con el
 servidor, ausencia de registros adicionales, nombres válidos en `NpcString`,
 igualdad de los 201 nombres con `stats/items`, `keep_option = 0` y presencia de
-los 201 ítems en las tres tablas auxiliares.
+los 201 ítems en las tres tablas auxiliares de cada variante.
 
 Para instalarlo únicamente después de revisar el resultado:
 
@@ -97,7 +100,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\client\Install-ClassicSpecialCr
   -ClientSystemPath 'C:\ruta\al\cliente\system'
 ```
 
-El instalador actualiza los nueve DAT juntos. Primero crea respaldos con el
+El instalador actualiza los 17 DAT juntos. Primero crea respaldos con el
 mismo sufijo `.backup-yyyyMMdd-HHmmss`, comprueba el SHA-256 de cada copia y,
 si una operación falla, restaura automáticamente todos los originales.
 

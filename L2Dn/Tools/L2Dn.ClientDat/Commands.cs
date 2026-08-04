@@ -65,15 +65,16 @@ internal static class Commands
 
         string outputDirectory = Path.GetFullPath(args[3]);
         SpecialCraftClientBundleResult result = SpecialCraftClientBundle.Build(args[1], args[2], outputDirectory);
-        WriteManifest(Path.Combine(outputDirectory, "PurchaseLimitCraft_Classic-eu.json"), result.Craft);
+        WriteManifest(Path.Combine(outputDirectory, "PurchaseLimitCraft_Classic-eu.json"), result.ClassicCraft);
+        WriteManifest(Path.Combine(outputDirectory, "PurchaseLimitCraft_ClassicAden-eu.json"),
+            result.ClassicAdenCraft);
 
-        Console.WriteLine($"Bundle: {result.Craft.Records.Count(record => record.ShopIndex == 4)} recipes, " +
-                          $"{result.ReferencedItems} referenced items");
-        Console.WriteLine($"Imported from Classic Aden: names={result.AddedItemNames}, " +
-                          $"etc={result.AddedEtcItems}, armor={result.AddedArmorItems}, " +
-                          $"weapon={result.AddedWeaponItems}, baseInfo={result.AddedBaseInfoItems}, " +
-                          $"additional={result.AddedAdditionalItems}, stats={result.AddedItemStats}, " +
-                          $"gameDataNames={result.AddedGameDataNames}, reindexedNames={result.ReindexedItemNames}");
+        Console.WriteLine($"Bundle: Classic={result.ClassicCraft.Records.Count(record => record.ShopIndex == 4)}, " +
+                          $"ClassicAden={result.ClassicAdenCraft.Records.Count(record => record.ShopIndex == 4)} " +
+                          $"recipes, {result.ReferencedItems} referenced items");
+        WriteVariantStats("Classic", result.Classic, result.ReindexedClassicItemNames);
+        WriteVariantStats("ClassicAden", result.ClassicAden, result.ReindexedClassicAdenItemNames);
+        Console.WriteLine($"L2GameDataName additions: {result.AddedGameDataNames}");
         Console.WriteLine($"Output: {outputDirectory}");
         return 0;
     }
@@ -264,6 +265,15 @@ internal static class Commands
     }
 
     private static string IconText(IndexedString value) => value.Text;
+
+    private static void WriteVariantStats(string variant, SpecialCraftClientVariantStats stats,
+        int reindexedNames)
+    {
+        Console.WriteLine($"{variant}: names={stats.AddedItemNames}, etc={stats.AddedEtcItems}, " +
+                          $"armor={stats.AddedArmorItems}, weapon={stats.AddedWeaponItems}, " +
+                          $"baseInfo={stats.AddedBaseInfoItems}, additional={stats.AddedAdditionalItems}, " +
+                          $"stats={stats.AddedItemStats}, reindexedNames={reindexedNames}");
+    }
 
     private static void WriteSupportSummary(string table, int availableInClassic, int availableInDonor,
         IEnumerable<uint> unavailable, string classicKey, string donorKey)

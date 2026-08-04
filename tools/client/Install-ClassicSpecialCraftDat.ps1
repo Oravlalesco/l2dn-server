@@ -21,7 +21,15 @@ $fileNames = @(
     'Weapongrp_Classic.dat',
     'item_baseinfo_Classic.dat',
     'AdditionalItemGrp_Classic.dat',
-    'ItemStatData_Classic.dat'
+    'ItemStatData_Classic.dat',
+    'PurchaseLimitCraft_ClassicAden-eu.dat',
+    'ItemName_ClassicAden-eu.dat',
+    'EtcItemgrp_ClassicAden.dat',
+    'Armorgrp_ClassicAden.dat',
+    'Weapongrp_ClassicAden.dat',
+    'item_baseinfo_ClassicAden.dat',
+    'AdditionalItemGrp_ClassicAden.dat',
+    'ItemStatData_ClassicAden.dat'
 )
 
 $operations = foreach ($fileName in $fileNames) {

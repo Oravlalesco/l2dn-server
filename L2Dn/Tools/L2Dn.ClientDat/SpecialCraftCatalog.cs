@@ -228,11 +228,11 @@ internal static class SpecialCraftCatalog
         IReadOnlyDictionary<ushort, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> donorRecords)
     {
         Dictionary<byte, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> result = new();
-        AddTemplate(result, baseRecords, 10083, 0); // Frost Lord weapons.
-        AddTemplate(result, donorRecords, 4238, 2); // Spellbooks.
-        AddTemplate(result, baseRecords, 10043, 3); // Rare accessories.
-        AddTemplate(result, baseRecords, 10001, 4); // General crafting materials.
-        AddTemplate(result, donorRecords, 1203, 5); // Blessings.
+        AddTemplate(result, baseRecords, donorRecords, 10083, 0); // Frost Lord weapons.
+        AddTemplate(result, baseRecords, donorRecords, 4238, 2); // Spellbooks.
+        AddTemplate(result, baseRecords, donorRecords, 10043, 3); // Rare accessories.
+        AddTemplate(result, baseRecords, donorRecords, 10001, 4); // General crafting materials.
+        AddTemplate(result, baseRecords, donorRecords, 1203, 5); // Blessings.
         return result;
     }
 
@@ -243,11 +243,13 @@ internal static class SpecialCraftCatalog
         record.ProductEnchant == product.Outcomes[0].Enchant;
 
     private static void AddTemplate(Dictionary<byte, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> templates,
-        IReadOnlyDictionary<ushort, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> records, ushort productId,
-        byte category)
+        IReadOnlyDictionary<ushort, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> primaryRecords,
+        IReadOnlyDictionary<ushort, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> secondaryRecords,
+        ushort productId, byte category)
     {
-        if (!records.TryGetValue(productId, out PurchaseLimitCraftV7.PurchaseLimitCraftRecord? record) ||
-            record.Category != category)
+        if ((!primaryRecords.TryGetValue(productId, out PurchaseLimitCraftV7.PurchaseLimitCraftRecord? record) ||
+             record.Category != category) &&
+            (!secondaryRecords.TryGetValue(productId, out record) || record.Category != category))
         {
             throw new InvalidDataException($"Client template ProductId {productId} for category {category} is missing.");
         }
