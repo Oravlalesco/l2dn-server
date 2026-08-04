@@ -6,6 +6,7 @@ try
     {
         "inspect" => Commands.Inspect(args),
         "audit-special-craft-client" => Commands.AuditSpecialCraftClient(args),
+        "audit-special-craft-support" => Commands.AuditSpecialCraftSupport(args),
         "build-special-craft-bundle" => Commands.BuildSpecialCraftBundle(args),
         "build-special-craft" => Commands.BuildSpecialCraft(args),
         "verify-special-craft" => Commands.VerifySpecialCraft(args),

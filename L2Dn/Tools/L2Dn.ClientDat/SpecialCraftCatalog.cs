@@ -22,7 +22,7 @@ internal static class SpecialCraftCatalog
         string fullPath = Path.GetFullPath(path);
         XDocument document = XDocument.Load(fullPath, LoadOptions.SetLineInfo);
         XElement root = document.Root ?? throw new InvalidDataException("LimitShopCraft.xml has no root element.");
-        Dictionary<uint, string> itemNames = ReadItemNames(fullPath);
+        IReadOnlyDictionary<uint, string> itemNames = ReadServerItemNames(fullPath);
         List<SpecialCraftServerProduct> result = new();
         foreach (XElement product in root.Elements("product"))
         {
@@ -295,7 +295,7 @@ internal static class SpecialCraftCatalog
         };
     }
 
-    private static Dictionary<uint, string> ReadItemNames(string catalogPath)
+    public static IReadOnlyDictionary<uint, string> ReadServerItemNames(string catalogPath)
     {
         string dataPackDirectory = Path.GetDirectoryName(catalogPath)
             ?? throw new InvalidDataException("LimitShopCraft.xml has no parent directory.");

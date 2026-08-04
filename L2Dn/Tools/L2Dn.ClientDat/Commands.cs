@@ -71,7 +71,9 @@ internal static class Commands
                           $"{result.ReferencedItems} referenced items");
         Console.WriteLine($"Imported from Classic Aden: names={result.AddedItemNames}, " +
                           $"etc={result.AddedEtcItems}, armor={result.AddedArmorItems}, " +
-                          $"weapon={result.AddedWeaponItems}");
+                          $"weapon={result.AddedWeaponItems}, baseInfo={result.AddedBaseInfoItems}, " +
+                          $"additional={result.AddedAdditionalItems}, stats={result.AddedItemStats}, " +
+                          $"gameDataNames={result.AddedGameDataNames}, reindexedNames={result.ReindexedItemNames}");
         Console.WriteLine($"Output: {outputDirectory}");
         return 0;
     }
@@ -162,6 +164,80 @@ internal static class Commands
         return 0;
     }
 
+    public static int AuditSpecialCraftSupport(string[] args)
+    {
+        if (args.Length is < 3 or > 4)
+            return Usage();
+
+        string clientSystem = Path.GetFullPath(args[1]);
+        string clientEu = Path.Combine(clientSystem, "eu");
+        L2NameData nameData = ClientDatFile.Read<L2NameData>(Path.Combine(clientEu, "L2GameDataName.dat"), out _);
+        DatReader.SetNameData(nameData.Names);
+
+        IReadOnlyList<SpecialCraftServerProduct> products = SpecialCraftCatalog.ReadServerProducts(args[2]);
+        uint[] requiredIds = products
+            .SelectMany(product => product.Ingredients.Select(item => item.ItemId)
+                .Concat(product.Outcomes.Select(item => item.ItemId)))
+            .Distinct()
+            .Order()
+            .ToArray();
+
+        ItemBaseInfoV5 baseInfo = ClientDatFile.Read<ItemBaseInfoV5>(
+            Path.Combine(clientEu, "item_baseinfo_Classic.dat"), out string baseInfoKey);
+        ItemBaseInfoV5 donorInfo = ClientDatFile.Read<ItemBaseInfoV5>(
+            Path.Combine(clientEu, "item_baseinfo_ClassicAden.dat"), out string donorInfoKey);
+        AdditionalItemGrpV4 baseAdditional = ClientDatFile.Read<AdditionalItemGrpV4>(
+            Path.Combine(clientEu, "AdditionalItemGrp_Classic.dat"), out string baseAdditionalKey);
+        AdditionalItemGrpV4 donorAdditional = ClientDatFile.Read<AdditionalItemGrpV4>(
+            Path.Combine(clientEu, "AdditionalItemGrp_ClassicAden.dat"), out string donorAdditionalKey);
+        ItemStatDataV4 baseStats = ClientDatFile.Read<ItemStatDataV4>(
+            Path.Combine(clientEu, "ItemStatData_Classic.dat"), out string baseStatsKey);
+        ItemStatDataV4 donorStats = ClientDatFile.Read<ItemStatDataV4>(
+            Path.Combine(clientEu, "ItemStatData_ClassicAden.dat"), out string donorStatsKey);
+
+        HashSet<uint> baseInfoIds = baseInfo.Records.Select(record => record.ItemId).ToHashSet();
+        HashSet<uint> donorInfoIds = donorInfo.Records.Select(record => record.ItemId).ToHashSet();
+        HashSet<uint> baseAdditionalIds = baseAdditional.Records.Select(record => record.Id).ToHashSet();
+        HashSet<uint> donorAdditionalIds = donorAdditional.Records.Select(record => record.Id).ToHashSet();
+        HashSet<uint> baseStatIds = baseStats.Records.Select(record => record.ItemId).ToHashSet();
+        HashSet<uint> donorStatIds = donorStats.Records.Select(record => record.ItemId).ToHashSet();
+
+        var records = requiredIds.Select(itemId => new
+        {
+            ItemId = itemId,
+            BaseInfoClassic = baseInfoIds.Contains(itemId),
+            BaseInfoClassicAden = donorInfoIds.Contains(itemId),
+            AdditionalClassic = baseAdditionalIds.Contains(itemId),
+            AdditionalClassicAden = donorAdditionalIds.Contains(itemId),
+            StatsClassic = baseStatIds.Contains(itemId),
+            StatsClassicAden = donorStatIds.Contains(itemId),
+        }).ToArray();
+
+        Console.WriteLine($"Referenced items: {requiredIds.Length}");
+        WriteSupportSummary("item_baseinfo", records.Count(record => record.BaseInfoClassic),
+            records.Count(record => !record.BaseInfoClassic && record.BaseInfoClassicAden),
+            records.Where(record => !record.BaseInfoClassic && !record.BaseInfoClassicAden).Select(record => record.ItemId),
+            baseInfoKey, donorInfoKey);
+        WriteSupportSummary("AdditionalItemGrp", records.Count(record => record.AdditionalClassic),
+            records.Count(record => !record.AdditionalClassic && record.AdditionalClassicAden),
+            records.Where(record => !record.AdditionalClassic && !record.AdditionalClassicAden).Select(record => record.ItemId),
+            baseAdditionalKey, donorAdditionalKey);
+        WriteSupportSummary("ItemStatData", records.Count(record => record.StatsClassic),
+            records.Count(record => !record.StatsClassic && record.StatsClassicAden),
+            records.Where(record => !record.StatsClassic && !record.StatsClassicAden).Select(record => record.ItemId),
+            baseStatsKey, donorStatsKey);
+
+        if (args.Length == 4)
+        {
+            string outputPath = Path.GetFullPath(args[3]);
+            Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+            File.WriteAllText(outputPath, JsonSerializer.Serialize(records, _jsonOptions));
+            Console.WriteLine($"Audit: {outputPath}");
+        }
+
+        return 0;
+    }
+
     public static int VerifySpecialCraft(string[] args)
     {
         if (args.Length != 4)
@@ -180,6 +256,7 @@ internal static class Commands
         Console.Error.WriteLine("Usage:");
         Console.Error.WriteLine("  L2Dn.ClientDat inspect <input.dat> [output.json]");
         Console.Error.WriteLine("  L2Dn.ClientDat audit-special-craft-client <craft.dat> <category.dat> <NpcString.dat> <L2GameDataName.dat> <ItemName.dat> <EtcItemGrp.dat> <ArmorGrp.dat> <WeaponGrp.dat> [output.json]");
+        Console.Error.WriteLine("  L2Dn.ClientDat audit-special-craft-support <client-system-dir> <LimitShopCraft.xml> [output.json]");
         Console.Error.WriteLine("  L2Dn.ClientDat build-special-craft-bundle <client-system-dir> <LimitShopCraft.xml> <output-dir>");
         Console.Error.WriteLine("  L2Dn.ClientDat build-special-craft <base-classic.dat> <donor-classic-aden.dat> <npc-string-classic.dat> <LimitShopCraft.xml> <output.dat> <manifest.json>");
         Console.Error.WriteLine("  L2Dn.ClientDat verify-special-craft <input.dat> <npc-string-classic.dat> <LimitShopCraft.xml>");
@@ -187,6 +264,16 @@ internal static class Commands
     }
 
     private static string IconText(IndexedString value) => value.Text;
+
+    private static void WriteSupportSummary(string table, int availableInClassic, int availableInDonor,
+        IEnumerable<uint> unavailable, string classicKey, string donorKey)
+    {
+        uint[] missing = unavailable.ToArray();
+        Console.WriteLine($"{table}: Classic={availableInClassic}, donor additions={availableInDonor}, " +
+                          $"unavailable={missing.Length} ({classicKey}/{donorKey})");
+        if (missing.Length != 0)
+            Console.WriteLine($"  Missing: {string.Join(", ", missing)}");
+    }
 
     private static string IdRange(IEnumerable<uint> values)
     {

@@ -21,6 +21,12 @@ $requiredNames = @(
     'eu\Armorgrp_ClassicAden.dat',
     'eu\Weapongrp_Classic.dat',
     'eu\Weapongrp_ClassicAden.dat',
+    'eu\item_baseinfo_Classic.dat',
+    'eu\item_baseinfo_ClassicAden.dat',
+    'eu\AdditionalItemGrp_Classic.dat',
+    'eu\AdditionalItemGrp_ClassicAden.dat',
+    'eu\ItemStatData_Classic.dat',
+    'eu\ItemStatData_ClassicAden.dat',
     'DSETUP.dll'
 )
 $requiredFiles = $requiredNames | ForEach-Object { Join-Path $clientSystem $_ }
@@ -63,11 +69,15 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $outputFiles = @(
+    'L2GameDataName.dat',
     'PurchaseLimitCraft_Classic-eu.dat',
     'ItemName_Classic-eu.dat',
     'EtcItemgrp_Classic.dat',
     'Armorgrp_Classic.dat',
-    'Weapongrp_Classic.dat'
+    'Weapongrp_Classic.dat',
+    'item_baseinfo_Classic.dat',
+    'AdditionalItemGrp_Classic.dat',
+    'ItemStatData_Classic.dat'
 )
 Write-Host 'Paquete DAT generado y verificado:' -ForegroundColor Green
 foreach ($fileName in $outputFiles) {

@@ -9,7 +9,12 @@ internal sealed record SpecialCraftClientBundleResult(
     int AddedItemNames,
     int AddedEtcItems,
     int AddedArmorItems,
-    int AddedWeaponItems);
+    int AddedWeaponItems,
+    int AddedBaseInfoItems,
+    int AddedAdditionalItems,
+    int AddedItemStats,
+    int AddedGameDataNames,
+    int ReindexedItemNames);
 
 internal static class SpecialCraftClientBundle
 {
@@ -39,9 +44,19 @@ internal static class SpecialCraftClientBundle
         ArmorGrpV14 donorArmor = Read<ArmorGrpV14>(clientEu, "Armorgrp_ClassicAden.dat");
         WeaponGrpV12 baseWeapon = Read<WeaponGrpV12>(clientEu, "Weapongrp_Classic.dat");
         WeaponGrpV12 donorWeapon = Read<WeaponGrpV12>(clientEu, "Weapongrp_ClassicAden.dat");
+        ItemBaseInfoV5 baseInfo = Read<ItemBaseInfoV5>(clientEu, "item_baseinfo_Classic.dat");
+        ItemBaseInfoV5 donorInfo = Read<ItemBaseInfoV5>(clientEu, "item_baseinfo_ClassicAden.dat");
+        AdditionalItemGrpV4 baseAdditional = Read<AdditionalItemGrpV4>(clientEu,
+            "AdditionalItemGrp_Classic.dat");
+        AdditionalItemGrpV4 donorAdditional = Read<AdditionalItemGrpV4>(clientEu,
+            "AdditionalItemGrp_ClassicAden.dat");
+        ItemStatDataV4 baseStats = Read<ItemStatDataV4>(clientEu, "ItemStatData_Classic.dat");
+        ItemStatDataV4 donorStats = Read<ItemStatDataV4>(clientEu, "ItemStatData_ClassicAden.dat");
 
         IReadOnlyList<SpecialCraftServerProduct> serverProducts =
             SpecialCraftCatalog.ReadServerProducts(catalogPath);
+        IReadOnlyDictionary<uint, string> serverItemNames =
+            SpecialCraftCatalog.ReadServerItemNames(catalogPath);
         PurchaseLimitCraftV7 craft = SpecialCraftCatalog.Build(baseCraft, donorCraft, npcStrings, serverProducts);
         HashSet<uint> referencedItemIds = serverProducts
             .SelectMany(product => product.Ingredients.Select(ingredient => ingredient.ItemId)
@@ -49,20 +64,42 @@ internal static class SpecialCraftClientBundle
             .ToHashSet();
 
         ItemNameV18 itemNames = MergeItemNames(baseNames, donorNames, referencedItemIds, out int addedNames);
+        L2NameData normalizedNameData = NormalizeItemNames(nameData, itemNames, serverItemNames,
+            referencedItemIds, out int addedGameDataNames, out int reindexedItemNames);
         (EtcItemGrpV9 etcItems, ArmorGrpV14 armorItems, WeaponGrpV12 weaponItems,
             int addedEtc, int addedArmor, int addedWeapon) = MergeVisualAssets(
             baseEtc, donorEtc, baseArmor, donorArmor, baseWeapon, donorWeapon, referencedItemIds);
+        ItemBaseInfoV5 itemInfo = new()
+        {
+            Records = MergeRequiredRecords(baseInfo.Records, donorInfo.Records, referencedItemIds,
+                record => record.ItemId, "item_baseinfo", out int addedBaseInfo),
+        };
+        AdditionalItemGrpV4 additionalItems = new()
+        {
+            Records = MergeRequiredRecords(baseAdditional.Records, donorAdditional.Records, referencedItemIds,
+                record => record.Id, "AdditionalItemGrp", out int addedAdditional),
+        };
+        ItemStatDataV4 itemStats = new()
+        {
+            Records = MergeRequiredRecords(baseStats.Records, donorStats.Records, referencedItemIds,
+                record => record.ItemId, "ItemStatData", out int addedStats),
+        };
 
         Directory.CreateDirectory(output);
+        ClientDatFile.WriteLineage2Ver413(Path.Combine(output, "L2GameDataName.dat"), normalizedNameData);
         ClientDatFile.WriteLineage2Ver413(Path.Combine(output, "PurchaseLimitCraft_Classic-eu.dat"), craft);
         ClientDatFile.WriteLineage2Ver413(Path.Combine(output, "ItemName_Classic-eu.dat"), itemNames);
         ClientDatFile.WriteLineage2Ver413(Path.Combine(output, "EtcItemgrp_Classic.dat"), etcItems);
         ClientDatFile.WriteLineage2Ver413(Path.Combine(output, "Armorgrp_Classic.dat"), armorItems);
         ClientDatFile.WriteLineage2Ver413(Path.Combine(output, "Weapongrp_Classic.dat"), weaponItems);
+        ClientDatFile.WriteLineage2Ver413(Path.Combine(output, "item_baseinfo_Classic.dat"), itemInfo);
+        ClientDatFile.WriteLineage2Ver413(Path.Combine(output, "AdditionalItemGrp_Classic.dat"), additionalItems);
+        ClientDatFile.WriteLineage2Ver413(Path.Combine(output, "ItemStatData_Classic.dat"), itemStats);
 
-        Verify(output, npcStrings, serverProducts, referencedItemIds);
+        Verify(output, npcStrings, serverProducts, serverItemNames, referencedItemIds);
         return new SpecialCraftClientBundleResult(craft, referencedItemIds.Count, addedNames, addedEtc,
-            addedArmor, addedWeapon);
+            addedArmor, addedWeapon, addedBaseInfo, addedAdditional, addedStats, addedGameDataNames,
+            reindexedItemNames);
     }
 
     private static ItemNameV18 MergeItemNames(ItemNameV18 baseData, ItemNameV18 donorData,
@@ -116,6 +153,47 @@ internal static class SpecialCraftClientBundle
                     requiredIds.Contains(item.ItemExId) && !baseItemExIds.Contains(item.ItemExId)))
                 .ToArray(),
         };
+    }
+
+    private static L2NameData NormalizeItemNames(L2NameData nameData, ItemNameV18 itemNames,
+        IReadOnlyDictionary<uint, string> serverItemNames, IReadOnlySet<uint> requiredIds,
+        out int addedGameDataNames, out int reindexedItemNames)
+    {
+        List<string> names = nameData.Names.ToList();
+        Dictionary<string, int> indexByName = names
+            .Select((name, index) => (name, index))
+            .GroupBy(entry => entry.name, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First().index, StringComparer.Ordinal);
+        Dictionary<uint, ItemNameV18.ItemNameRecord> recordsById = ToDictionary(itemNames.Records,
+            record => record.Id);
+        reindexedItemNames = 0;
+
+        foreach (uint itemId in requiredIds.Order())
+        {
+            if (!recordsById.TryGetValue(itemId, out ItemNameV18.ItemNameRecord? record))
+                throw new InvalidDataException($"ItemName has no record for required item {itemId}.");
+            if (!serverItemNames.TryGetValue(itemId, out string? desiredName) ||
+                string.IsNullOrWhiteSpace(desiredName))
+            {
+                throw new InvalidDataException($"The server has no name for required item {itemId}.");
+            }
+
+            if (string.Equals(record.Name.Text, desiredName, StringComparison.Ordinal))
+                continue;
+
+            if (!indexByName.TryGetValue(desiredName, out int index))
+            {
+                index = names.Count;
+                names.Add(desiredName);
+                indexByName.Add(desiredName, index);
+            }
+
+            record.Name = new IndexedString(desiredName, index);
+            reindexedItemNames++;
+        }
+
+        addedGameDataNames = names.Count - nameData.Names.Length;
+        return new L2NameData { Names = names.ToArray() };
     }
 
     private static (EtcItemGrpV9 Etc, ArmorGrpV14 Armor, WeaponGrpV12 Weapon,
@@ -196,9 +274,41 @@ internal static class SpecialCraftClientBundle
             weaponAdditions.Count);
     }
 
-    private static void Verify(string outputDirectory, NpcString npcStrings,
-        IReadOnlyList<SpecialCraftServerProduct> serverProducts, IReadOnlySet<uint> requiredIds)
+    private static T[] MergeRequiredRecords<T>(IEnumerable<T> baseRecords, IEnumerable<T> donorRecords,
+        IReadOnlySet<uint> requiredIds, Func<T, uint> idSelector, string tableName, out int additions)
     {
+        T[] baseArray = baseRecords.ToArray();
+        HashSet<uint> baseIds = baseArray.Select(idSelector).ToHashSet();
+        Dictionary<uint, T> donorById = donorRecords
+            .GroupBy(idSelector)
+            .ToDictionary(group => group.Key, group => group.First());
+        List<T> donorAdditions = new();
+        List<uint> missing = new();
+
+        foreach (uint itemId in requiredIds.Order())
+        {
+            if (baseIds.Contains(itemId))
+                continue;
+
+            if (donorById.TryGetValue(itemId, out T? donorRecord))
+                donorAdditions.Add(donorRecord);
+            else
+                missing.Add(itemId);
+        }
+
+        if (missing.Count != 0)
+            throw new InvalidDataException($"Items absent from Classic/Classic Aden {tableName}: {string.Join(", ", missing)}");
+
+        additions = donorAdditions.Count;
+        return baseArray.Concat(donorAdditions).ToArray();
+    }
+
+    private static void Verify(string outputDirectory, NpcString npcStrings,
+        IReadOnlyList<SpecialCraftServerProduct> serverProducts,
+        IReadOnlyDictionary<uint, string> serverItemNames, IReadOnlySet<uint> requiredIds)
+    {
+        L2NameData nameData = Read<L2NameData>(outputDirectory, "L2GameDataName.dat");
+        DatReader.SetNameData(nameData.Names);
         PurchaseLimitCraftV7 craft = Read<PurchaseLimitCraftV7>(outputDirectory,
             "PurchaseLimitCraft_Classic-eu.dat");
         SpecialCraftCatalog.Verify(craft, npcStrings, serverProducts);
@@ -207,6 +317,10 @@ internal static class SpecialCraftClientBundle
         EtcItemGrpV9 etc = Read<EtcItemGrpV9>(outputDirectory, "EtcItemgrp_Classic.dat");
         ArmorGrpV14 armor = Read<ArmorGrpV14>(outputDirectory, "Armorgrp_Classic.dat");
         WeaponGrpV12 weapon = Read<WeaponGrpV12>(outputDirectory, "Weapongrp_Classic.dat");
+        ItemBaseInfoV5 itemInfo = Read<ItemBaseInfoV5>(outputDirectory, "item_baseinfo_Classic.dat");
+        AdditionalItemGrpV4 additionalItems = Read<AdditionalItemGrpV4>(outputDirectory,
+            "AdditionalItemGrp_Classic.dat");
+        ItemStatDataV4 itemStats = Read<ItemStatDataV4>(outputDirectory, "ItemStatData_Classic.dat");
         Dictionary<uint, ItemNameV18.ItemNameRecord> namesById = ToDictionary(names.Records, record => record.Id);
         Dictionary<uint, EtcItemGrpV9.EtcItemGrpRecord> etcById = ToDictionary(etc.Records, record => record.ObjectId);
         Dictionary<uint, ArmorGrpV14.ArmorGrpRecord> armorById = ToDictionary(armor.Records,
@@ -222,12 +336,34 @@ internal static class SpecialCraftClientBundle
         if (missingNames.Length != 0)
             throw new InvalidDataException($"Generated bundle has items without names: {string.Join(", ", missingNames)}");
 
+        uint[] mismatchedNames = requiredIds.Where(itemId =>
+                !namesById.TryGetValue(itemId, out ItemNameV18.ItemNameRecord? record) ||
+                !serverItemNames.TryGetValue(itemId, out string? serverName) ||
+                !string.Equals(record.Name.Text, serverName, StringComparison.Ordinal))
+            .Order()
+            .ToArray();
+        if (mismatchedNames.Length != 0)
+            throw new InvalidDataException($"Generated bundle has client/server name mismatches: {string.Join(", ", mismatchedNames)}");
+
         uint[] missingVisuals = requiredIds.Where(itemId =>
                 !HasValidVisual(itemId, etcById, armorById, weaponById))
             .Order()
             .ToArray();
         if (missingVisuals.Length != 0)
             throw new InvalidDataException($"Generated bundle has items without visual assets: {string.Join(", ", missingVisuals)}");
+
+        VerifyRequiredIds("item_baseinfo", requiredIds, itemInfo.Records.Select(record => record.ItemId));
+        VerifyRequiredIds("AdditionalItemGrp", requiredIds, additionalItems.Records.Select(record => record.Id));
+        VerifyRequiredIds("ItemStatData", requiredIds, itemStats.Records.Select(record => record.ItemId));
+    }
+
+    private static void VerifyRequiredIds(string tableName, IEnumerable<uint> requiredIds,
+        IEnumerable<uint> availableIds)
+    {
+        HashSet<uint> available = availableIds.ToHashSet();
+        uint[] missing = requiredIds.Where(itemId => !available.Contains(itemId)).Order().ToArray();
+        if (missing.Length != 0)
+            throw new InvalidDataException($"Generated bundle has items absent from {tableName}: {string.Join(", ", missing)}");
     }
 
     private static bool HasValidVisual(uint itemId,

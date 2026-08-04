@@ -9,9 +9,13 @@ Special Craft no se define en `LCoinShopProduct_Classic-eu.dat`. La interfaz usa
 - `system/eu/PurchaseLimitCraftCategory_Classic.dat`: las pestañas;
 - `system/eu/NpcString_Classic-eu.dat`: textos referenciados por
   `category_sub`;
-- `system/eu/ItemName_Classic-eu.dat`: nombres de los ítems;
+- `system/eu/L2GameDataName.dat` y `ItemName_Classic-eu.dat`: cadenas e índices
+  de los nombres de los ítems;
 - `system/eu/EtcItemgrp_Classic.dat`, `Armorgrp_Classic.dat` y
-  `Weapongrp_Classic.dat`: iconos y recursos visuales.
+  `Weapongrp_Classic.dat`: iconos y recursos visuales;
+- `system/eu/item_baseinfo_Classic.dat`, `AdditionalItemGrp_Classic.dat` e
+  `ItemStatData_Classic.dat`: ficha base, metadata adicional y estadísticas que
+  permiten al cliente materializar correctamente cada ítem.
 
 Los ingredientes pertenecen al servidor. `LimitShopCraft.xml` los envía por
 protocolo, con un máximo de cinco por receta. El DAT y el XML deben coincidir en
@@ -27,10 +31,16 @@ compatibles de los DAT Classic y ClassicAden y reconstruye las entradas desde
 DAT: los IDs inventados `20000+` se descartaron porque el cliente mostraba el
 registro incompleto y podía dejar otra categoría vacía.
 
-Classic tampoco incluye todos los nombres e iconos usados por el catálogo. El
-paquete importa desde Classic Aden solo los 31 nombres y 31 recursos visuales
-necesarios. La verificación cubre los 201 ItemId distintos usados tanto como
-resultado como ingrediente; falla si falta un texto o un icono.
+Classic tampoco incluye todos los registros usados por el catálogo. El paquete
+importa desde Classic Aden solo los 31 ítems necesarios en las tablas de nombre,
+recurso visual, ficha base, metadata adicional y estadísticas. Copiar únicamente
+el nombre y el icono deja cuadros negros o textos atenuados en Special Craft.
+Además, el `ItemName_Classic` original apunta a nombres rusos en 170 de los 201
+ítems usados por este catálogo; el generador los reindexa hacia los nombres
+ingleses de `stats/items` y agrega cadenas al final de `L2GameDataName` sin
+desplazar ningún índice existente.
+La verificación cubre los 201 ItemId distintos usados tanto como resultado como
+ingrediente y falla si cualquiera queda incompleto.
 
 El resultado contiene exactamente:
 
@@ -63,17 +73,22 @@ powershell -ExecutionPolicy Bypass -File .\tools\client\Build-ClassicSpecialCraf
 
 El comando no modifica el cliente. Produce un paquete inseparable:
 
+- `tools/client/output/L2GameDataName.dat`;
 - `tools/client/output/PurchaseLimitCraft_Classic-eu.dat`;
 - `tools/client/output/ItemName_Classic-eu.dat`;
 - `tools/client/output/EtcItemgrp_Classic.dat`;
 - `tools/client/output/Armorgrp_Classic.dat`;
 - `tools/client/output/Weapongrp_Classic.dat`;
+- `tools/client/output/item_baseinfo_Classic.dat`;
+- `tools/client/output/AdditionalItemGrp_Classic.dat`;
+- `tools/client/output/ItemStatData_Classic.dat`;
 - `tools/client/output/PurchaseLimitCraft_Classic-eu.json`, manifiesto legible
   de los 184 registros.
 
 La verificación vuelve a abrir el DAT generado y exige igualdad exacta con el
-servidor, ausencia de registros adicionales, nombres válidos en `NpcString` y
-`keep_option = 0`.
+servidor, ausencia de registros adicionales, nombres válidos en `NpcString`,
+igualdad de los 201 nombres con `stats/items`, `keep_option = 0` y presencia de
+los 201 ítems en las tres tablas auxiliares.
 
 Para instalarlo únicamente después de revisar el resultado:
 
@@ -82,7 +97,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\client\Install-ClassicSpecialCr
   -ClientSystemPath 'C:\ruta\al\cliente\system'
 ```
 
-El instalador actualiza los cinco DAT juntos. Primero crea respaldos con el
+El instalador actualiza los nueve DAT juntos. Primero crea respaldos con el
 mismo sufijo `.backup-yyyyMMdd-HHmmss`, comprueba el SHA-256 de cada copia y,
 si una operación falla, restaura automáticamente todos los originales.
 

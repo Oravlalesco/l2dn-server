@@ -13,11 +13,15 @@ if ([string]::IsNullOrWhiteSpace($PatchDirectory)) {
 $clientSystem = (Resolve-Path -LiteralPath $ClientSystemPath).Path
 $patchRoot = (Resolve-Path -LiteralPath $PatchDirectory).Path
 $fileNames = @(
+    'L2GameDataName.dat',
     'PurchaseLimitCraft_Classic-eu.dat',
     'ItemName_Classic-eu.dat',
     'EtcItemgrp_Classic.dat',
     'Armorgrp_Classic.dat',
-    'Weapongrp_Classic.dat'
+    'Weapongrp_Classic.dat',
+    'item_baseinfo_Classic.dat',
+    'AdditionalItemGrp_Classic.dat',
+    'ItemStatData_Classic.dat'
 )
 
 $operations = foreach ($fileName in $fileNames) {
