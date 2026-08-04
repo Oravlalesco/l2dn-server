@@ -6,9 +6,12 @@ Special Craft no se define en `LCoinShopProduct_Classic-eu.dat`. La interfaz usa
 
 - `system/eu/PurchaseLimitCraft_Classic-eu.dat`: productos, resultados,
   probabilidades, categorías y límites visuales;
-- `system/PurchaseLimitCraftCategory_Classic.dat`: las pestañas;
+- `system/eu/PurchaseLimitCraftCategory_Classic.dat`: las pestañas;
 - `system/eu/NpcString_Classic-eu.dat`: textos referenciados por
-  `category_sub`.
+  `category_sub`;
+- `system/eu/ItemName_Classic-eu.dat`: nombres de los ítems;
+- `system/eu/EtcItemgrp_Classic.dat`, `Armorgrp_Classic.dat` y
+  `Weapongrp_Classic.dat`: iconos y recursos visuales.
 
 Los ingredientes pertenecen al servidor. `LimitShopCraft.xml` los envía por
 protocolo, con un máximo de cinco por receta. El DAT y el XML deben coincidir en
@@ -19,9 +22,15 @@ de nivel.
 
 El DAT Classic original contiene 90 registros para `shop_index = 4`, pero no
 representa el nuevo catálogo del servidor. El generador conserva metadatos
-compatibles de los DAT Classic y ClassicAden y sintetiza las entradas faltantes
-desde `LimitShopCraft.xml`. No se depende de que exista un registro donante para
-cada ProductId nuevo.
+compatibles de los DAT Classic y ClassicAden y reconstruye las entradas desde
+`LimitShopCraft.xml`. Cada ProductId debe existir previamente en uno de esos dos
+DAT: los IDs inventados `20000+` se descartaron porque el cliente mostraba el
+registro incompleto y podía dejar otra categoría vacía.
+
+Classic tampoco incluye todos los nombres e iconos usados por el catálogo. El
+paquete importa desde Classic Aden solo los 31 nombres y 31 recursos visuales
+necesarios. La verificación cubre los 201 ItemId distintos usados tanto como
+resultado como ingrediente; falla si falta un texto o un icono.
 
 El resultado contiene exactamente:
 
@@ -52,9 +61,13 @@ powershell -ExecutionPolicy Bypass -File .\tools\client\Build-ClassicSpecialCraf
   -ClientSystemPath 'C:\ruta\al\cliente\system'
 ```
 
-El comando no modifica el cliente. Produce:
+El comando no modifica el cliente. Produce un paquete inseparable:
 
 - `tools/client/output/PurchaseLimitCraft_Classic-eu.dat`;
+- `tools/client/output/ItemName_Classic-eu.dat`;
+- `tools/client/output/EtcItemgrp_Classic.dat`;
+- `tools/client/output/Armorgrp_Classic.dat`;
+- `tools/client/output/Weapongrp_Classic.dat`;
 - `tools/client/output/PurchaseLimitCraft_Classic-eu.json`, manifiesto legible
   de los 184 registros.
 
@@ -69,8 +82,9 @@ powershell -ExecutionPolicy Bypass -File .\tools\client\Install-ClassicSpecialCr
   -ClientSystemPath 'C:\ruta\al\cliente\system'
 ```
 
-El instalador crea primero un respaldo con sufijo
-`.backup-yyyyMMdd-HHmmss` y comprueba el SHA-256 de la copia.
+El instalador actualiza los cinco DAT juntos. Primero crea respaldos con el
+mismo sufijo `.backup-yyyyMMdd-HHmmss`, comprueba el SHA-256 de cada copia y,
+si una operación falla, restaura automáticamente todos los originales.
 
 ## Implementación auditable
 

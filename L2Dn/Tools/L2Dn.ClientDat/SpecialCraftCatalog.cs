@@ -6,7 +6,10 @@ using L2Dn.Packages.DatDefinitions.Definitions.Enums;
 namespace L2Dn.ClientDat;
 
 internal sealed record SpecialCraftServerProduct(ushort ProductId, byte Category, short LevelMin, short LevelMax,
-    string ProductName, IReadOnlyList<SpecialCraftServerOutcome> Outcomes);
+    string ProductName, IReadOnlyList<SpecialCraftServerIngredient> Ingredients,
+    IReadOnlyList<SpecialCraftServerOutcome> Outcomes);
+
+internal sealed record SpecialCraftServerIngredient(uint ItemId, long Count, uint Enchant);
 
 internal sealed record SpecialCraftServerOutcome(uint ItemId, uint Count, float Probability, uint Enchant);
 
@@ -37,11 +40,17 @@ internal static class SpecialCraftCatalog
             string productName = primaryOutcome.Enchant > 0
                 ? $"+{primaryOutcome.Enchant} {itemName}"
                 : itemName;
-            int ingredientCount = product.Elements("ingredient").Count();
-            if (ingredientCount is < 1 or > 5)
+            SpecialCraftServerIngredient[] ingredients = product.Elements("ingredient")
+                .Select(ingredient => new SpecialCraftServerIngredient(
+                    GetUInt(ingredient, "id"),
+                    GetLong(ingredient, "count", 1),
+                    GetUInt(ingredient, "enchant")))
+                .ToArray();
+            if (ingredients.Length is < 1 or > 5)
                 throw new InvalidDataException($"Product {productId} must have between one and five ingredients.");
 
-            result.Add(new SpecialCraftServerProduct(productId, category, levelMin, levelMax, productName, outcomes));
+            result.Add(new SpecialCraftServerProduct(productId, category, levelMin, levelMax, productName,
+                ingredients, outcomes));
         }
 
         ushort[] duplicates = result.GroupBy(product => product.ProductId).Where(group => group.Count() > 1)
@@ -61,6 +70,16 @@ internal static class SpecialCraftCatalog
         Dictionary<ushort, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> donorRecords = donorData.Records
             .Where(record => record.ShopIndex == specialCraftShopIndex)
             .ToDictionary(record => record.ProductId);
+        ushort[] unknownProductIds = serverProducts.Select(product => product.ProductId)
+            .Where(productId => !baseRecords.ContainsKey(productId) && !donorRecords.ContainsKey(productId))
+            .Order()
+            .ToArray();
+        if (unknownProductIds.Length != 0)
+        {
+            throw new InvalidDataException(
+                $"ProductId values absent from the Classic/Classic Aden client: {string.Join(", ", unknownProductIds)}");
+        }
+
         Dictionary<byte, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> categoryTemplates = BuildCategoryTemplates(
             baseRecords, donorRecords);
         List<PurchaseLimitCraftV7.PurchaseLimitCraftRecord> selectedRecords = new(serverProducts.Count);
@@ -68,13 +87,13 @@ internal static class SpecialCraftCatalog
         {
             PurchaseLimitCraftV7.PurchaseLimitCraftRecord template;
             if (baseRecords.TryGetValue(product.ProductId, out PurchaseLimitCraftV7.PurchaseLimitCraftRecord? baseRecord) &&
-                baseRecord.Category == product.Category)
+                MatchesProduct(baseRecord, product))
             {
                 template = baseRecord;
             }
             else if (donorRecords.TryGetValue(product.ProductId,
                          out PurchaseLimitCraftV7.PurchaseLimitCraftRecord? donorRecord) &&
-                     donorRecord.Category == product.Category)
+                     MatchesProduct(donorRecord, product))
             {
                 template = donorRecord;
             }
@@ -217,6 +236,12 @@ internal static class SpecialCraftCatalog
         return result;
     }
 
+    private static bool MatchesProduct(PurchaseLimitCraftV7.PurchaseLimitCraftRecord record,
+        SpecialCraftServerProduct product) =>
+        record.Category == product.Category &&
+        record.ProductItem == product.Outcomes[0].ItemId &&
+        record.ProductEnchant == product.Outcomes[0].Enchant;
+
     private static void AddTemplate(Dictionary<byte, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> templates,
         IReadOnlyDictionary<ushort, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> records, ushort productId,
         byte category)
@@ -311,6 +336,14 @@ internal static class SpecialCraftCatalog
         if (attribute is null)
             return defaultValue;
         return ParseUInt(attribute);
+    }
+
+    private static long GetLong(XElement element, string name, long defaultValue = 0)
+    {
+        XAttribute? attribute = element.Attribute(name);
+        return attribute is null
+            ? defaultValue
+            : long.Parse(attribute.Value, NumberStyles.None, CultureInfo.InvariantCulture);
     }
 
     private static uint ParseUInt(XAttribute attribute) =>

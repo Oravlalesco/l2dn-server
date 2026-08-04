@@ -66,437 +66,437 @@
 	</product>
 
 	<!-- Category 2: all third-class books that are consumed by the active skill trees. -->
-	<product id="20000" category="2">
+	<product id="4238" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90046" /> <!-- Scroll: Vengeance -->
 	</product>
-	<product id="20001" category="2">
+	<product id="4239" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90047" /> <!-- Scroll: Touch of Life -->
 	</product>
-	<product id="20002" category="2">
+	<product id="4240" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90048" /> <!-- Scroll: Touch of Death -->
 	</product>
-	<product id="20003" category="2">
+	<product id="4241" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90049" /> <!-- Scroll: Shield of Faith -->
 	</product>
-	<product id="20004" category="2">
+	<product id="4242" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90050" /> <!-- Scroll: Shield of Sacrifice -->
 	</product>
-	<product id="20005" category="2">
+	<product id="4243" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90051" /> <!-- Scroll: Insane Crusher -->
 	</product>
-	<product id="20006" category="2">
+	<product id="4244" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90053" /> <!-- Scroll: Mass Lightning Strike -->
 	</product>
-	<product id="20007" category="2">
+	<product id="4245" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90054" /> <!-- Scroll: Clear Movements -->
 	</product>
-	<product id="20008" category="2">
+	<product id="4521" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90055" /> <!-- Scroll: Critical Wound -->
 	</product>
-	<product id="20009" category="2">
+	<product id="4522" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90056" /> <!-- Scroll: Focus Power -->
 	</product>
-	<product id="20010" category="2">
+	<product id="4523" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90057" /> <!-- Scroll: Focus Chance -->
 	</product>
-	<product id="20011" category="2">
+	<product id="4524" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90058" /> <!-- Scroll: Focus Death -->
 	</product>
-	<product id="20012" category="2">
+	<product id="4767" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90059" /> <!-- Scroll: Mirage -->
 	</product>
-	<product id="20013" category="2">
+	<product id="4768" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90060" /> <!-- Scroll: Evasion -->
 	</product>
-	<product id="20014" category="2">
+	<product id="4870" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90061" /> <!-- Scroll: Counterattack -->
 	</product>
-	<product id="20015" category="2">
+	<product id="4871" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90062" /> <!-- Scroll: Real Target -->
 	</product>
-	<product id="20016" category="2">
+	<product id="3591" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90063" /> <!-- Scroll: Death Sting -->
 	</product>
-	<product id="20017" category="2">
+	<product id="3592" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90064" /> <!-- Scroll: Flame Hawk -->
 	</product>
-	<product id="20018" category="2">
+	<product id="3593" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90065" /> <!-- Scroll: Arrow Rain -->
 	</product>
-	<product id="20019" category="2">
+	<product id="3594" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90066" /> <!-- Scroll: Ghost Piercing -->
 	</product>
-	<product id="20020" category="2">
+	<product id="3595" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90067" /> <!-- Scroll: Sonic Barrier -->
 	</product>
-	<product id="20021" category="2">
+	<product id="3596" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90068" /> <!-- Scroll: Indestructible Sound -->
 	</product>
-	<product id="20022" category="2">
+	<product id="3597" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90069" /> <!-- Scroll: Maximum Sonic Focus -->
 	</product>
-	<product id="20023" category="2">
+	<product id="3598" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90070" /> <!-- Scroll: Force Barrier -->
 	</product>
-	<product id="20024" category="2">
+	<product id="3599" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90071" /> <!-- Scroll: Rush -->
 	</product>
-	<product id="20025" category="2">
+	<product id="3600" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90072" /> <!-- Scroll: Maximum Force Focus -->
 	</product>
-	<product id="20026" category="2">
+	<product id="3601" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90073" /> <!-- Scroll: Destroyer's Roar -->
 	</product>
-	<product id="20027" category="2">
+	<product id="3602" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90075" /> <!-- Scroll: Demolition Impact -->
 	</product>
-	<product id="20028" category="2">
+	<product id="3603" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90076" /> <!-- Scroll: Shocking Burst -->
 	</product>
-	<product id="20029" category="2">
+	<product id="3604" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90077" /> <!-- Scroll: Spear Howl -->
 	</product>
-	<product id="20030" category="2">
+	<product id="3605" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90078" /> <!-- Scroll: Armor Crush -->
 	</product>
-	<product id="20031" category="2">
+	<product id="3606" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90079" /> <!-- Scroll: Spoil Crush -->
 	</product>
-	<product id="20032" category="2">
+	<product id="3607" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90080" /> <!-- Scroll: Final Secret -->
 	</product>
-	<product id="20033" category="2">
+	<product id="3608" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90081" /> <!-- Scroll: Arcane Power -->
 	</product>
-	<product id="20034" category="2">
+	<product id="3609" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90082" /> <!-- Scroll: Fire Vortex Buster -->
 	</product>
-	<product id="20035" category="2">
+	<product id="3610" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90083" /> <!-- Scroll: Ice Vortex Crusher -->
 	</product>
-	<product id="20036" category="2">
+	<product id="3611" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90084" /> <!-- Scroll: Wind Vortex Slug -->
 	</product>
-	<product id="20037" category="2">
+	<product id="3612" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90085" /> <!-- Scroll: Arcane Chaos -->
 	</product>
-	<product id="20038" category="2">
+	<product id="3613" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90086" /> <!-- Scroll: Arcane Shield -->
 	</product>
-	<product id="20039" category="2">
+	<product id="3614" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90087" /> <!-- Scroll: Curse of Doom -->
 	</product>
-	<product id="20040" category="2">
+	<product id="3615" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90088" /> <!-- Scroll: Curse of Abyss -->
 	</product>
-	<product id="20041" category="2">
+	<product id="3616" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90089" /> <!-- Scroll: Vampiric Mist -->
 	</product>
-	<product id="20042" category="2">
+	<product id="3617" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90090" /> <!-- Scroll: Song of Renewal -->
 	</product>
-	<product id="20043" category="2">
+	<product id="3618" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90091" /> <!-- Scroll: Champion Song -->
 	</product>
-	<product id="20044" category="2">
+	<product id="3619" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90092" /> <!-- Scroll: Song of Silence -->
 	</product>
-	<product id="20045" category="2">
+	<product id="3620" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90093" /> <!-- Scroll: Song of Purification -->
 	</product>
-	<product id="20046" category="2">
+	<product id="3621" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90094" /> <!-- Scroll: Dance of Shadows -->
 	</product>
-	<product id="20047" category="2">
+	<product id="3622" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90095" /> <!-- Scroll: Dance of Siren -->
 	</product>
-	<product id="20048" category="2">
+	<product id="3623" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90096" /> <!-- Scroll: Dance of Medusa -->
 	</product>
-	<product id="20049" category="2">
+	<product id="3624" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90097" /> <!-- Scroll: Dance of Berserker -->
 	</product>
-	<product id="20050" category="2">
+	<product id="3625" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90098" /> <!-- Scroll: Prophecy of Fire -->
 	</product>
-	<product id="20051" category="2">
+	<product id="3626" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90099" /> <!-- Scroll: Block Defense -->
 	</product>
-	<product id="20052" category="2">
+	<product id="3627" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90100" /> <!-- Scroll: Block Wind Walk -->
 	</product>
-	<product id="20053" category="2">
+	<product id="3628" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90101" /> <!-- Scroll: Turn to Stone -->
 	</product>
-	<product id="20054" category="2">
+	<product id="3629" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90102" /> <!-- Scroll: Counter Critical -->
 	</product>
-	<product id="20055" category="2">
+	<product id="3630" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90103" /> <!-- Scroll: Prophecy of Water -->
 	</product>
-	<product id="20056" category="2">
+	<product id="3631" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90104" /> <!-- Scroll: Mass Cure -->
 	</product>
-	<product id="20057" category="2">
+	<product id="3632" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90105" /> <!-- Scroll: Mass Vitalize -->
 	</product>
-	<product id="20058" category="2">
+	<product id="3633" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90106" /> <!-- Scroll: Mana Gain -->
 	</product>
-	<product id="20059" category="2">
+	<product id="3634" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90107" /> <!-- Scroll: Blessing of Eva -->
 	</product>
-	<product id="20060" category="2">
+	<product id="3635" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90108" /> <!-- Scroll: Prophecy of Wind -->
 	</product>
-	<product id="20061" category="2">
+	<product id="3636" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90109" /> <!-- Scroll: Mass Purify -->
 	</product>
-	<product id="20062" category="2">
+	<product id="3637" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90110" /> <!-- Scroll: Spirit of Shillien -->
 	</product>
-	<product id="20063" category="2">
+	<product id="3638" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90111" /> <!-- Scroll: Enlightenment -->
 	</product>
-	<product id="20064" category="2">
+	<product id="3639" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90112" /> <!-- Scroll: Prophecy of Victory -->
 	</product>
-	<product id="20065" category="2">
+	<product id="3640" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90113" /> <!-- Scroll: Chant of Spirit -->
 	</product>
-	<product id="20066" category="2">
+	<product id="3641" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90114" /> <!-- Scroll: Chant of Gate -->
 	</product>
-	<product id="20067" category="2">
+	<product id="3642" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90115" /> <!-- Scroll: Chant of Protection -->
 	</product>
-	<product id="20068" category="2">
+	<product id="3643" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90116" /> <!-- Scroll: Great Fury -->
 	</product>
-	<product id="20069" category="2">
+	<product id="3644" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90117" /> <!-- Scroll: Prophecy of Pa'agrio -->
 	</product>
-	<product id="20070" category="2">
+	<product id="3645" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90118" /> <!-- Scroll: Seal of Disease -->
 	</product>
-	<product id="20071" category="2">
+	<product id="3646" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90119" /> <!-- Scroll: Pa'agrio's Fist -->
 	</product>
-	<product id="20072" category="2">
+	<product id="3647" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90120" /> <!-- Scroll: Seal of Despair -->
 	</product>
-	<product id="20073" category="2">
+	<product id="3648" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90121" /> <!-- Scroll: Flames of Invincibility -->
 	</product>
-	<product id="20074" category="2">
+	<product id="3649" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90122" /> <!-- Scroll: Balance Life -->
 	</product>
-	<product id="20075" category="2">
+	<product id="3650" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90123" /> <!-- Scroll: Cleanse -->
 	</product>
-	<product id="20076" category="2">
+	<product id="3651" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90124" /> <!-- Scroll: Chain Heal -->
 	</product>
-	<product id="20077" category="2">
+	<product id="3652" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90125" /> <!-- Scroll: Salvation -->
 	</product>
-	<product id="20078" category="2">
+	<product id="3653" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90126" /> <!-- Scroll: Miracle -->
 	</product>
-	<product id="20079" category="2">
+	<product id="3654" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90127" /> <!-- Scroll: Warrior Servitor -->
 	</product>
-	<product id="20080" category="2">
+	<product id="3655" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90128" /> <!-- Scroll: Wizard Servitor -->
 	</product>
-	<product id="20081" category="2">
+	<product id="3656" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90129" /> <!-- Scroll: Assassin Servitor -->
 	</product>
-	<product id="20082" category="2">
+	<product id="3657" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90130" /> <!-- Scroll: Final Servitor -->
 	</product>
-	<product id="20083" category="2">
+	<product id="3658" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90131" /> <!-- Scroll: Servitor Share -->
 	</product>
-	<product id="20084" category="2">
+	<product id="3659" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90133" /> <!-- Scroll: Exciting Adventure -->
 	</product>
-	<product id="20085" category="2">
+	<product id="3660" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90134" /> <!-- Scroll: Wind Riding -->
 	</product>
-	<product id="20086" category="2">
+	<product id="3661" category="2">
 		<ingredient id="90045" count="31" /> <!-- Magical Tablet -->
 		<ingredient id="57" count="100000" /> <!-- Adena -->
 		<production id="90135" /> <!-- Scroll: Ghost Walking -->
@@ -652,22 +652,22 @@
 	</product>
 
 	<!-- Category 4: tablets, permanent progression materials and augmenting-stone conversions. -->
-	<product id="20100" category="4">
+	<product id="3662" category="4">
 		<ingredient id="91040" count="20" /> <!-- Fire Attribute Fragment -->
 		<ingredient id="57" count="200000" /> <!-- Adena -->
 		<production id="90045" /> <!-- Magical Tablet -->
 	</product>
-	<product id="20101" category="4">
+	<product id="3663" category="4">
 		<ingredient id="91039" count="20" /> <!-- Water Attribute Fragment -->
 		<ingredient id="57" count="200000" /> <!-- Adena -->
 		<production id="90045" /> <!-- Magical Tablet -->
 	</product>
-	<product id="20102" category="4">
+	<product id="3664" category="4">
 		<ingredient id="91041" count="20" /> <!-- Wind Attribute Fragment -->
 		<ingredient id="57" count="200000" /> <!-- Adena -->
 		<production id="90045" /> <!-- Magical Tablet -->
 	</product>
-	<product id="20103" category="4">
+	<product id="3665" category="4">
 		<ingredient id="91042" count="20" /> <!-- Earth Attribute Fragment -->
 		<ingredient id="57" count="200000" /> <!-- Adena -->
 		<production id="90045" /> <!-- Magical Tablet -->

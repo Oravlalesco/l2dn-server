@@ -7,11 +7,23 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $clientSystem = (Resolve-Path -LiteralPath $ClientSystemPath).Path
-$baseDat = Join-Path $clientSystem 'eu\PurchaseLimitCraft_Classic-eu.dat'
-$donorDat = Join-Path $clientSystem 'eu\PurchaseLimitCraft_ClassicAden-eu.dat'
-$npcStringDat = Join-Path $clientSystem 'eu\NpcString_Classic-eu.dat'
 $dsetup = Join-Path $clientSystem 'DSETUP.dll'
-$requiredFiles = @($baseDat, $donorDat, $npcStringDat, $dsetup)
+$requiredNames = @(
+    'eu\PurchaseLimitCraft_Classic-eu.dat',
+    'eu\PurchaseLimitCraft_ClassicAden-eu.dat',
+    'eu\NpcString_Classic-eu.dat',
+    'eu\L2GameDataName.dat',
+    'eu\ItemName_Classic-eu.dat',
+    'eu\ItemName_ClassicAden-eu.dat',
+    'eu\EtcItemgrp_Classic.dat',
+    'eu\EtcItemgrp_ClassicAden.dat',
+    'eu\Armorgrp_Classic.dat',
+    'eu\Armorgrp_ClassicAden.dat',
+    'eu\Weapongrp_Classic.dat',
+    'eu\Weapongrp_ClassicAden.dat',
+    'DSETUP.dll'
+)
+$requiredFiles = $requiredNames | ForEach-Object { Join-Path $clientSystem $_ }
 foreach ($requiredFile in $requiredFiles) {
     if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
         throw "Falta el archivo requerido: $requiredFile"
@@ -41,20 +53,26 @@ New-Item -ItemType Directory -Path $nugetDirectory -Force | Out-Null
     mcr.microsoft.com/dotnet/sdk:9.0 `
     dotnet run -p:NuGetAudit=false `
     --project L2Dn/Tools/L2Dn.ClientDat/L2Dn.ClientDat.csproj `
-    -- build-special-craft `
-    /client/eu/PurchaseLimitCraft_Classic-eu.dat `
-    /client/eu/PurchaseLimitCraft_ClassicAden-eu.dat `
-    /client/eu/NpcString_Classic-eu.dat `
+    -- build-special-craft-bundle `
+    /client `
     /src/L2Dn/L2Dn.GameServer/DataPack/LimitShopCraft.xml `
-    /src/tools/client/output/PurchaseLimitCraft_Classic-eu.dat `
-    /src/tools/client/output/PurchaseLimitCraft_Classic-eu.json
+    /src/tools/client/output
 
 if ($LASTEXITCODE -ne 0) {
     throw "La generacion del DAT fallo con codigo $LASTEXITCODE."
 }
 
-$outputDat = Join-Path $outputDirectory 'PurchaseLimitCraft_Classic-eu.dat'
-$outputHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $outputDat).Hash
-Write-Host "DAT generado y verificado: $outputDat" -ForegroundColor Green
-Write-Host "SHA-256: $outputHash"
+$outputFiles = @(
+    'PurchaseLimitCraft_Classic-eu.dat',
+    'ItemName_Classic-eu.dat',
+    'EtcItemgrp_Classic.dat',
+    'Armorgrp_Classic.dat',
+    'Weapongrp_Classic.dat'
+)
+Write-Host 'Paquete DAT generado y verificado:' -ForegroundColor Green
+foreach ($fileName in $outputFiles) {
+    $outputFile = Join-Path $outputDirectory $fileName
+    $outputHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $outputFile).Hash
+    Write-Host "  $fileName  $outputHash"
+}
 Write-Host 'El cliente instalado no fue modificado.'

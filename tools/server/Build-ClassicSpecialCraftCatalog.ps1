@@ -72,8 +72,18 @@ for ($index = 0; $index -lt $frostWeapons.Count; $index++) {
 Add-Line
 Add-Line "`t<!-- Category 2: all third-class books that are consumed by the active skill trees. -->"
 $spellbookIds = @(90046..90135 | Where-Object { $_ -notin @(90052, 90074, 90132) })
+$spellbookProductIds = @(
+    4238..4245
+    4521..4524
+    4767, 4768, 4870, 4871
+    3591..3661
+)
+if ($spellbookProductIds.Count -ne $spellbookIds.Count) {
+    throw "Spellbook ProductId count ($($spellbookProductIds.Count)) does not match book count ($($spellbookIds.Count))."
+}
+
 for ($index = 0; $index -lt $spellbookIds.Count; $index++) {
-    Add-Product -id (20000 + $index) -category 2 -ingredients @(
+    Add-Product -id $spellbookProductIds[$index] -category 2 -ingredients @(
         (New-Ingredient 90045 31),
         (New-Ingredient 57 100000)
     ) -production ([ordered]@{ id = $spellbookIds[$index] })
@@ -123,10 +133,10 @@ foreach ($family in $accessoryFamilies) {
 
 Add-Line
 Add-Line "`t<!-- Category 4: tablets, permanent progression materials and augmenting-stone conversions. -->"
-Add-Product -id 20100 -category 4 -ingredients @((New-Ingredient 91040 20), (New-Ingredient 57 200000)) -production ([ordered]@{ id = 90045 })
-Add-Product -id 20101 -category 4 -ingredients @((New-Ingredient 91039 20), (New-Ingredient 57 200000)) -production ([ordered]@{ id = 90045 })
-Add-Product -id 20102 -category 4 -ingredients @((New-Ingredient 91041 20), (New-Ingredient 57 200000)) -production ([ordered]@{ id = 90045 })
-Add-Product -id 20103 -category 4 -ingredients @((New-Ingredient 91042 20), (New-Ingredient 57 200000)) -production ([ordered]@{ id = 90045 })
+Add-Product -id 3662 -category 4 -ingredients @((New-Ingredient 91040 20), (New-Ingredient 57 200000)) -production ([ordered]@{ id = 90045 })
+Add-Product -id 3663 -category 4 -ingredients @((New-Ingredient 91039 20), (New-Ingredient 57 200000)) -production ([ordered]@{ id = 90045 })
+Add-Product -id 3664 -category 4 -ingredients @((New-Ingredient 91041 20), (New-Ingredient 57 200000)) -production ([ordered]@{ id = 90045 })
+Add-Product -id 3665 -category 4 -ingredients @((New-Ingredient 91042 20), (New-Ingredient 57 200000)) -production ([ordered]@{ id = 90045 })
 
 Add-Product -id 10001 -category 4 -ingredients @((New-Ingredient 94328 10)) -production ([ordered]@{
     id = 94314; chance = 5; id2 = 94328; count2 = 7; chance2 = 95

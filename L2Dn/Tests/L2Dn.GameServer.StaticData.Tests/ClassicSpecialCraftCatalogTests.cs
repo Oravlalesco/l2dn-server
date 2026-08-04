@@ -78,6 +78,8 @@ public sealed class ClassicSpecialCraftCatalogTests
             });
 
         products.Select(ProductId).Should().OnlyHaveUniqueItems();
+        products.Select(ProductId).Should().OnlyContain(productId => productId <= 11487,
+            "every ProductId must exist in the shipped Classic or Classic Aden client DAT");
         products.Should().NotContain(product => ProductCategory(product) == 6);
         products.SelectMany(product => product.Elements("ingredient"))
             .Should().NotContain(ingredient => (int)ingredient.Attribute("id")! == 92314);
@@ -93,6 +95,10 @@ public sealed class ClassicSpecialCraftCatalogTests
             .Where(product => ProductCategory(product) == 2)
             .Select(product => (int)product.Element("production")!.Attribute("id")!)
             .ToArray();
+        int[] productIds = LoadProductElements("LimitShopCraft.xml")
+            .Where(product => ProductCategory(product) == 2)
+            .Select(ProductId)
+            .ToArray();
         HashSet<int> skillTreeItemIds = Directory
             .EnumerateFiles(DataPackPath("skillTrees", "3rdClass"), "*.xml")
             .SelectMany(path => XDocument.Load(path).Descendants("item"))
@@ -100,6 +106,11 @@ public sealed class ClassicSpecialCraftCatalogTests
             .ToHashSet();
 
         craftedBookIds.Should().Equal(expectedBookIds);
+        productIds.Should().Equal(
+            Enumerable.Range(4238, 8)
+                .Concat(Enumerable.Range(4521, 4))
+                .Concat([4767, 4768, 4870, 4871])
+                .Concat(Enumerable.Range(3591, 71)));
         craftedBookIds.Should().OnlyContain(itemId => skillTreeItemIds.Contains(itemId));
     }
 

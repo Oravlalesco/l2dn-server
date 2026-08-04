@@ -57,12 +57,13 @@ materiales se incorporan a raids ya existentes:
 Se publican 87 libros, con resultados `90046`–`90135`, excepto `90052`,
 `90074` y `90132`. Esas exclusiones no son consumidas por los árboles activos.
 Cada libro cuesta 31 Magical Tablet (`90045`) y 100.000 Adena. Las recetas usan
-ProductId propios del servidor (`20000`–`20086`) y el generador crea sus
-registros de cliente correspondientes.
+87 ProductId libres que ya existen en `PurchaseLimitCraft_ClassicAden-eu.dat`;
+así el índice interno del cliente reconoce cada producto y muestra nombre,
+icono y vista previa correctamente.
 
 La pestaña se conecta con Misc: una Magical Tablet se fabrica con 20 fragmentos
 de Fire, Water, Wind o Earth (`91040`, `91039`, `91041`, `91042`) más 200.000
-Adena.
+Adena. Esas cuatro recetas usan ProductId oficiales libres `3662`–`3665`.
 
 ## Accessories
 
@@ -119,4 +120,6 @@ fuera de fecha.
 Las pruebas automatizadas fijan el número de recetas por pestaña, ausencia total
 de Giran Seal, existencia de cada ItemId, correspondencia con los skill trees,
 fuentes de Frost Lord, fórmulas de accesorios, rangos +4–+10 y suma de todas las
-probabilidades. El DAT se verifica además contra el XML después de cifrarlo.
+probabilidades. El paquete cliente se verifica además contra el XML después de
+cifrarlo: ProductId conocidos y nombres/iconos presentes para cada ingrediente
+y resultado.
