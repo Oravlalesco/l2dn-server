@@ -228,10 +228,10 @@ internal static class SpecialCraftCatalog
         IReadOnlyDictionary<ushort, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> donorRecords)
     {
         Dictionary<byte, PurchaseLimitCraftV7.PurchaseLimitCraftRecord> result = new();
-        AddTemplate(result, baseRecords, donorRecords, 10083, 0); // Frost Lord weapons.
+        AddTemplate(result, baseRecords, donorRecords, 1542, 0); // Frost Lord weapons.
         AddTemplate(result, baseRecords, donorRecords, 4238, 2); // Spellbooks.
-        AddTemplate(result, baseRecords, donorRecords, 10043, 3); // Rare accessories.
-        AddTemplate(result, baseRecords, donorRecords, 10001, 4); // General crafting materials.
+        AddTemplate(result, baseRecords, donorRecords, 4322, 3); // Accessories.
+        AddTemplate(result, baseRecords, donorRecords, 1112, 4); // Scrolls and general crafting.
         AddTemplate(result, baseRecords, donorRecords, 1203, 5); // Blessings.
         return result;
     }
@@ -251,7 +251,12 @@ internal static class SpecialCraftCatalog
              record.Category != category) &&
             (!secondaryRecords.TryGetValue(productId, out record) || record.Category != category))
         {
-            throw new InvalidDataException($"Client template ProductId {productId} for category {category} is missing.");
+            record = primaryRecords.Values
+                .Concat(secondaryRecords.Values)
+                .Where(candidate => candidate.Category == category)
+                .OrderBy(candidate => candidate.ProductId)
+                .FirstOrDefault()
+                ?? throw new InvalidDataException($"No client template exists for Special Craft category {category}.");
         }
 
         templates.Add(category, record);

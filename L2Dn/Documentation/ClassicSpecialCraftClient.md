@@ -25,7 +25,8 @@ de nivel.
 
 ## Diagnóstico y solución
 
-El DAT Classic original contiene 90 registros para `shop_index = 4`, pero no
+El DAT Classic original del cliente L2-P447 contiene 41 registros para
+`shop_index = 4`, pero no
 representa el nuevo catálogo del servidor. El generador conserva metadatos
 compatibles de los DAT Classic y ClassicAden y reconstruye las entradas desde
 `LimitShopCraft.xml`. Cada ProductId debe existir previamente en uno de esos dos
@@ -36,10 +37,10 @@ Classic tampoco incluye todos los registros usados por el catálogo. El paquete
 importa desde Classic Aden solo los 31 ítems necesarios en las tablas de nombre,
 recurso visual, ficha base, metadata adicional y estadísticas. Copiar únicamente
 el nombre y el icono deja cuadros negros o textos atenuados en Special Craft.
-Además, el `ItemName_Classic` original apunta a nombres rusos en 170 de los 201
-ítems usados por este catálogo; el generador los reindexa hacia los nombres
-ingleses de `stats/items` y agrega cadenas al final de `L2GameDataName` sin
-desplazar ningún índice existente.
+Además, 49 nombres de `ItemName_Classic` y 19 de `ItemName_ClassicAden` no
+coinciden con los nombres ingleses del servidor; el generador los reindexa hacia
+`stats/items` y agrega siete cadenas al final de `L2GameDataName` sin desplazar
+ningún índice existente.
 La verificación cubre los 201 ItemId distintos usados tanto como resultado como
 ingrediente y falla si cualquiera queda incompleto.
 
@@ -49,6 +50,14 @@ Spellbook y Giran Seal del DAT Aden original, aunque el servidor ya enviaba
 Magical Tablet y Adena. Por eso el bundle genera e instala ambas familias. Aden
 también importa 7 ítems ausentes desde Classic y corrige sus propios índices de
 nombre.
+
+El cliente objetivo validado es
+`C:\Users\Lenovo\Documents\l2 cliente\L2-P447-EN\L2-P447\system`. Sus DAT no
+son binariamente equivalentes a los de `Lineage II - Essence EN 447`: contiene
+373 ProductId de Special Craft y carece de 50 IDs que usaba la primera versión
+del catálogo. El servidor ahora utiliza únicamente IDs presentes en L2-P447,
+incluidos los IDs semánticos originales para Frost Lord (`1542`–`1552`,
+`1554`), Elixir (`1112`), Dye Powder (`1878`) y augmentación (`3350`–`3357`).
 
 El resultado contiene exactamente:
 
@@ -92,6 +101,9 @@ La verificación vuelve a abrir ambas familias y exige igualdad exacta con el
 servidor, ausencia de registros adicionales, nombres válidos en `NpcString`,
 igualdad de los 201 nombres con `stats/items`, `keep_option = 0` y presencia de
 los 201 ítems en las tres tablas auxiliares de cada variante.
+El generador también admite como fuente un cliente que ya tenga este parche:
+si una entrada auxiliar original fue reemplazada, deriva la plantilla de otro
+registro de la misma categoría y vuelve a producir exactamente el mismo bundle.
 
 Para instalarlo únicamente después de revisar el resultado:
 

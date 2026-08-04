@@ -4,62 +4,62 @@
 	<!-- Categories: 0 Special Weapon, 2 Spellbook, 3 Accessories, 4 Misc, 5 Blessing, 6 Event. -->
 
 	<!-- Category 0: deterministic Frost Lord weapon progression. -->
-	<product id="10083" category="0">
+	<product id="1542" category="0">
 		<ingredient id="95781" count="1" /> <!-- Black Frozen Core -->
 		<ingredient id="95782" count="1500" /> <!-- Frost Lord's Weapon Crystal -->
 		<production id="95823" /> <!-- Package: Frost Lord's Sword -->
 	</product>
-	<product id="10084" category="0">
+	<product id="1543" category="0">
 		<ingredient id="95781" count="1" /> <!-- Black Frozen Core -->
 		<ingredient id="95782" count="1500" /> <!-- Frost Lord's Weapon Crystal -->
 		<production id="95824" /> <!-- Package: Frost Lord's Two-handed Sword -->
 	</product>
-	<product id="10085" category="0">
+	<product id="1544" category="0">
 		<ingredient id="95781" count="1" /> <!-- Black Frozen Core -->
 		<ingredient id="95782" count="1500" /> <!-- Frost Lord's Weapon Crystal -->
 		<production id="95825" /> <!-- Package: Frost Lord's Axe -->
 	</product>
-	<product id="10086" category="0">
+	<product id="1545" category="0">
 		<ingredient id="95781" count="1" /> <!-- Black Frozen Core -->
 		<ingredient id="95782" count="1500" /> <!-- Frost Lord's Weapon Crystal -->
 		<production id="95826" /> <!-- Package: Frost Lord's Dagger -->
 	</product>
-	<product id="10087" category="0">
+	<product id="1546" category="0">
 		<ingredient id="95781" count="1" /> <!-- Black Frozen Core -->
 		<ingredient id="95782" count="1500" /> <!-- Frost Lord's Weapon Crystal -->
 		<production id="95827" /> <!-- Package: Frost Lord's Spear -->
 	</product>
-	<product id="10088" category="0">
+	<product id="1547" category="0">
 		<ingredient id="95781" count="1" /> <!-- Black Frozen Core -->
 		<ingredient id="95782" count="1500" /> <!-- Frost Lord's Weapon Crystal -->
 		<production id="95828" /> <!-- Package: Frost Lord's Bow -->
 	</product>
-	<product id="10089" category="0">
+	<product id="1548" category="0">
 		<ingredient id="95781" count="1" /> <!-- Black Frozen Core -->
 		<ingredient id="95782" count="1500" /> <!-- Frost Lord's Weapon Crystal -->
 		<production id="95829" /> <!-- Package: Frost Lord's Blade Fists -->
 	</product>
-	<product id="10090" category="0">
+	<product id="1549" category="0">
 		<ingredient id="95781" count="1" /> <!-- Black Frozen Core -->
 		<ingredient id="95782" count="1500" /> <!-- Frost Lord's Weapon Crystal -->
 		<production id="95830" /> <!-- Package: Frost Lord's Magic Blunt Weapon -->
 	</product>
-	<product id="10091" category="0">
+	<product id="1550" category="0">
 		<ingredient id="95781" count="1" /> <!-- Black Frozen Core -->
 		<ingredient id="95782" count="1500" /> <!-- Frost Lord's Weapon Crystal -->
 		<production id="95831" /> <!-- Package: Frost Lord's Staff -->
 	</product>
-	<product id="10092" category="0">
+	<product id="1551" category="0">
 		<ingredient id="95781" count="1" /> <!-- Black Frozen Core -->
 		<ingredient id="95782" count="1500" /> <!-- Frost Lord's Weapon Crystal -->
 		<production id="95832" /> <!-- Package: Frost Lord's Ancient Sword -->
 	</product>
-	<product id="10093" category="0">
+	<product id="1552" category="0">
 		<ingredient id="95781" count="1" /> <!-- Black Frozen Core -->
 		<ingredient id="95782" count="1500" /> <!-- Frost Lord's Weapon Crystal -->
 		<production id="95833" /> <!-- Package: Frost Lord's Rapier -->
 	</product>
-	<product id="10094" category="0">
+	<product id="1554" category="0">
 		<ingredient id="95781" count="1" /> <!-- Black Frozen Core -->
 		<ingredient id="95782" count="1500" /> <!-- Frost Lord's Weapon Crystal -->
 		<production id="95835" /> <!-- Package: Frost Lord's Dual Swords -->
@@ -503,148 +503,148 @@
 	</product>
 
 	<!-- Category 3: seven complete raid-accessory upgrade chains. -->
-	<product id="10043" category="3">
+	<product id="4353" category="3">
 		<ingredient id="91550" count="2" /> <!-- Frintezza's Necklace -->
 		<ingredient id="57" count="5000000" /> <!-- Adena -->
 		<production id="91551" /> <!-- Frintezza's Necklace Lv. 2 -->
 	</product>
-	<product id="10044" category="3">
+	<product id="4354" category="3">
 		<ingredient id="91551" count="2" /> <!-- Frintezza's Necklace Lv. 2 -->
 		<ingredient id="57" count="20000000" /> <!-- Adena -->
 		<production id="91552" /> <!-- Frintezza's Necklace Lv. 3 -->
 	</product>
-	<product id="10045" category="3">
+	<product id="4355" category="3">
 		<ingredient id="91552" count="2" /> <!-- Frintezza's Necklace Lv. 3 -->
 		<ingredient id="57" count="100000000" /> <!-- Adena -->
 		<production id="91553" /> <!-- Frintezza's Necklace Lv. 4 -->
 	</product>
-	<product id="10046" category="3">
+	<product id="4356" category="3">
 		<ingredient id="91553" count="1" /> <!-- Frintezza's Necklace Lv. 4 -->
 		<ingredient id="91550" count="1" /> <!-- Frintezza's Necklace -->
 		<ingredient id="57" count="300000000" /> <!-- Adena -->
 		<production id="99228" chance="4" id2="91553" count2="1" chance2="96" refundAdenaOnFailure="true" /> <!-- Frintezza's Necklace Lv. 5 -->
 	</product>
-	<product id="10047" category="3">
+	<product id="4357" category="3">
 		<ingredient id="90992" count="2" /> <!-- Antharas' Earring -->
 		<ingredient id="57" count="5000000" /> <!-- Adena -->
 		<production id="91138" /> <!-- Antharas' Earring Lv. 2 -->
 	</product>
-	<product id="10048" category="3">
+	<product id="4358" category="3">
 		<ingredient id="91138" count="2" /> <!-- Antharas' Earring Lv. 2 -->
 		<ingredient id="57" count="20000000" /> <!-- Adena -->
 		<production id="91139" /> <!-- Antharas' Earring Lv. 3 -->
 	</product>
-	<product id="10049" category="3">
+	<product id="4359" category="3">
 		<ingredient id="91139" count="2" /> <!-- Antharas' Earring Lv. 3 -->
 		<ingredient id="57" count="100000000" /> <!-- Adena -->
 		<production id="91383" /> <!-- Antharas' Earring Lv. 4 -->
 	</product>
-	<product id="10050" category="3">
+	<product id="4360" category="3">
 		<ingredient id="91383" count="1" /> <!-- Antharas' Earring Lv. 4 -->
 		<ingredient id="90992" count="1" /> <!-- Antharas' Earring -->
 		<ingredient id="57" count="300000000" /> <!-- Adena -->
 		<production id="99227" chance="4" id2="91383" count2="1" chance2="96" refundAdenaOnFailure="true" /> <!-- Antharas' Earring Lv. 5 -->
 	</product>
-	<product id="10051" category="3">
+	<product id="4361" category="3">
 		<ingredient id="49580" count="2" /> <!-- Baium's Ring -->
 		<ingredient id="57" count="5000000" /> <!-- Adena -->
 		<production id="49581" /> <!-- Baium's Ring Lv. 2 -->
 	</product>
-	<product id="10052" category="3">
+	<product id="4362" category="3">
 		<ingredient id="49581" count="2" /> <!-- Baium's Ring Lv. 2 -->
 		<ingredient id="57" count="20000000" /> <!-- Adena -->
 		<production id="49582" /> <!-- Baium's Ring Lv. 3 -->
 	</product>
-	<product id="10053" category="3">
+	<product id="4363" category="3">
 		<ingredient id="49582" count="2" /> <!-- Baium's Ring Lv. 3 -->
 		<ingredient id="57" count="100000000" /> <!-- Adena -->
 		<production id="91381" /> <!-- Baium's Ring Lv. 4 -->
 	</product>
-	<product id="10054" category="3">
+	<product id="4364" category="3">
 		<ingredient id="91381" count="1" /> <!-- Baium's Ring Lv. 4 -->
 		<ingredient id="49580" count="1" /> <!-- Baium's Ring -->
 		<ingredient id="57" count="300000000" /> <!-- Adena -->
 		<production id="99225" chance="3" id2="91381" count2="1" chance2="97" refundAdenaOnFailure="true" /> <!-- Baium's Ring Lv. 5 -->
 	</product>
-	<product id="10055" category="3">
+	<product id="4365" category="3">
 		<ingredient id="90763" count="2" /> <!-- Zaken's Earring -->
 		<ingredient id="57" count="5000000" /> <!-- Adena -->
 		<production id="90764" /> <!-- Zaken's Earring Lv. 2 -->
 	</product>
-	<product id="10056" category="3">
+	<product id="4366" category="3">
 		<ingredient id="90764" count="2" /> <!-- Zaken's Earring Lv. 2 -->
 		<ingredient id="57" count="20000000" /> <!-- Adena -->
 		<production id="90765" /> <!-- Zaken's Earring Lv. 3 -->
 	</product>
-	<product id="10057" category="3">
+	<product id="4367" category="3">
 		<ingredient id="90765" count="2" /> <!-- Zaken's Earring Lv. 3 -->
 		<ingredient id="57" count="100000000" /> <!-- Adena -->
 		<production id="91382" /> <!-- Zaken's Earring Lv. 4 -->
 	</product>
-	<product id="10058" category="3">
+	<product id="4368" category="3">
 		<ingredient id="91382" count="1" /> <!-- Zaken's Earring Lv. 4 -->
 		<ingredient id="90763" count="1" /> <!-- Zaken's Earring -->
 		<ingredient id="57" count="150000000" /> <!-- Adena -->
 		<production id="99226" chance="3" id2="91382" count2="1" chance2="97" refundAdenaOnFailure="true" /> <!-- Zaken's Earring Lv. 5 -->
 	</product>
-	<product id="10059" category="3">
+	<product id="4369" category="3">
 		<ingredient id="6660" count="2" /> <!-- Queen Ant's Ring -->
 		<ingredient id="57" count="5000000" /> <!-- Adena -->
 		<production id="49574" /> <!-- Queen Ant's Ring Lv. 2 -->
 	</product>
-	<product id="10060" category="3">
+	<product id="4370" category="3">
 		<ingredient id="49574" count="2" /> <!-- Queen Ant's Ring Lv. 2 -->
 		<ingredient id="57" count="20000000" /> <!-- Adena -->
 		<production id="49577" /> <!-- Queen Ant's Ring Lv. 3 -->
 	</product>
-	<product id="10061" category="3">
+	<product id="4371" category="3">
 		<ingredient id="49577" count="2" /> <!-- Queen Ant's Ring Lv. 3 -->
 		<ingredient id="57" count="100000000" /> <!-- Adena -->
 		<production id="91378" /> <!-- Queen Ant's Ring Lv. 4 -->
 	</product>
-	<product id="10062" category="3">
+	<product id="4372" category="3">
 		<ingredient id="91378" count="1" /> <!-- Queen Ant's Ring Lv. 4 -->
 		<ingredient id="6660" count="1" /> <!-- Queen Ant's Ring -->
 		<ingredient id="57" count="150000000" /> <!-- Adena -->
 		<production id="99222" chance="3" id2="91378" count2="1" chance2="97" refundAdenaOnFailure="true" /> <!-- Queen Ant's Ring Lv. 5 -->
 	</product>
-	<product id="10063" category="3">
+	<product id="4373" category="3">
 		<ingredient id="6661" count="2" /> <!-- Orfen's Earring -->
 		<ingredient id="57" count="5000000" /> <!-- Adena -->
 		<production id="49575" /> <!-- Orfen's Earring Lv. 2 -->
 	</product>
-	<product id="10064" category="3">
+	<product id="4374" category="3">
 		<ingredient id="49575" count="2" /> <!-- Orfen's Earring Lv. 2 -->
 		<ingredient id="57" count="20000000" /> <!-- Adena -->
 		<production id="49578" /> <!-- Orfen's Earring Lv. 3 -->
 	</product>
-	<product id="10065" category="3">
+	<product id="4375" category="3">
 		<ingredient id="49578" count="2" /> <!-- Orfen's Earring Lv. 3 -->
 		<ingredient id="57" count="100000000" /> <!-- Adena -->
 		<production id="91379" /> <!-- Orfen's Earring Lv. 4 -->
 	</product>
-	<product id="10066" category="3">
+	<product id="4376" category="3">
 		<ingredient id="91379" count="1" /> <!-- Orfen's Earring Lv. 4 -->
 		<ingredient id="6661" count="1" /> <!-- Orfen's Earring -->
 		<ingredient id="57" count="150000000" /> <!-- Adena -->
 		<production id="99223" chance="3" id2="91379" count2="1" chance2="97" refundAdenaOnFailure="true" /> <!-- Orfen's Earring Lv. 5 -->
 	</product>
-	<product id="10067" category="3">
+	<product id="4377" category="3">
 		<ingredient id="6662" count="2" /> <!-- Ring of Core -->
 		<ingredient id="57" count="5000000" /> <!-- Adena -->
 		<production id="49576" /> <!-- Ring of Core Lv. 2 -->
 	</product>
-	<product id="10068" category="3">
+	<product id="4378" category="3">
 		<ingredient id="49576" count="2" /> <!-- Ring of Core Lv. 2 -->
 		<ingredient id="57" count="20000000" /> <!-- Adena -->
 		<production id="49579" /> <!-- Ring of Core Lv. 3 -->
 	</product>
-	<product id="10069" category="3">
+	<product id="4381" category="3">
 		<ingredient id="49579" count="2" /> <!-- Ring of Core Lv. 3 -->
 		<ingredient id="57" count="100000000" /> <!-- Adena -->
 		<production id="91380" /> <!-- Ring of Core Lv. 4 -->
 	</product>
-	<product id="10070" category="3">
+	<product id="4382" category="3">
 		<ingredient id="91380" count="1" /> <!-- Ring of Core Lv. 4 -->
 		<ingredient id="6662" count="1" /> <!-- Ring of Core -->
 		<ingredient id="57" count="150000000" /> <!-- Adena -->
@@ -672,51 +672,51 @@
 		<ingredient id="57" count="200000" /> <!-- Adena -->
 		<production id="90045" /> <!-- Magical Tablet -->
 	</product>
-	<product id="10001" category="4">
+	<product id="1112" category="4">
 		<ingredient id="94328" count="10" /> <!-- Elixir Powder -->
 		<production id="94314" chance="5" id2="94328" count2="7" chance2="95" /> <!-- Elixir -->
 	</product>
-	<product id="10095" category="4">
+	<product id="1878" category="4">
 		<ingredient id="96623" count="5" /> <!-- Dye Powder -->
 		<ingredient id="57" count="500000" /> <!-- Adena -->
 		<production id="96630" count="3" chance="8" id2="96630" count2="1" chance2="67" id3="96623" count3="2" chance3="25" /> <!-- Enhanced Dye Powder -->
 	</product>
-	<product id="10534" category="4">
+	<product id="3350" category="4">
 		<ingredient id="97787" count="2" /> <!-- Special Equipment Augmenting Stone -->
 		<ingredient id="57" count="1000000" /> <!-- Adena -->
 		<production id="97789" chance="15" id2="97787" count2="1" chance2="85" /> <!-- Blessed Augmenting Stone: Special Equipment -->
 	</product>
-	<product id="10535" category="4">
+	<product id="3351" category="4">
 		<ingredient id="97788" count="2" /> <!-- Special Equipment Augmenting Stone -->
 		<ingredient id="57" count="1000000" /> <!-- Adena -->
 		<production id="97790" chance="15" id2="97788" count2="1" chance2="85" /> <!-- Blessed Augmenting Stone: Special Equipment -->
 	</product>
-	<product id="10536" category="4">
+	<product id="3352" category="4">
 		<ingredient id="94186" count="2" /> <!-- Life Stone Lv. 2 - Weapon -->
 		<ingredient id="57" count="1000000" /> <!-- Adena -->
 		<production id="97439" chance="15" id2="94186" count2="1" chance2="85" /> <!-- Blessed Augmenting Stone: Weapon -->
 	</product>
-	<product id="10537" category="4">
+	<product id="3353" category="4">
 		<ingredient id="94210" count="2" /> <!-- Life Stone Lv. 2 - Weapon -->
 		<ingredient id="57" count="1000000" /> <!-- Adena -->
 		<production id="97444" chance="15" id2="94210" count2="1" chance2="85" /> <!-- Blessed Augmenting Stone: Weapon -->
 	</product>
-	<product id="10538" category="4">
+	<product id="3354" category="4">
 		<ingredient id="94188" count="2" /> <!-- Life Stone Lv. 2 - Armor -->
 		<ingredient id="57" count="1000000" /> <!-- Adena -->
 		<production id="97440" chance="15" id2="94188" count2="1" chance2="85" /> <!-- Blessed Augmenting Stone: Armor -->
 	</product>
-	<product id="10539" category="4">
+	<product id="3355" category="4">
 		<ingredient id="94212" count="2" /> <!-- Life Stone Lv. 2 - Armor -->
 		<ingredient id="57" count="1000000" /> <!-- Adena -->
 		<production id="97445" chance="15" id2="94212" count2="1" chance2="85" /> <!-- Blessed Augmenting Stone: Armor -->
 	</product>
-	<product id="10540" category="4">
+	<product id="3356" category="4">
 		<ingredient id="94423" count="2" /> <!-- Life Stone - Accessories -->
 		<ingredient id="57" count="1000000" /> <!-- Adena -->
 		<production id="97442" chance="15" id2="94423" count2="1" chance2="85" /> <!-- Blessed Augmenting Stone: Accessory -->
 	</product>
-	<product id="10541" category="4">
+	<product id="3357" category="4">
 		<ingredient id="94424" count="2" /> <!-- Life Stone - Accessories -->
 		<ingredient id="57" count="1000000" /> <!-- Adena -->
 		<production id="97447" chance="15" id2="94424" count2="1" chance2="85" /> <!-- Blessed Augmenting Stone: Accessory -->

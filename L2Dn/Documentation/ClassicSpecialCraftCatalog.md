@@ -46,6 +46,10 @@ Los resultados son los paquetes `95823`–`95833` y `95835`, uno para cada tipo
 de arma Frost Lord. Para que el circuito sea obtenible dentro del juego, los
 materiales se incorporan a raids ya existentes:
 
+Las recetas usan los ProductId nativos `1542`–`1552` y `1554`, que en el
+cliente L2-P447 ya corresponden exactamente a esos paquetes. Esto conserva la
+subcategoría y la metadata visual original de Frost Lord's Weapon.
+
 | Raid | NPC | Cristales garantizados | Probabilidad del core |
 |---|---:|---:|---:|
 | Scarlet van Halisha / Frintezza | 29047 | 75–125 | 10% |
@@ -69,6 +73,11 @@ Adena. Esas cuatro recetas usan ProductId oficiales libres `3662`–`3665`.
 
 Hay cuatro etapas para Frintezza, Antharas, Baium, Zaken, Queen Ant, Orfen y
 Core:
+
+Las 28 entradas reutilizan los ProductId nativos `4353`–`4378`, `4381` y
+`4382`. El parche reemplaza sus registros completos y los agrupa bajo la
+subcategoría Accessories; no dependen de los IDs `10043+`, ausentes en el
+cliente L2-P447 usado por el servidor.
 
 | Etapa | Materiales | Resultado |
 |---|---|---|
@@ -96,6 +105,10 @@ el servidor no pueda cumplir.
 | 1 | 5 Dye Powder + 500.000 Adena | 8% ×3 / 67% ×1 Enhanced Dye Powder; 25% devolución de 2 polvos |
 | 8 | 2 piedras de augmentación + 1.000.000 Adena | 15% piedra bendecida; 85% devolución de 1 piedra base |
 | 1 | 5 Scroll: Enchant Rare Accessories + 1.000 L-Coin + 10.000.000 Adena | Stable Scroll: Enchant Rare Accessories |
+
+Elixir, Dye Powder y las ocho piedras bendecidas conservan los ProductId
+nativos `1112`, `1878` y `3350`–`3357`, respectivamente. De esta forma el
+cliente parte de registros de la misma función en vez de entradas inexistentes.
 
 Todas las probabilidades constituyen una única distribución de 100%; el flujo
 del servidor realiza un solo sorteo por intento.

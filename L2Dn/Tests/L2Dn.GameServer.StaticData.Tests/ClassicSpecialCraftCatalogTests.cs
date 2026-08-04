@@ -78,8 +78,15 @@ public sealed class ClassicSpecialCraftCatalogTests
             });
 
         products.Select(ProductId).Should().OnlyHaveUniqueItems();
-        products.Select(ProductId).Should().OnlyContain(productId => productId <= 11487,
-            "every ProductId must exist in the shipped Classic or Classic Aden client DAT");
+        products.Where(product => ProductCategory(product) == 0).Select(ProductId).Should()
+            .Equal(Enumerable.Range(1542, 11).Concat([1554]));
+        products.Where(product => ProductCategory(product) == 3).Select(ProductId).Should()
+            .Equal(Enumerable.Range(4353, 26).Concat([4381, 4382]));
+        products.Where(product => ProductCategory(product) == 4).Select(ProductId).Should()
+            .Equal(Enumerable.Range(3662, 4)
+                .Concat([1112, 1878])
+                .Concat(Enumerable.Range(3350, 8))
+                .Concat([4267]));
         products.Should().NotContain(product => ProductCategory(product) == 6);
         products.SelectMany(product => product.Elements("ingredient"))
             .Should().NotContain(ingredient => (int)ingredient.Attribute("id")! == 92314);

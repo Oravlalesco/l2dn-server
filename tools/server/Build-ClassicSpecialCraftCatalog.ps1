@@ -62,8 +62,13 @@ $frostWeapons = @(
     95823, 95824, 95825, 95826, 95827, 95828,
     95829, 95830, 95831, 95832, 95833, 95835
 )
+$frostProductIds = @(1542..1552) + 1554
+if ($frostProductIds.Count -ne $frostWeapons.Count) {
+    throw "Frost weapon ProductId count ($($frostProductIds.Count)) does not match weapon count ($($frostWeapons.Count))."
+}
+
 for ($index = 0; $index -lt $frostWeapons.Count; $index++) {
-    Add-Product -id (10083 + $index) -category 0 -ingredients @(
+    Add-Product -id $frostProductIds[$index] -category 0 -ingredients @(
         (New-Ingredient 95781 1),
         (New-Ingredient 95782 1500)
     ) -production ([ordered]@{ id = $frostWeapons[$index] })
@@ -92,32 +97,38 @@ for ($index = 0; $index -lt $spellbookIds.Count; $index++) {
 Add-Line
 Add-Line "`t<!-- Category 3: seven complete raid-accessory upgrade chains. -->"
 $accessoryFamilies = @(
-    [pscustomobject]@{ Name = 'Frintezza'; Base = 91550; Levels = @(91551, 91552, 91553, 99228); Product = 10043; Rate = 4; Fee = 300000000 },
-    [pscustomobject]@{ Name = 'Antharas'; Base = 90992; Levels = @(91138, 91139, 91383, 99227); Product = 10047; Rate = 4; Fee = 300000000 },
-    [pscustomobject]@{ Name = 'Baium'; Base = 49580; Levels = @(49581, 49582, 91381, 99225); Product = 10051; Rate = 3; Fee = 300000000 },
-    [pscustomobject]@{ Name = 'Zaken'; Base = 90763; Levels = @(90764, 90765, 91382, 99226); Product = 10055; Rate = 3; Fee = 150000000 },
-    [pscustomobject]@{ Name = 'Queen Ant'; Base = 6660; Levels = @(49574, 49577, 91378, 99222); Product = 10059; Rate = 3; Fee = 150000000 },
-    [pscustomobject]@{ Name = 'Orfen'; Base = 6661; Levels = @(49575, 49578, 91379, 99223); Product = 10063; Rate = 3; Fee = 150000000 },
-    [pscustomobject]@{ Name = 'Core'; Base = 6662; Levels = @(49576, 49579, 91380, 99224); Product = 10067; Rate = 3; Fee = 150000000 }
+    [pscustomobject]@{ Name = 'Frintezza'; Base = 91550; Levels = @(91551, 91552, 91553, 99228); Rate = 4; Fee = 300000000 },
+    [pscustomobject]@{ Name = 'Antharas'; Base = 90992; Levels = @(91138, 91139, 91383, 99227); Rate = 4; Fee = 300000000 },
+    [pscustomobject]@{ Name = 'Baium'; Base = 49580; Levels = @(49581, 49582, 91381, 99225); Rate = 3; Fee = 300000000 },
+    [pscustomobject]@{ Name = 'Zaken'; Base = 90763; Levels = @(90764, 90765, 91382, 99226); Rate = 3; Fee = 150000000 },
+    [pscustomobject]@{ Name = 'Queen Ant'; Base = 6660; Levels = @(49574, 49577, 91378, 99222); Rate = 3; Fee = 150000000 },
+    [pscustomobject]@{ Name = 'Orfen'; Base = 6661; Levels = @(49575, 49578, 91379, 99223); Rate = 3; Fee = 150000000 },
+    [pscustomobject]@{ Name = 'Core'; Base = 6662; Levels = @(49576, 49579, 91380, 99224); Rate = 3; Fee = 150000000 }
 )
+$accessoryProductIds = @(4353..4378) + @(4381, 4382)
+if ($accessoryProductIds.Count -ne ($accessoryFamilies.Count * 4)) {
+    throw "Accessory ProductId count ($($accessoryProductIds.Count)) does not match recipe count ($($accessoryFamilies.Count * 4))."
+}
 
-foreach ($family in $accessoryFamilies) {
-    Add-Product -id $family.Product -category 3 -ingredients @(
+for ($familyIndex = 0; $familyIndex -lt $accessoryFamilies.Count; $familyIndex++) {
+    $family = $accessoryFamilies[$familyIndex]
+    $productIds = $accessoryProductIds[($familyIndex * 4)..(($familyIndex * 4) + 3)]
+    Add-Product -id $productIds[0] -category 3 -ingredients @(
         (New-Ingredient $family.Base 2),
         (New-Ingredient 57 5000000)
     ) -production ([ordered]@{ id = $family.Levels[0] })
 
-    Add-Product -id ($family.Product + 1) -category 3 -ingredients @(
+    Add-Product -id $productIds[1] -category 3 -ingredients @(
         (New-Ingredient $family.Levels[0] 2),
         (New-Ingredient 57 20000000)
     ) -production ([ordered]@{ id = $family.Levels[1] })
 
-    Add-Product -id ($family.Product + 2) -category 3 -ingredients @(
+    Add-Product -id $productIds[2] -category 3 -ingredients @(
         (New-Ingredient $family.Levels[1] 2),
         (New-Ingredient 57 100000000)
     ) -production ([ordered]@{ id = $family.Levels[2] })
 
-    Add-Product -id ($family.Product + 3) -category 3 -ingredients @(
+    Add-Product -id $productIds[3] -category 3 -ingredients @(
         (New-Ingredient $family.Levels[2] 1),
         (New-Ingredient $family.Base 1),
         (New-Ingredient 57 $family.Fee)
@@ -138,18 +149,18 @@ Add-Product -id 3663 -category 4 -ingredients @((New-Ingredient 91039 20), (New-
 Add-Product -id 3664 -category 4 -ingredients @((New-Ingredient 91041 20), (New-Ingredient 57 200000)) -production ([ordered]@{ id = 90045 })
 Add-Product -id 3665 -category 4 -ingredients @((New-Ingredient 91042 20), (New-Ingredient 57 200000)) -production ([ordered]@{ id = 90045 })
 
-Add-Product -id 10001 -category 4 -ingredients @((New-Ingredient 94328 10)) -production ([ordered]@{
+Add-Product -id 1112 -category 4 -ingredients @((New-Ingredient 94328 10)) -production ([ordered]@{
     id = 94314; chance = 5; id2 = 94328; count2 = 7; chance2 = 95
 })
-Add-Product -id 10095 -category 4 -ingredients @((New-Ingredient 96623 5), (New-Ingredient 57 500000)) -production ([ordered]@{
+Add-Product -id 1878 -category 4 -ingredients @((New-Ingredient 96623 5), (New-Ingredient 57 500000)) -production ([ordered]@{
     id = 96630; count = 3; chance = 8; id2 = 96630; count2 = 1; chance2 = 67; id3 = 96623; count3 = 2; chance3 = 25
 })
 
 $augmentingRecipes = @(
-    @(10534, 97787, 97789), @(10535, 97788, 97790),
-    @(10536, 94186, 97439), @(10537, 94210, 97444),
-    @(10538, 94188, 97440), @(10539, 94212, 97445),
-    @(10540, 94423, 97442), @(10541, 94424, 97447)
+    @(3350, 97787, 97789), @(3351, 97788, 97790),
+    @(3352, 94186, 97439), @(3353, 94210, 97444),
+    @(3354, 94188, 97440), @(3355, 94212, 97445),
+    @(3356, 94423, 97442), @(3357, 94424, 97447)
 )
 foreach ($recipe in $augmentingRecipes) {
     Add-Product -id $recipe[0] -category 4 -ingredients @(
