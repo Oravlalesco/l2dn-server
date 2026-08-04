@@ -1,4 +1,4 @@
-<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/spawns.xsd">
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/spawns.xsd" dailyMissionAreas="land_of_winds">
 	<spawn name="LandOfWinds">
 		<group>
 			<npc id="21770" x="171457" y="180376" z="-2680" heading="13093" respawnTime="60sec" />

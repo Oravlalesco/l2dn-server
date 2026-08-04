@@ -529,6 +529,9 @@ namespace L2Dn.GameServer.Db.Migrations
                     b.Property<DateTime>("LastCompleted")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime>("CycleStart")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("Progress")
                         .HasColumnType("integer");
 
@@ -538,6 +541,38 @@ namespace L2Dn.GameServer.Db.Migrations
                     b.HasKey("CharacterId", "RewardId");
 
                     b.ToTable("CharacterDailyRewards");
+                });
+
+            modelBuilder.Entity("L2Dn.GameServer.Db.DbCharacterDailyMissionRewardGrant", b =>
+                {
+                    b.Property<int>("CharacterId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RewardId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CycleStart")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<byte>("DeliveryKind")
+                        .HasColumnType("smallint");
+
+                    b.Property<DateTime>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("MailMessageId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RewardSnapshot")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("CharacterId", "RewardId", "CycleStart");
+
+                    b.ToTable("CharacterDailyMissionRewardGrants");
                 });
 
             modelBuilder.Entity("L2Dn.GameServer.Db.CharacterFriend", b =>

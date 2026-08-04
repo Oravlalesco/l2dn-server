@@ -17,10 +17,10 @@ namespace L2Dn.GameServer.Handlers;
 /**
  * @author Sdw
  */
-public abstract class AbstractDailyMissionHandler
+public abstract class AbstractDailyMissionHandler: IDisposable
 {
 	public const int MISSION_LEVEL_POINTS = 97224;
-	private const int CLAN_EXP = 94481;
+	public const int CLAN_EXP = 94481;
 
 	protected readonly Logger LOGGER = LogManager.GetLogger(nameof(AbstractDailyMissionHandler));
 
@@ -29,7 +29,6 @@ public abstract class AbstractDailyMissionHandler
 	protected AbstractDailyMissionHandler(DailyMissionDataHolder holder)
 	{
 		_holder = holder;
-		init();
 	}
 
 	public DailyMissionDataHolder getHolder()
@@ -37,9 +36,24 @@ public abstract class AbstractDailyMissionHandler
 		return _holder;
 	}
 
-	public abstract bool isAvailable(Player player);
+	public virtual bool isAvailable(Player player)
+	{
+		return player.getDailyMissions().getStatus(_holder.getId()) == DailyMissionStatus.AVAILABLE;
+	}
 
 	public abstract void init();
+
+	public virtual void refresh(Player player)
+	{
+		player.getDailyMissions().updateEntry(_holder, entry =>
+		{
+			if (entry.getStatus() == DailyMissionStatus.NOT_AVAILABLE &&
+				entry.getProgress() >= _holder.getRequiredCompletions())
+			{
+				entry.setStatus(DailyMissionStatus.AVAILABLE);
+			}
+		}, synchronizeOnStatus: false);
+	}
 
 	public virtual int getProgress(Player player)
 	{
@@ -49,42 +63,12 @@ public abstract class AbstractDailyMissionHandler
 	[MethodImpl(MethodImplOptions.Synchronized)]
 	public virtual void reset()
 	{
-		if (!_holder.dailyReset())
-		{
-			return;
-		}
-
-		int missionId = getHolder().getId();
-
-		try
-		{
-			using GameServerDbContext ctx = DbFactory.Instance.CreateDbContext();
-			ctx.CharacterDailyRewards.Where(r => r.RewardId == missionId)
-				.ExecuteDelete();
-		}
-		catch (Exception e)
-		{
-			LOGGER.Warn("Error while deleting rewards from database: " + e);
-		}
-
-		World.getInstance().getPlayers().ForEach(r => r.getDailyMissions().reset(missionId, false));
+		World.getInstance().getPlayers().ForEach(player => player.getDailyMissions().resetExpired(DateTimeOffset.Now));
 	}
 
 	public bool requestReward(Player player)
 	{
-		if (isAvailable(player))
-		{
-			giveRewards(player);
-
-			DailyMissionPlayerEntry entry = player.getDailyMissions().getOrCreateEntry(_holder.getId());
-			entry.setStatus(DailyMissionStatus.COMPLETED);
-			entry.setLastCompleted(DateTime.UtcNow);
-			entry.setRecentlyCompleted(true);
-			player.getDailyMissions().storeEntry(entry);
-			return true;
-		}
-
-		return false;
+		return isAvailable(player) && player.getDailyMissions().claim(_holder);
 	}
 
 	protected void giveRewards(Player player)
@@ -124,5 +108,14 @@ public abstract class AbstractDailyMissionHandler
 				}
 			}
 		}
+	}
+
+	public virtual void Dispose()
+	{
+		GlobalEvents.Global.UnsubscribeAllTypes(this);
+		GlobalEvents.Npcs.UnsubscribeAllTypes(this);
+		GlobalEvents.Monsters.UnsubscribeAllTypes(this);
+		GlobalEvents.Players.UnsubscribeAllTypes(this);
+		GC.SuppressFinalize(this);
 	}
 }

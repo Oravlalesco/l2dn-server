@@ -4,7 +4,7 @@
 			<npc id="34040" x="11534" y="-23727" z="-3640" heading="32866" respawnTime="60sec" />
 		</group>
 	</spawn>
-	<spawn name="ForgottenIsland_Monsters">
+	<spawn name="ForgottenIsland_Monsters" dailyMissionAreas="forgotten_island_inner">
 		<group>
 			<npc id="21746" x="21532" y="-16838" z="-2976" heading="0" respawnTime="60sec" />
 			<npc id="21746" x="20172" y="-9161" z="-2784" heading="55874" respawnTime="60sec" />

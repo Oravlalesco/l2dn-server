@@ -29,28 +29,7 @@ public class OlympiadDailyMissionHandler: AbstractDailyMissionHandler
 
 	public override bool isAvailable(Player player)
 	{
-		DailyMissionPlayerEntry? entry = player.getDailyMissions().getEntry(getHolder().getId());
-		if (entry != null)
-		{
-			switch (entry.getStatus())
-			{
-				case DailyMissionStatus.NOT_AVAILABLE: // Initial state
-				{
-					if (entry.getProgress() >= _amount)
-					{
-						entry.setStatus(DailyMissionStatus.AVAILABLE);
-						player.getDailyMissions().storeEntry(entry);
-					}
-					break;
-				}
-				case DailyMissionStatus.AVAILABLE:
-				{
-					return true;
-				}
-			}
-		}
-
-		return false;
+		return base.isAvailable(player);
 	}
 
 	private void onOlympiadMatchResult(OnOlympiadMatchResult @event)
@@ -59,31 +38,13 @@ public class OlympiadDailyMissionHandler: AbstractDailyMissionHandler
 		if (winner != null)
 		{
 			Player player = winner.getPlayer();
-			DailyMissionPlayerEntry winnerEntry = player.getDailyMissions().getOrCreateEntry(getHolder().getId());
-			if (winnerEntry.getStatus() == DailyMissionStatus.NOT_AVAILABLE)
-			{
-				if (winnerEntry.increaseProgress() >= _amount)
-				{
-					winnerEntry.setStatus(DailyMissionStatus.AVAILABLE);
-				}
-
-				player.getDailyMissions().storeEntry(winnerEntry);
-			}
+			player.getDailyMissions().addProgress(getHolder());
 		}
 
 		if (!_winOnly && @event.getLoser() != null)
 		{
 			Player player = @event.getLoser().getPlayer();
-			DailyMissionPlayerEntry loseEntry = player.getDailyMissions().getOrCreateEntry(getHolder().getId());
-			if (loseEntry.getStatus() == DailyMissionStatus.NOT_AVAILABLE)
-			{
-				if (loseEntry.increaseProgress() >= _amount)
-				{
-					loseEntry.setStatus(DailyMissionStatus.AVAILABLE);
-				}
-
-				player.getDailyMissions().storeEntry(loseEntry);
-			}
+			player.getDailyMissions().addProgress(getHolder());
 		}
 	}
 }

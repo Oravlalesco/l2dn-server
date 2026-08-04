@@ -2,6 +2,8 @@
 using L2Dn.GameServer.Db;
 using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
+using L2Dn.GameServer.Model.DailyMissions;
+using L2Dn.Model.Enums;
 using L2Dn.Packets;
 
 namespace L2Dn.GameServer.Network.OutgoingPackets.DailyMissions;
@@ -23,14 +25,10 @@ public readonly struct ExOneDayReceiveRewardListPacket: IOutgoingPacket
         _player = player;
         _rewards = sendRewards ? DailyMissionData.getInstance().getDailyMissionData(player) : new List<DailyMissionDataHolder>();
 
-        _dayRemainTimeInSeconds = 0;
-        _weekRemainTimeInSeconds = 0;
-        _monthRemainTimeInSeconds = 0;
-
-        // TODO calculate remaining time
-        // _dayRemainTimeInSeconds = (int) ((DAILY_REUSE_PATTERN.next(System.currentTimeMillis()) - System.currentTimeMillis()) / 1000);
-        // _weekRemainTimeInSeconds = (int) ((WEEKLY_REUSE_PATTERN.next(System.currentTimeMillis()) - System.currentTimeMillis()) / 1000);
-        // _monthRemainTimeInSeconds = (int) ((MONTHLY_REUSE_PATTERN.next(System.currentTimeMillis()) - System.currentTimeMillis()) / 1000);
+        DateTimeOffset now = DateTimeOffset.Now;
+        _dayRemainTimeInSeconds = DailyMissionCycle.getRemainingSeconds(MissionResetType.DAY, now);
+        _weekRemainTimeInSeconds = DailyMissionCycle.getRemainingSeconds(MissionResetType.WEEK, now);
+        _monthRemainTimeInSeconds = DailyMissionCycle.getRemainingSeconds(MissionResetType.MONTH, now);
     }
 
     public void WriteContent(PacketBitWriter writer)

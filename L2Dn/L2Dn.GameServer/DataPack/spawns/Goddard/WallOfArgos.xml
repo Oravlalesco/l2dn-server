@@ -1,4 +1,4 @@
-<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/spawns.xsd">
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/spawns.xsd" dailyMissionAreas="wall_of_argos">
 	<spawn name="argos_npc">
 		<group>
 			<npc id="34049" x="164427" y="-47837" z="-3528" heading="58088" respawnTime="60sec" />

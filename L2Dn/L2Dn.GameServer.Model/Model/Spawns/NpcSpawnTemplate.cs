@@ -14,6 +14,7 @@ using L2Dn.Geometry;
 using L2Dn.Model.Xml;
 using L2Dn.Utilities;
 using NLog;
+using System.Collections.Immutable;
 
 namespace L2Dn.GameServer.Model.Spawns;
 
@@ -37,6 +38,7 @@ public class NpcSpawnTemplate: IParameterized<StatSet>
 	private readonly SpawnTemplate _spawnTemplate;
 	private readonly SpawnGroup _group;
 	private readonly Set<Npc> _spawnedNpcs = [];
+	private readonly ImmutableHashSet<string> _dailyMissionAreas;
 
 	private NpcSpawnTemplate(NpcSpawnTemplate template)
 	{
@@ -55,6 +57,7 @@ public class NpcSpawnTemplate: IParameterized<StatSet>
 		_zone = template._zone;
 		_parameters = template._parameters;
 		_minions = template._minions;
+		_dailyMissionAreas = template._dailyMissionAreas;
 	}
 
 	public NpcSpawnTemplate(SpawnTemplate spawnTemplate, SpawnGroup group, XmlSpawnNpc npc)
@@ -77,6 +80,8 @@ public class NpcSpawnTemplate: IParameterized<StatSet>
 		_saveInDb = npc.DbSave;
 		_dbName = npc.DbName;
 		_parameters = MergeParameters(null, spawnTemplate, group);
+		_dailyMissionAreas = DailyMissionAreaTags.Resolve(group.getDailyMissionAreas(), npc.DailyMissionAreas,
+			npc.ExcludedDailyMissionAreas);
 
 		int x = npc.X;
 		int y = npc.Y;
@@ -133,6 +138,11 @@ public class NpcSpawnTemplate: IParameterized<StatSet>
 	public SpawnGroup getGroup()
 	{
 		return _group;
+	}
+
+	public IReadOnlySet<string> getDailyMissionAreas()
+	{
+		return _dailyMissionAreas;
 	}
 
 	private string processParam(int value)

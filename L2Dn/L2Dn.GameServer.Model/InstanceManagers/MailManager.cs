@@ -200,6 +200,19 @@ public class MailManager
 		MessageDeletionTaskManager.getInstance().add(msg.getId(), msg.getExpiration());
 	}
 
+	public void registerCommittedMessage(Message msg)
+	{
+		_messages.put(msg.getId(), msg);
+		Player? receiver = World.getInstance().getPlayer(msg.getReceiverId());
+		if (receiver != null)
+		{
+			receiver.sendPacket(new ExNoticePostArrivedPacket(true));
+			receiver.sendPacket(new ExUnReadMailCountPacket(getUnreadCount(receiver)));
+		}
+
+		MessageDeletionTaskManager.getInstance().add(msg.getId(), msg.getExpiration());
+	}
+
 	public void markAsReadInDb(int msgId)
 	{
 		try

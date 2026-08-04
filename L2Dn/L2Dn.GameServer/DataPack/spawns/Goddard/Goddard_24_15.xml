@@ -1,4 +1,4 @@
-<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/spawns.xsd">
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/spawns.xsd" dailyMissionAreas="ketra_orc_outpost">
 	<spawn>
 		<territories>
 			<territory name="godard12_2415_01" minZ="-3860" maxZ="-3360">

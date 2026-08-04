@@ -1,4 +1,4 @@
-<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/spawns.xsd">
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/spawns.xsd" dailyMissionAreas="varka_silenos_barracks">
 	<spawn>
 		<territories>
 			<territory name="godard28_2316_01" minZ="-4104" maxZ="-3604">

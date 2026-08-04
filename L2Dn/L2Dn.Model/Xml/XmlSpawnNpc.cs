@@ -47,4 +47,10 @@ public class XmlSpawnNpc: XmlLocationWithHeading
 
     [XmlAttribute("dbSave")]
     public bool DbSave { get; set; }
+
+    [XmlAttribute("dailyMissionAreas")]
+    public string DailyMissionAreas { get; set; } = string.Empty;
+
+    [XmlAttribute("excludedDailyMissionAreas")]
+    public string ExcludedDailyMissionAreas { get; set; } = string.Empty;
 }

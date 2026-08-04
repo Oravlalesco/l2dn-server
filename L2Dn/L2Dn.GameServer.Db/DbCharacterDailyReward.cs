@@ -10,6 +10,7 @@ public class DbCharacterDailyReward
     public DailyMissionStatus Status { get; set; } = DailyMissionStatus.AVAILABLE;
     public int Progress { get; set; }
     public DateTime LastCompleted { get; set; }
+    public DateTime CycleStart { get; set; } = DateTime.UnixEpoch;
 }
 
 public enum DailyMissionStatus: byte

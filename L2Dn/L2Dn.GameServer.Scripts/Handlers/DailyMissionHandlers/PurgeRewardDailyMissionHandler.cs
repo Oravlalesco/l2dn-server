@@ -30,28 +30,7 @@ public class PurgeRewardDailyMissionHandler: AbstractDailyMissionHandler
 	
 	public override bool isAvailable(Player player)
 	{
-		DailyMissionPlayerEntry? entry = player.getDailyMissions().getEntry(getHolder().getId());
-		if (entry != null)
-		{
-			switch (entry.getStatus())
-			{
-				case DailyMissionStatus.NOT_AVAILABLE: // Initial state
-				{
-					if (entry.getProgress() >= _amount)
-					{
-						entry.setStatus(DailyMissionStatus.AVAILABLE);
-						player.getDailyMissions().storeEntry(entry);
-					}
-					break;
-				}
-				case DailyMissionStatus.AVAILABLE:
-				{
-					return true;
-				}
-			}
-		}
-
-		return false;
+		return base.isAvailable(player);
 	}
 	
 	private void onItemPurgeReward(OnItemPurgeReward @event)
@@ -66,15 +45,6 @@ public class PurgeRewardDailyMissionHandler: AbstractDailyMissionHandler
 	
 	private void processPlayerProgress(Player player)
 	{
-		DailyMissionPlayerEntry entry = player.getDailyMissions().getOrCreateEntry(getHolder().getId());
-		if (entry.getStatus() == DailyMissionStatus.NOT_AVAILABLE)
-		{
-			if (entry.increaseProgress() >= _amount)
-			{
-				entry.setStatus(DailyMissionStatus.AVAILABLE);
-			}
-
-			player.getDailyMissions().storeEntry(entry);
-		}
+		player.getDailyMissions().addProgress(getHolder());
 	}
 }

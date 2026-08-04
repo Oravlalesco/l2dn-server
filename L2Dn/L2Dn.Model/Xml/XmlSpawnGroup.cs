@@ -17,4 +17,10 @@ public class XmlSpawnGroup
 
     [XmlAttribute("spawnByDefault")]
     public bool SpawnByDefault { get; set; } = true;
+
+    [XmlAttribute("dailyMissionAreas")]
+    public string DailyMissionAreas { get; set; } = string.Empty;
+
+    [XmlAttribute("excludedDailyMissionAreas")]
+    public string ExcludedDailyMissionAreas { get; set; } = string.Empty;
 }

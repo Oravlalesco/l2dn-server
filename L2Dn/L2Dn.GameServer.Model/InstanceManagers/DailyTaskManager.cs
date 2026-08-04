@@ -6,6 +6,7 @@ using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Model.Actor.Stats;
 using L2Dn.GameServer.Model.Clans;
+using L2Dn.GameServer.Model.DailyMissions;
 using L2Dn.GameServer.Model.Holders;
 using L2Dn.GameServer.Model.Items.Instances;
 using L2Dn.GameServer.Model.Olympiads;
@@ -40,28 +41,28 @@ public class DailyTaskManager
 
 	protected DailyTaskManager()
 	{
-		// Schedule reset every day at 6:30.
 		DateTime currentTime = DateTime.Now;
-		DateTime calendar = new DateTime(currentTime.Year, currentTime.Month, currentTime.Day, 6, 30, 0, DateTimeKind.Local);
-		if (calendar < currentTime)
-			calendar = calendar.AddDays(1);
-
-		// Check if 24 hours have passed since the last daily reset.
-        DateTime resetTime = GlobalVariablesManager.getInstance().Get<DateTime>(GlobalVariablesManager.DAILY_TASK_RESET);
-		if (resetTime < calendar)
+		DateTime latestReset = new(currentTime.Year, currentTime.Month, currentTime.Day, 6, 30, 0,
+			DateTimeKind.Local);
+		if (latestReset > currentTime)
 		{
-			LOGGER.Info(GetType().Name +": Next schedule at " + calendar.ToString("dd/MM HH:mm") + ".");
+			latestReset = latestReset.AddDays(-1);
 		}
-		else
+
+        DateTime resetTime = GlobalVariablesManager.getInstance().Get<DateTime>(GlobalVariablesManager.DAILY_TASK_RESET);
+		if (resetTime < latestReset)
 		{
-			LOGGER.Info(GetType().Name +": Daily task will run now.");
+			LOGGER.Info(GetType().Name + ": Missed daily reset detected; running catch-up now.");
 			onReset();
 		}
 
-		// Daily reset task.
-		TimeSpan startDelay = calendar - currentTime;
+		DateTime nextReset = latestReset.AddDays(1);
+		LOGGER.Info(GetType().Name + ": Next schedule at " + nextReset.ToString("dd/MM HH:mm") + ".");
+		TimeSpan startDelay = nextReset - DateTime.Now;
 		if (startDelay < TimeSpan.Zero)
+		{
 			startDelay = TimeSpan.Zero;
+		}
 
 		ThreadPool.scheduleAtFixedRate(onReset, startDelay, TimeSpan.FromDays(1));
 
@@ -121,6 +122,7 @@ public class DailyTaskManager
 
 	private void onSave()
 	{
+		DailyMissionProgressManager.Instance.FlushAll();
 		GlobalVariablesManager.getInstance().storeMe();
 
 		RevengeHistoryManager.getInstance().storeMe();
@@ -452,7 +454,8 @@ public class DailyTaskManager
 
 	private void resetDailyMissionRewards()
 	{
-		DailyMissionData.getInstance().getDailyMissionData().ForEach(x => x.reset());
+		DateTimeOffset now = DateTimeOffset.Now;
+		World.getInstance().getPlayers().ForEach(player => player.getDailyMissions().resetExpired(now));
 	}
 
 	private void resetTimedHuntingZones()

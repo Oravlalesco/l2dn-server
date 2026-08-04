@@ -31,6 +31,7 @@ The instruction how to set up the client is [here](https://l2dn.readthedocs.io/e
 - [Catálogo Special Craft Classic 447](L2Dn/Documentation/ClassicSpecialCraftCatalog.md)
 - [Parche de cliente Special Craft Classic 447](L2Dn/Documentation/ClassicSpecialCraftClient.md)
 - [Tiendas NPC](L2Dn/Documentation/NpcShop.md)
+- [Misiones públicas (Daily Missions / One Day Reward)](L2Dn/Documentation/DailyMissions.md)
 
 ---
 

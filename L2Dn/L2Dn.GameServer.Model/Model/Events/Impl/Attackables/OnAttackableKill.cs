@@ -9,6 +9,8 @@ namespace L2Dn.GameServer.Model.Events.Impl.Attackables;
  */
 public class OnAttackableKill(Player? attacker, Attackable target, bool summon): EventBase
 {
+	private readonly DateTimeOffset _occurredAt = DateTimeOffset.UtcNow;
+
     public Player? getAttacker()
 	{
 		return attacker;
@@ -22,5 +24,10 @@ public class OnAttackableKill(Player? attacker, Attackable target, bool summon):
 	public bool isSummon()
 	{
 		return summon;
+	}
+
+	public DateTimeOffset getOccurredAt()
+	{
+		return _occurredAt;
 	}
 }

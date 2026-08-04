@@ -47,7 +47,6 @@ public static class StaticDataLoader
         ClanRewardData.getInstance();
         MissionLevel.getInstance();
         DailyMissionHandler.getInstance(); //.executeScript();
-        DailyMissionData.getInstance();
         ElementalSpiritData.getInstance();
         RankingPowerManager.getInstance();
         SubjugationData.getInstance();
@@ -142,6 +141,7 @@ public static class StaticDataLoader
         FakePlayerData.getInstance();
         FakePlayerChatManager.getInstance();
         SpawnData.getInstance();
+        DailyMissionData.getInstance();
         WalkingManager.getInstance();
         StaticObjectData.getInstance();
         ItemAuctionManager.getInstance();

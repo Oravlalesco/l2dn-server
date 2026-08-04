@@ -18,8 +18,7 @@ public class JoinClanDailyMissionHandler: AbstractDailyMissionHandler
 
 	public override bool isAvailable(Player player)
 	{
-		DailyMissionPlayerEntry? entry = player.getDailyMissions().getEntry(getHolder().getId());
-		return entry != null && entry.getStatus() == DailyMissionStatus.AVAILABLE;
+		return base.isAvailable(player);
 	}
 
 	public override void init()
@@ -34,29 +33,17 @@ public class JoinClanDailyMissionHandler: AbstractDailyMissionHandler
         if (player == null)
             return;
 
-		DailyMissionPlayerEntry missionData = player.getDailyMissions().getOrCreateEntry(getHolder().getId());
-		processMission(player, missionData);
+		processMission(player);
 	}
 
 	private void onPlayerClanCreate(OnClanCreate @event)
 	{
 		Player player = @event.getPlayer();
-		DailyMissionPlayerEntry missionData = player.getDailyMissions().getOrCreateEntry(getHolder().getId());
-		processMission(player, missionData);
+		processMission(player);
 	}
 
-	private void processMission(Player player, DailyMissionPlayerEntry missionData)
+	private void processMission(Player player)
 	{
-		if (missionData.getProgress() == 1)
-		{
-			missionData.setStatus(DailyMissionStatus.COMPLETED);
-		}
-		else
-		{
-			missionData.setProgress(1);
-			missionData.setStatus(DailyMissionStatus.AVAILABLE);
-		}
-
-		player.getDailyMissions().storeEntry(missionData);
+		player.getDailyMissions().makeAvailable(getHolder());
 	}
 }

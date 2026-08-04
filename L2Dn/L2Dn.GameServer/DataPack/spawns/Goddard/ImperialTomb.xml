@@ -1,4 +1,4 @@
-<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/spawns.xsd">
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/spawns.xsd" dailyMissionAreas="imperial_tomb">
 	<spawn>
 		<territories>
 			<territory name="godard14_2515_05" minZ="-2778" maxZ="-2478">

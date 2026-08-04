@@ -122,6 +122,8 @@
 		<xs:attribute type="xs:boolean" name="spawnAnimation" />
 		<xs:attribute type="xs:string" name="dbName" />
 		<xs:attribute type="xs:boolean" name="dbSave" />
+		<xs:attribute type="xs:string" name="dailyMissionAreas" />
+		<xs:attribute type="xs:string" name="excludedDailyMissionAreas" />
 	</xs:complexType>
 
 	<xs:complexType name="parameters">
@@ -201,12 +203,16 @@
 					</xs:sequence>
 					<xs:attribute type="xs:string" name="name" />
 					<xs:attribute type="xs:string" name="spawnByDefault" />
+					<xs:attribute type="xs:string" name="dailyMissionAreas" />
+					<xs:attribute type="xs:string" name="excludedDailyMissionAreas" />
 				</xs:complexType>
 			</xs:element>
 		</xs:sequence>
 		<xs:attribute type="xs:string" name="name" />
 		<xs:attribute type="xs:string" name="ai" />
 		<xs:attribute type="xs:boolean" name="spawnByDefault" />
+		<xs:attribute type="xs:string" name="dailyMissionAreas" />
+		<xs:attribute type="xs:string" name="excludedDailyMissionAreas" />
 	</xs:complexType>
 
 	<!-- end -->

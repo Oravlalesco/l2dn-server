@@ -26,6 +26,19 @@ public class GameServerDbContext(DbContextOptions options)
             entity.Property(e => e.NextWeeklyChange).HasConversion(UtcDateTimeConverter);
         });
 
+        modelBuilder.Entity<DbCharacterDailyReward>(entity =>
+        {
+            entity.Property(e => e.LastCompleted).HasConversion(UtcDateTimeConverter);
+            entity.Property(e => e.CycleStart).HasConversion(UtcDateTimeConverter);
+        });
+
+        modelBuilder.Entity<DbCharacterDailyMissionRewardGrant>(entity =>
+        {
+            entity.Property(e => e.CycleStart).HasConversion(UtcDateTimeConverter);
+            entity.Property(e => e.CreatedAt).HasConversion(UtcDateTimeConverter);
+            entity.Property(e => e.DeliveredAt).HasConversion(UtcDateTimeConverter);
+        });
+
         modelBuilder.Entity<DbCharacter>()
             .HasOne(c => c.Clan)
             .WithMany()
@@ -52,6 +65,8 @@ public class GameServerDbContext(DbContextOptions options)
     public DbSet<DbCharacterOfflineTrade> CharacterOfflineTrades => Set<DbCharacterOfflineTrade>();
     public DbSet<DbCharacterOfflineTradeItem> CharacterOfflineTradeItems => Set<DbCharacterOfflineTradeItem>();
     public DbSet<DbCharacterDailyReward> CharacterDailyRewards => Set<DbCharacterDailyReward>();
+    public DbSet<DbCharacterDailyMissionRewardGrant> CharacterDailyMissionRewardGrants =>
+        Set<DbCharacterDailyMissionRewardGrant>();
     public DbSet<DbCharacterSubClass> CharacterSubClasses => Set<DbCharacterSubClass>();
     public DbSet<DbCharacterHenna> CharacterHennas => Set<DbCharacterHenna>();
     public DbSet<DbCharacterHennaPoten> CharacterHennaPotens => Set<DbCharacterHennaPoten>();

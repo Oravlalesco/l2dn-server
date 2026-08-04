@@ -1,4 +1,5 @@
 ﻿using L2Dn.GameServer.Model.Actor;
+using L2Dn.GameServer.Data.Xml;
 using L2Dn.GameServer.Network.OutgoingPackets.DailyMissions;
 using L2Dn.Network;
 using L2Dn.Packets;
@@ -36,6 +37,7 @@ public struct RequestToDoListPacket: IIncomingPacket<GameSession>
             // }
             case 9: // Daily Rewards
             {
+                DailyMissionData.getInstance().refreshPlayer(player);
                 // Initial EW request should be false
                 ExOneDayReceiveRewardListPacket oneDayReceiveRewardListPacket =
                     new ExOneDayReceiveRewardListPacket(player, true);

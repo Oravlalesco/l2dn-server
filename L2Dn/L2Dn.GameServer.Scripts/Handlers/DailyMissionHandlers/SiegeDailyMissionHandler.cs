@@ -33,8 +33,7 @@ public class SiegeDailyMissionHandler: AbstractDailyMissionHandler
 
 	public override bool isAvailable(Player player)
 	{
-		DailyMissionPlayerEntry? entry = player.getDailyMissions().getEntry(getHolder().getId());
-		return entry != null && entry.getStatus() == DailyMissionStatus.AVAILABLE;
+		return base.isAvailable(player);
 	}
 
 	private void onSiegeStart(OnCastleSiegeStart @event)
@@ -55,9 +54,7 @@ public class SiegeDailyMissionHandler: AbstractDailyMissionHandler
 					return;
 				}
 
-				DailyMissionPlayerEntry entry = player.getDailyMissions().getOrCreateEntry(getHolder().getId());
-				entry.setStatus(DailyMissionStatus.AVAILABLE);
-				player.getDailyMissions().storeEntry(entry);
+				player.getDailyMissions().makeAvailable(getHolder());
 			});
 		}
 	}

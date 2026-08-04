@@ -41,7 +41,7 @@ public class XmlDailyMission
     public bool IsOneTime { get; set; } = true;
 
     [XmlAttribute("isMainClassOnly")]
-    public bool IsMainClassOnly { get; set; } = true;
+    public bool IsMainClassOnly { get; set; }
 
     [XmlAttribute("isDualClassOnly")]
     public bool IsDualClassOnly { get; set; }

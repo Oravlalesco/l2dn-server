@@ -1,145 +1,292 @@
+using System.Collections.Immutable;
 using System.Globalization;
-using L2Dn.GameServer.Db;
 using L2Dn.GameServer.Handlers;
 using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
+using L2Dn.GameServer.Model.Actor.Instances;
 using L2Dn.GameServer.Model.Events;
 using L2Dn.GameServer.Model.Events.Impl.Attackables;
-using L2Dn.GameServer.Utilities;
-using L2Dn.Geometry;
-using Config = L2Dn.GameServer.Configuration.Config;
+using L2Dn.GameServer.Model.DailyMissions;
 
 namespace L2Dn.GameServer.Scripts.Handlers.DailyMissionHandlers;
 
 /**
- * @author Mobius
+ * A monster mission rule. All instances are evaluated by one global kill subscriber so raids and regular
+ * monsters follow the same path and one kill can be persisted as a single character batch.
  */
 public class MonsterDailyMissionHandler: AbstractDailyMissionHandler
 {
-    private readonly int _amount;
+    private static readonly DailyMissionMonsterKillEvaluator _evaluator = new();
+
     private readonly int _minLevel;
     private readonly int _maxLevel;
-    private readonly Set<int> _ids = [];
-    private readonly string _startHour;
-    private readonly string _endHour;
+    private readonly int _minMonsterLevelOffset;
+    private readonly HashSet<int> _ids;
+    private readonly HashSet<int> _excludedIds;
+    private readonly HashSet<string> _areas;
+    private readonly TimeSpan? _startTime;
+    private readonly TimeSpan? _endTime;
+    private bool _registered;
+
+    internal DailyMissionMonsterTargetMode TargetMode { get; }
+    internal IReadOnlySet<int> Ids => _ids;
+    internal IReadOnlySet<string> Areas => _areas;
 
     public MonsterDailyMissionHandler(DailyMissionDataHolder holder): base(holder)
     {
-        _amount = holder.getRequiredCompletions();
         _minLevel = holder.getParams().getInt("minLevel", 0);
         _maxLevel = holder.getParams().getInt("maxLevel", int.MaxValue);
-        string ids = holder.getParams().getString("ids", "");
-        if (!string.IsNullOrEmpty(ids))
+        _minMonsterLevelOffset = holder.getParams().getInt("minMonsterLevelOffset", -4);
+        _ids = ParseIntSet(holder.getParams().getString("ids", ""));
+        _excludedIds = ParseIntSet(holder.getParams().getString("excludedIds", ""));
+        _areas = ParseStringSet(holder.getParams().getString("areas", ""));
+
+        string mode = holder.getParams().getString("targetMode", _ids.Count == 0 ? "ANY" : "NPC_IDS");
+        if (!Enum.TryParse(mode, true, out DailyMissionMonsterTargetMode targetMode))
         {
-            foreach (string s in ids.Split(","))
-            {
-                int id = int.Parse(s);
-                if (!_ids.Contains(id))
-                {
-                    _ids.add(id);
-                }
-            }
+            throw new InvalidOperationException($"Invalid targetMode '{mode}' for daily mission {holder.getId()}.");
         }
 
-        _startHour = holder.getParams().getString("startHour", "");
-        _endHour = holder.getParams().getString("endHour", "");
+        TargetMode = targetMode;
+        string startHour = holder.getParams().getString("startHour", "");
+        string endHour = holder.getParams().getString("endHour", "");
+        if (!string.IsNullOrWhiteSpace(startHour) || !string.IsNullOrWhiteSpace(endHour))
+        {
+            if (!TimeSpan.TryParseExact(startHour, "hh\\:mm", CultureInfo.InvariantCulture, out TimeSpan start) ||
+                !TimeSpan.TryParseExact(endHour, "hh\\:mm", CultureInfo.InvariantCulture, out TimeSpan end))
+            {
+                throw new InvalidOperationException(
+                    $"Invalid time interval '{startHour}-{endHour}' for daily mission {holder.getId()}.");
+            }
+
+            _startTime = start;
+            _endTime = end;
+        }
     }
 
     public override void init()
     {
-        GlobalEvents.Monsters.Subscribe<OnAttackableKill>(this, onAttackableKill);
+        _evaluator.Register(this);
+        _registered = true;
     }
 
-    public override bool isAvailable(Player player)
+    public static string diagnoseKill(Player player, Attackable monster)
     {
-        DailyMissionPlayerEntry? entry = player.getDailyMissions().getEntry(getHolder().getId());
-        if (entry != null)
+        return _evaluator.Diagnose(player, monster);
+    }
+
+    internal bool IsEligible(Player player, Attackable monster, IReadOnlySet<string> originAreas,
+        DateTimeOffset occurredAt)
+    {
+        if (_excludedIds.Contains(monster.getId()) || player.getLevel() < _minLevel || player.getLevel() > _maxLevel ||
+            !CheckTimeInterval(occurredAt))
         {
-            switch (entry.getStatus())
+            return false;
+        }
+
+        bool targetMatch = DailyMissionMonsterRule.MatchesTarget(TargetMode, monster.getId(), _ids, originAreas,
+            _areas);
+
+        // The relative monster-level rule is deliberately restricted to generic hunting missions.
+        return targetMatch && (TargetMode != DailyMissionMonsterTargetMode.ANY ||
+            DailyMissionMonsterRule.MatchesGenericMonsterLevel(player.getLevel(), monster.getLevel(),
+                _minMonsterLevelOffset));
+    }
+
+    private bool CheckTimeInterval(DateTimeOffset occurredAt)
+    {
+        if (_startTime == null || _endTime == null)
+        {
+            return true;
+        }
+
+        TimeSpan time = occurredAt.ToLocalTime().TimeOfDay;
+        return _startTime <= _endTime
+            ? time >= _startTime && time < _endTime
+            : time >= _startTime || time < _endTime;
+    }
+
+    private static HashSet<int> ParseIntSet(string value)
+    {
+        HashSet<int> result = [];
+        foreach (string part in value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            result.Add(int.Parse(part, CultureInfo.InvariantCulture));
+        }
+
+        return result;
+    }
+
+    private static HashSet<string> ParseStringSet(string value)
+    {
+        return value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    public override void Dispose()
+    {
+        if (_registered)
+        {
+            _evaluator.Unregister(this);
+            _registered = false;
+        }
+
+        base.Dispose();
+    }
+
+    private sealed class DailyMissionMonsterKillEvaluator
+    {
+        private readonly object _syncRoot = new();
+        private readonly HashSet<MonsterDailyMissionHandler> _rules = [];
+        private KillIndex _index = KillIndex.Empty;
+
+        public DailyMissionMonsterKillEvaluator()
+        {
+            GlobalEvents.Global.Subscribe<OnAttackableKill>(this, OnKill);
+        }
+
+        public void Register(MonsterDailyMissionHandler rule)
+        {
+            lock (_syncRoot)
             {
-                case DailyMissionStatus.NOT_AVAILABLE: // Initial state
+                _rules.Add(rule);
+                RebuildIndexLocked();
+            }
+        }
+
+        public void Unregister(MonsterDailyMissionHandler rule)
+        {
+            lock (_syncRoot)
+            {
+                _rules.Remove(rule);
+                RebuildIndexLocked();
+            }
+        }
+
+		public string Diagnose(Player player, Attackable monster)
+		{
+			IReadOnlySet<string> areas = GetOriginAreas(monster);
+			MonsterDailyMissionHandler[] rules;
+			lock (_syncRoot)
+			{
+				rules = _rules.OrderBy(rule => rule.getHolder().getId()).ToArray();
+			}
+
+			DateTimeOffset now = DateTimeOffset.UtcNow;
+			string matched = string.Join(',', rules.Where(rule => rule.IsEligible(player, monster, areas, now))
+				.Select(rule => rule.getHolder().getId()));
+			return $"npcId={monster.getId()} type={monster.getTemplate().getType()} level={monster.getLevel()} " +
+				$"originAreas=[{string.Join(',', areas)}] playerLevel={player.getLevel()} matchedMissions=[{matched}]";
+		}
+
+        private void RebuildIndexLocked()
+        {
+            Dictionary<int, List<MonsterDailyMissionHandler>> byNpcId = [];
+            Dictionary<string, List<MonsterDailyMissionHandler>> byArea = new(StringComparer.OrdinalIgnoreCase);
+            ImmutableArray<MonsterDailyMissionHandler>.Builder generic = ImmutableArray.CreateBuilder<MonsterDailyMissionHandler>();
+
+            foreach (MonsterDailyMissionHandler rule in _rules)
+            {
+                if (rule.TargetMode == DailyMissionMonsterTargetMode.ANY)
                 {
-                    if (entry.getProgress() >= _amount)
+                    generic.Add(rule);
+                }
+
+                if (rule.TargetMode is DailyMissionMonsterTargetMode.NPC_IDS or
+                    DailyMissionMonsterTargetMode.NPC_IDS_OR_SPAWN_AREAS)
+                {
+                    foreach (int id in rule.Ids)
                     {
-                        entry.setStatus(DailyMissionStatus.AVAILABLE);
-                        player.getDailyMissions().storeEntry(entry);
+						if (!byNpcId.TryGetValue(id, out List<MonsterDailyMissionHandler>? rules))
+						{
+							byNpcId[id] = rules = [];
+						}
+
+						rules.Add(rule);
                     }
-
-                    break;
                 }
-                case DailyMissionStatus.AVAILABLE:
+
+                if (rule.TargetMode is DailyMissionMonsterTargetMode.SPAWN_AREAS or
+                    DailyMissionMonsterTargetMode.NPC_IDS_OR_SPAWN_AREAS)
                 {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private void onAttackableKill(OnAttackableKill @event)
-    {
-        Attackable monster = @event.getTarget();
-        if (!_ids.isEmpty() && !_ids.Contains(monster.getId()))
-        {
-            return;
-        }
-
-        Player? player = @event.getAttacker();
-        if (player == null)
-            return;
-
-        int monsterLevel = monster.getLevel();
-        if (_minLevel > 0 && (monsterLevel < _minLevel || monsterLevel > _maxLevel ||
-                player.getLevel() - monsterLevel > 15))
-        {
-            return;
-        }
-
-        if (checkTimeInterval() || (_startHour.equals("") && _endHour.equals("")))
-        {
-            Party? party = player.getParty();
-            if (party != null)
-            {
-                CommandChannel? channel = party.getCommandChannel();
-                List<Player> members = channel != null ? channel.getMembers() : party.getMembers();
-                foreach (Player member in members)
-                {
-                    if (member.getLevel() >= monsterLevel - 5 && member.Distance3D(monster) <= Config.Character.ALT_PARTY_RANGE)
+                    foreach (string area in rule.Areas)
                     {
-                        processPlayerProgress(member);
+						if (!byArea.TryGetValue(area, out List<MonsterDailyMissionHandler>? rules))
+						{
+							byArea[area] = rules = [];
+						}
+
+						rules.Add(rule);
                     }
                 }
             }
-            else
-            {
-                processPlayerProgress(player);
-            }
-        }
-    }
 
-    private void processPlayerProgress(Player player)
-    {
-        DailyMissionPlayerEntry entry = player.getDailyMissions().getOrCreateEntry(getHolder().getId());
-        if (entry.getStatus() == DailyMissionStatus.NOT_AVAILABLE)
+            _index = new KillIndex(
+                byNpcId.ToDictionary(x => x.Key, x => x.Value.ToImmutableArray()),
+                byArea.ToDictionary(x => x.Key, x => x.Value.ToImmutableArray(), StringComparer.OrdinalIgnoreCase),
+                generic.ToImmutable());
+        }
+
+        private void OnKill(OnAttackableKill @event)
         {
-            if (entry.increaseProgress() >= _amount)
+            Player? player = @event.getAttacker();
+            if (player == null)
             {
-                entry.setStatus(DailyMissionStatus.AVAILABLE);
+                return;
             }
 
-            player.getDailyMissions().storeEntry(entry);
-        }
-    }
+            Attackable monster = @event.getTarget();
+            IReadOnlySet<string> originAreas = GetOriginAreas(monster);
+            KillIndex index = _index;
+            HashSet<MonsterDailyMissionHandler> candidates = [..index.Generic];
+            if (index.ByNpcId.TryGetValue(monster.getId(), out ImmutableArray<MonsterDailyMissionHandler> idRules))
+            {
+                candidates.UnionWith(idRules);
+            }
 
-    private bool checkTimeInterval()
-    {
-        if (!_startHour.equals("") && !_endHour.equals(""))
+            foreach (string area in originAreas)
+            {
+                if (index.ByArea.TryGetValue(area, out ImmutableArray<MonsterDailyMissionHandler> areaRules))
+                {
+                    candidates.UnionWith(areaRules);
+                }
+            }
+
+            foreach (MonsterDailyMissionHandler rule in candidates)
+            {
+                if (rule.IsEligible(player, monster, originAreas, @event.getOccurredAt()))
+                {
+                    player.getDailyMissions().addProgress(rule.getHolder(), 1, @event.getOccurredAt());
+                }
+            }
+        }
+
+        private static IReadOnlySet<string> GetOriginAreas(Attackable monster)
         {
-            return TimeSpan.TryParseExact(_startHour, "HH:mm", CultureInfo.InvariantCulture, out _) &&
-                TimeSpan.TryParseExact(_endHour, "HH:mm", CultureInfo.InvariantCulture, out _);
+            Attackable? origin = monster;
+            while (origin != null)
+            {
+                Spawn? spawn = origin.getSpawn();
+                if (spawn != null)
+                {
+                    return spawn.getDailyMissionAreas();
+                }
+
+                origin = origin is Monster minion ? minion.getLeader() : null;
+            }
+
+            return ImmutableHashSet<string>.Empty;
         }
 
-        return false;
+        private sealed record KillIndex(
+            IReadOnlyDictionary<int, ImmutableArray<MonsterDailyMissionHandler>> ByNpcId,
+            IReadOnlyDictionary<string, ImmutableArray<MonsterDailyMissionHandler>> ByArea,
+            ImmutableArray<MonsterDailyMissionHandler> Generic)
+        {
+            public static readonly KillIndex Empty = new(
+                new Dictionary<int, ImmutableArray<MonsterDailyMissionHandler>>(),
+                new Dictionary<string, ImmutableArray<MonsterDailyMissionHandler>>(StringComparer.OrdinalIgnoreCase),
+                []);
+        }
     }
 }

@@ -38,17 +38,13 @@ public class SpiritDailyMissionHandler: AbstractDailyMissionHandler
 	
 	public override bool isAvailable(Player player)
 	{
-		DailyMissionPlayerEntry? entry = player.getDailyMissions().getEntry(getHolder().getId());
-		return entry != null && entry.getStatus() == DailyMissionStatus.AVAILABLE;
+		return base.isAvailable(player);
 	}
 	
 	private void onElementalSpiritLearn(OnPlayerElementalSpiritLearn @event)
 	{
 		Player player = @event.getPlayer();
-		DailyMissionPlayerEntry missionData = player.getDailyMissions().getOrCreateEntry(getHolder().getId());
-		missionData.setProgress(1);
-		missionData.setStatus(DailyMissionStatus.AVAILABLE);
-		player.getDailyMissions().storeEntry(missionData);
+		player.getDailyMissions().makeAvailable(getHolder());
 	}
 	
 	private void onElementalSpiritUpgrade(OnPlayerElementalSpiritUpgrade @event)
@@ -60,14 +56,7 @@ public class SpiritDailyMissionHandler: AbstractDailyMissionHandler
 		}
 		
 		Player player = @event.getPlayer();
-		DailyMissionPlayerEntry missionData = player.getDailyMissions().getOrCreateEntry(getHolder().getId());
-		missionData.setProgress(spirit.getStage());
-		if (missionData.getProgress() >= _amount)
-		{
-			missionData.setStatus(DailyMissionStatus.AVAILABLE);
-		}
-
-		player.getDailyMissions().storeEntry(missionData);
+		player.getDailyMissions().setProgress(getHolder(), spirit.getStage());
 	}
 	
 	private enum MissionKind

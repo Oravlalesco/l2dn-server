@@ -598,6 +598,7 @@ public struct EnterWorldPacket: IIncomingPacket<GameSession>
 
 		// Initial mission level progress for correct show RewardList.
 		player.getMissionLevelProgress();
+		DailyMissionData.getInstance().refreshPlayer(player);
 		connection.Send(new ExConnectedTimeAndGettableRewardPacket(player));
 		connection.Send(new ExOneDayReceiveRewardListPacket(player, true));
 

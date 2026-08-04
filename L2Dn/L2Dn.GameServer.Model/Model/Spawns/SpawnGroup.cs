@@ -2,6 +2,7 @@
 using L2Dn.GameServer.Model.Interfaces;
 using L2Dn.GameServer.Model.Zones.Types;
 using L2Dn.GameServer.Utilities;
+using System.Collections.Immutable;
 
 namespace L2Dn.GameServer.Model.Spawns;
 
@@ -13,11 +14,15 @@ public class SpawnGroup: ITerritorized, IParameterized<StatSet>
 	private readonly List<BannedSpawnTerritory> _bannedTerritories = [];
 	private readonly List<NpcSpawnTemplate> _spawns = [];
 	private readonly StatSet _parameters = new();
+	private readonly ImmutableHashSet<string> _dailyMissionAreas;
 
-	public SpawnGroup(string name, bool spawnByDefault)
+	public SpawnGroup(string name, bool spawnByDefault, IEnumerable<string>? inheritedDailyMissionAreas = null,
+		string? dailyMissionAreas = null, string? excludedDailyMissionAreas = null)
 	{
 		_name = name;
 		_spawnByDefault = spawnByDefault;
+		_dailyMissionAreas = DailyMissionAreaTags.Resolve(inheritedDailyMissionAreas, dailyMissionAreas,
+			excludedDailyMissionAreas);
 	}
 
 	public string getName()
@@ -28,6 +33,11 @@ public class SpawnGroup: ITerritorized, IParameterized<StatSet>
 	public bool isSpawningByDefault()
 	{
 		return _spawnByDefault;
+	}
+
+	public IReadOnlySet<string> getDailyMissionAreas()
+	{
+		return _dailyMissionAreas;
 	}
 
 	public void addSpawn(NpcSpawnTemplate template)
@@ -101,7 +111,7 @@ public class SpawnGroup: ITerritorized, IParameterized<StatSet>
 
 	public SpawnGroup clone()
 	{
-		SpawnGroup group = new SpawnGroup(_name, _spawnByDefault);
+		SpawnGroup group = new SpawnGroup(_name, _spawnByDefault, _dailyMissionAreas);
 
 		// Clone banned territories
 		foreach (BannedSpawnTerritory territory in getBannedTerritories())

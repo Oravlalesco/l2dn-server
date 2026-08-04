@@ -1311,6 +1311,28 @@ public abstract class Inventory: ItemContainer
 	 * Adds item to inventory for further adjustments and Equip it if necessary (itemlocation defined)
 	 * @param item : Item to be added from inventory
 	 */
+	public void applyCommittedDailyMissionRewards(IEnumerable<DbItem> createdItems,
+		IReadOnlyDictionary<int, long> stackIncrements, Player actor)
+	{
+		foreach ((int objectId, long count) in stackIncrements)
+		{
+			Item item = getItemByObjectId(objectId) ??
+				throw new InvalidOperationException($"Committed inventory stack {objectId} is not loaded.");
+			item.changeCount("Daily Mission Reward", count, actor, null);
+			item.setLastChange(ItemChangeType.MODIFIED);
+		}
+
+		foreach (DbItem record in createdItems)
+		{
+			Item item = new(record);
+			World.getInstance().addObject(item);
+			item.setLastChange(ItemChangeType.ADDED);
+			addItem(item);
+		}
+
+		refreshWeight();
+	}
+
 	protected override void addItem(Item item)
 	{
 		base.addItem(item);

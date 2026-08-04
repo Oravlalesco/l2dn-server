@@ -18,25 +18,23 @@ public class LoginMonthDailyMissionHandler: AbstractDailyMissionHandler
 	
 	public override bool isAvailable(Player player)
 	{
-		DailyMissionPlayerEntry? entry = player.getDailyMissions().getEntry(getHolder().getId());
-		return entry != null && entry.getStatus() == DailyMissionStatus.AVAILABLE;
+		return base.isAvailable(player);
 	}
 	
 	public override void init()
 	{
 		GlobalEvents.Global.Subscribe<OnPlayerLogin>(this, onPlayerLogin);
 	}
+
+	public override void refresh(Player player)
+	{
+		base.refresh(player);
+		player.getDailyMissions().makeAvailable(getHolder(), false);
+	}
 	
 	private void onPlayerLogin(OnPlayerLogin @event)
 	{
 		Player player = @event.getPlayer();
-		DailyMissionPlayerEntry entry = player.getDailyMissions().getOrCreateEntry(getHolder().getId());
-		if (entry.getStatus() != DailyMissionStatus.COMPLETED)
-		{
-			entry.setProgress(1);
-			entry.setStatus(DailyMissionStatus.AVAILABLE);
-		}
-		
-		player.getDailyMissions().storeEntry(entry);
+		player.getDailyMissions().makeAvailable(getHolder());
 	}
 }

@@ -9,6 +9,7 @@ public class DailyMissionPlayerEntry
     private DailyMissionStatus _status = DailyMissionStatus.NOT_AVAILABLE;
     private int _progress;
     private DateTime _lastCompleted;
+    private DateTime _cycleStart;
     private bool _recentlyCompleted;
 	
     public DailyMissionPlayerEntry(int objectId, int rewardId)
@@ -17,11 +18,13 @@ public class DailyMissionPlayerEntry
         _rewardId = rewardId;
     }
 	
-    public DailyMissionPlayerEntry(int objectId, int rewardId, DailyMissionStatus status, int progress, DateTime lastCompleted):this(objectId, rewardId)
+    public DailyMissionPlayerEntry(int objectId, int rewardId, DailyMissionStatus status, int progress,
+        DateTime lastCompleted, DateTime cycleStart):this(objectId, rewardId)
     {
         _status = status;
         _progress = progress;
         _lastCompleted = lastCompleted;
+        _cycleStart = cycleStart;
     }
 	
     public int getObjectId()
@@ -69,6 +72,16 @@ public class DailyMissionPlayerEntry
     {
         _lastCompleted = lastCompleted;
     }
+
+    public DateTime getCycleStart()
+    {
+        return _cycleStart;
+    }
+
+    public void setCycleStart(DateTime cycleStart)
+    {
+        _cycleStart = cycleStart;
+    }
 	
     public bool isRecentlyCompleted()
     {
@@ -78,5 +91,12 @@ public class DailyMissionPlayerEntry
     public void setRecentlyCompleted(bool recentlyCompleted)
     {
         _recentlyCompleted = recentlyCompleted;
+    }
+
+    public DailyMissionPlayerEntry copy()
+    {
+        DailyMissionPlayerEntry copy = new(_objectId, _rewardId, _status, _progress, _lastCompleted, _cycleStart);
+        copy.setRecentlyCompleted(_recentlyCompleted);
+        return copy;
     }
 }

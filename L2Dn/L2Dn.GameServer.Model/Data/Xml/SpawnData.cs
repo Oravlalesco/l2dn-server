@@ -35,18 +35,20 @@ public class SpawnData: DataReaderBase
 	public void load()
 	{
 		LoadXmlDocuments<XmlSpawnList>(DataFileLocation.Data, "spawns", true)
-			.SelectMany(t => t.Document.Spawns.Select(s => (t.FilePath, Spawn: s)))
-			.ForEach(t => LoadSpawn(t.FilePath, t.Spawn));
+			.SelectMany(t => t.Document.Spawns.Select(s => (t.FilePath, Spawn: s,
+				Areas: DailyMissionAreaTags.Resolve(null, t.Document.DailyMissionAreas,
+					t.Document.ExcludedDailyMissionAreas))))
+			.ForEach(t => LoadSpawn(t.FilePath, t.Spawn, t.Areas));
 
 		_logger.Info(GetType().Name + ": Loaded " +
 		             _spawns.Select(c => c.getGroups().Sum(gr => gr.getSpawns().Count)).Sum() + " spawns");
 	}
 
-	private void LoadSpawn(string filePath, XmlSpawn spawn)
+	private void LoadSpawn(string filePath, XmlSpawn spawn, IReadOnlySet<string> inheritedDailyMissionAreas)
 	{
 		try
 		{
-			parseSpawn(spawn, Path.GetFileNameWithoutExtension(filePath), _spawns);
+			parseSpawn(spawn, filePath, _spawns, inheritedDailyMissionAreas);
 		}
 		catch (Exception e)
 		{
@@ -179,9 +181,11 @@ public class SpawnData: DataReaderBase
 		return result;
 	}
 
-	internal void parseSpawn(XmlSpawn spawn, string fileName, ICollection<SpawnTemplate> spawns)
+	internal void parseSpawn(XmlSpawn spawn, string fileName, ICollection<SpawnTemplate> spawns,
+		IEnumerable<string>? inheritedDailyMissionAreas = null)
 	{
-		SpawnTemplate spawnTemplate = new(spawn.Name, spawn.Ai, spawn.SpawnByDefault, fileName);
+		SpawnTemplate spawnTemplate = new(spawn.Name, spawn.Ai, spawn.SpawnByDefault, fileName,
+			inheritedDailyMissionAreas, spawn.DailyMissionAreas, spawn.ExcludedDailyMissionAreas);
 		parseTerritories(spawn.Territories, fileName, spawnTemplate);
 
 		foreach (XmlSpawnGroup group in spawn.Groups)
@@ -190,7 +194,8 @@ public class SpawnData: DataReaderBase
 		if (spawn.Npcs.Count != 0)
 		{
 			// One static group for all npcs outside group scope
-			SpawnGroup defaultGroup = new(spawn.Name, spawn.SpawnByDefault);
+			SpawnGroup defaultGroup = new(spawn.Name, spawn.SpawnByDefault,
+				spawnTemplate.getDailyMissionAreas());
 			foreach (XmlSpawnNpc npc in spawn.Npcs)
 				parseNpc(npc, spawnTemplate, defaultGroup);
 
@@ -265,7 +270,8 @@ public class SpawnData: DataReaderBase
 
 	private void parseGroup(XmlSpawnGroup xmlGroup, SpawnTemplate spawnTemplate)
 	{
-		SpawnGroup group = new(xmlGroup.Name, xmlGroup.SpawnByDefault);
+		SpawnGroup group = new(xmlGroup.Name, xmlGroup.SpawnByDefault, spawnTemplate.getDailyMissionAreas(),
+			xmlGroup.DailyMissionAreas, xmlGroup.ExcludedDailyMissionAreas);
 		parseTerritories(xmlGroup.Territories, spawnTemplate.getFile(), group);
 		foreach (XmlSpawnNpc npc in xmlGroup.Npcs)
 			parseNpc(npc, spawnTemplate, group);

@@ -4,6 +4,7 @@ using L2Dn.GameServer.Model.Interfaces;
 using L2Dn.GameServer.Model.Quests;
 using L2Dn.GameServer.Model.Zones.Types;
 using L2Dn.GameServer.Utilities;
+using System.Collections.Immutable;
 
 namespace L2Dn.GameServer.Model.Spawns;
 
@@ -17,13 +18,18 @@ public class SpawnTemplate: ITerritorized, IParameterized<StatSet>
 	private List<BannedSpawnTerritory> _bannedTerritories = [];
 	private readonly List<SpawnGroup> _groups = [];
 	private StatSet _parameters = new();
+	private readonly ImmutableHashSet<string> _dailyMissionAreas;
 
-	public SpawnTemplate(string name, string ai, bool spawnByDefault, string filePath)
+	public SpawnTemplate(string name, string ai, bool spawnByDefault, string filePath,
+		IEnumerable<string>? inheritedDailyMissionAreas = null, string? dailyMissionAreas = null,
+		string? excludedDailyMissionAreas = null)
 	{
 		_name = name;
 		_ai = ai;
 		_spawnByDefault = spawnByDefault;
 		_filePath = filePath;
+		_dailyMissionAreas = DailyMissionAreaTags.Resolve(inheritedDailyMissionAreas, dailyMissionAreas,
+			excludedDailyMissionAreas);
 	}
 
 	public string getName()
@@ -44,6 +50,11 @@ public class SpawnTemplate: ITerritorized, IParameterized<StatSet>
 	public string getFile()
 	{
 		return _filePath;
+	}
+
+	public IReadOnlySet<string> getDailyMissionAreas()
+	{
+		return _dailyMissionAreas;
 	}
 
 	public void addTerritory(SpawnTerritory territory)
@@ -170,7 +181,7 @@ public class SpawnTemplate: ITerritorized, IParameterized<StatSet>
 
 	public SpawnTemplate clone()
 	{
-		SpawnTemplate template = new SpawnTemplate(_name, _ai, _spawnByDefault, _filePath);
+		SpawnTemplate template = new SpawnTemplate(_name, _ai, _spawnByDefault, _filePath, _dailyMissionAreas);
 
 		// Clone parameters
 		template.setParameters(_parameters);

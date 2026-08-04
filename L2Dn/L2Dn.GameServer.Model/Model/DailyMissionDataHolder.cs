@@ -5,13 +5,14 @@ using L2Dn.GameServer.Enums;
 using L2Dn.GameServer.Handlers;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Model.Holders;
+using L2Dn.GameServer.Model.DailyMissions;
 using L2Dn.GameServer.Utilities;
 using L2Dn.Model;
 using L2Dn.Model.Enums;
 
 namespace L2Dn.GameServer.Model;
 
-public class DailyMissionDataHolder
+public class DailyMissionDataHolder: IDisposable
 {
 	private readonly int _id;
 	private readonly ImmutableArray<CharacterClass> _classRestriction;
@@ -43,6 +44,15 @@ public class DailyMissionDataHolder
 		_rewardItems = rewardItems;
 		_params = handlerParams;
 		_handler = handlerFactory?.Invoke(this);
+		try
+		{
+			_handler?.init();
+		}
+		catch
+		{
+			_handler?.Dispose();
+			throw;
+		}
 	}
 
 	public int getId()
@@ -95,22 +105,41 @@ public class DailyMissionDataHolder
 		return _isDisplayedWhenNotAvailable;
 	}
 
-	public bool isDisplayable(Player player)
+	public MissionResetType getMissionResetType()
 	{
-		// Check if its main class only
+		return _missionResetType;
+	}
+
+	public bool isRecurring()
+	{
+		return _dailyReset && !_isOneTime;
+	}
+
+	public DateTime getCycleStartUtc(DateTimeOffset now)
+	{
+		return isRecurring()
+			? DailyMissionCycle.getCycleStartUtc(_missionResetType, now)
+			: DateTime.UnixEpoch;
+	}
+
+	public bool isEligible(Player player)
+	{
 		if (isMainClassOnly() && (player.isSubClassActive() || player.isDualClassActive()))
 		{
 			return false;
 		}
 
-		// Check if its dual class only.
 		if (isDualClassOnly() && !player.isDualClassActive())
 		{
 			return false;
 		}
 
-		// Check for specific class restrictions
-		if (!_classRestriction.IsDefaultOrEmpty && !_classRestriction.Contains(player.getClassId()))
+		return _classRestriction.IsDefaultOrEmpty || _classRestriction.Contains(player.getClassId());
+	}
+
+	public bool isDisplayable(Player player)
+	{
+		if (!isEligible(player))
 		{
 			return false;
 		}
@@ -130,6 +159,14 @@ public class DailyMissionDataHolder
 		if (_handler != null && isDisplayable(player))
 		{
 			_handler.requestReward(player);
+		}
+	}
+
+	public void refresh(Player player)
+	{
+		if (_handler != null && isEligible(player))
+		{
+			_handler.refresh(player);
 		}
 	}
 
@@ -159,24 +196,15 @@ public class DailyMissionDataHolder
 
 	public void reset()
 	{
-		if (_handler != null)
+		DateTimeOffset now = DateTimeOffset.Now;
+		foreach (Player player in World.getInstance().getPlayers())
 		{
-			if (_missionResetType == MissionResetType.WEEK && DateTime.Now.DayOfWeek == DayOfWeek.Monday)
-			{
-				_handler.reset();
-			}
-			else if (_missionResetType == MissionResetType.MONTH && DateTime.Now.Day == 1)
-			{
-				_handler.reset();
-			}
-			else if (_missionResetType == MissionResetType.WEEKEND && DateTime.Now.DayOfWeek == DayOfWeek.Saturday)
-			{
-				_handler.reset();
-			}
-			else if (_dailyReset)
-			{
-				_handler.reset();
-			}
+			player.getDailyMissions().resetExpired(now);
 		}
+	}
+
+	public void Dispose()
+	{
+		_handler?.Dispose();
 	}
 }

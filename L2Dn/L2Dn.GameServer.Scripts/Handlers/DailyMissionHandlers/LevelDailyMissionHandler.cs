@@ -28,28 +28,21 @@ public class LevelDailyMissionHandler: AbstractDailyMissionHandler
 	
 	public override bool isAvailable(Player player)
 	{
-		DailyMissionPlayerEntry? entry = player.getDailyMissions().getEntry(getHolder().getId());
-		if (entry != null)
+		if (player.getLevel() >= _level && player.isDualClassActive() == _dualclass)
 		{
-			switch (entry.getStatus())
-			{
-				case DailyMissionStatus.NOT_AVAILABLE:
-				{
-					if (player.getLevel() >= _level && player.isDualClassActive() == _dualclass)
-					{
-						entry.setStatus(DailyMissionStatus.AVAILABLE);
-						player.getDailyMissions().storeEntry(entry);
-					}
-					break;
-				}
-				case DailyMissionStatus.AVAILABLE:
-				{
-					return true;
-				}
-			}
+			player.getDailyMissions().makeAvailable(getHolder(), false);
 		}
-		
-		return false;
+
+		return base.isAvailable(player);
+	}
+
+	public override void refresh(Player player)
+	{
+		base.refresh(player);
+		if (player.getLevel() >= _level && player.isDualClassActive() == _dualclass)
+		{
+			player.getDailyMissions().makeAvailable(getHolder(), false);
+		}
 	}
 	
 	public override void reset()
@@ -67,12 +60,7 @@ public class LevelDailyMissionHandler: AbstractDailyMissionHandler
 		Player player = @event.getPlayer();
 		if (player.getLevel() >= _level && player.isDualClassActive() == _dualclass)
 		{
-			DailyMissionPlayerEntry entry = player.getDailyMissions().getOrCreateEntry(getHolder().getId());
-			if (entry.getStatus() == DailyMissionStatus.NOT_AVAILABLE)
-			{
-				entry.setStatus(DailyMissionStatus.AVAILABLE);
-				player.getDailyMissions().storeEntry(entry);
-			}
+			player.getDailyMissions().makeAvailable(getHolder());
 		}
 	}
 }

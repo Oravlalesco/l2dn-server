@@ -54,6 +54,7 @@ public class Spawn : IIdentifiable, IHasLocation
 	private readonly List<Npc> _spawnedNpcs = new();
     private bool _randomWalk; // Is no random walk
 	private NpcSpawnTemplate? _spawnTemplate;
+	private readonly HashSet<string> _dailyMissionAreas = new(StringComparer.OrdinalIgnoreCase);
 
 	/**
 	 * Constructor of Spawn.<br>
@@ -561,6 +562,34 @@ public class Spawn : IIdentifiable, IHasLocation
 	public void setSpawnTemplate(NpcSpawnTemplate npcSpawnTemplate)
 	{
 		_spawnTemplate = npcSpawnTemplate;
+	}
+
+	public void addDailyMissionArea(string area)
+	{
+		if (string.IsNullOrWhiteSpace(area))
+		{
+			throw new ArgumentException("Daily mission area cannot be empty.", nameof(area));
+		}
+
+		lock (_dailyMissionAreas)
+		{
+			_dailyMissionAreas.Add(area.Trim());
+		}
+	}
+
+	public IReadOnlySet<string> getDailyMissionAreas()
+	{
+		lock (_dailyMissionAreas)
+		{
+			HashSet<string> result = new(StringComparer.OrdinalIgnoreCase);
+			if (_spawnTemplate != null)
+			{
+				result.UnionWith(_spawnTemplate.getDailyMissionAreas());
+			}
+
+			result.UnionWith(_dailyMissionAreas);
+			return result;
+		}
 	}
 
 	public NpcSpawnTemplate? getNpcSpawnTemplate()
