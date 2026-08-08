@@ -103,7 +103,7 @@ public class NpcAiRuntimeTests
         TestWorldObject target = new(GetNextObjectId());
         RecordingCommandExecutor commands = new();
         NpcAiDependencies dependencies = new(new EmptyWorldQuery(), new EmptyGeoQuery(),
-            new EmptyThreatQuery(), commands);
+            new EmptyThreatQuery(), commands, new DeterministicRandomSource());
         AttackableAI ai = new(actor, dependencies);
 
         ai.setTarget(target);
@@ -235,5 +235,14 @@ public class NpcAiRuntimeTests
         public void PickUpDroppedItem(Attackable npc, Item item) => throw Unexpected();
 
         private static Exception Unexpected() => new InvalidOperationException("Unexpected command in test.");
+    }
+
+    private sealed class DeterministicRandomSource: INpcRandomSource
+    {
+        public int Next(int maxExclusive) => 0;
+        public int Next(int minInclusive, int maxExclusive) => minInclusive;
+        public bool NextBoolean() => false;
+        public T Pick<T>(IReadOnlyList<T> values) => values[0];
+        public T? PickOrDefault<T>(IReadOnlyList<T> values) => values.Count == 0 ? default : values[0];
     }
 }

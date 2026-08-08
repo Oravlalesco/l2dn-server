@@ -31,6 +31,7 @@ public class AttackableAI: CreatureAI
 	private readonly INpcGeoQuery _geoQuery;
 	private readonly INpcThreatQuery _threatQuery;
 	private readonly ILegacyNpcCommandExecutor _commands;
+	private readonly INpcRandomSource _random;
 
 	private const int RANDOM_WALK_RATE = 30; // confirmed
 	private const int MAX_ATTACK_TIMEOUT = 1200; // int ticks, i.e. 2min
@@ -60,6 +61,7 @@ public class AttackableAI: CreatureAI
 		_geoQuery = dependencies.Geo;
 		_threatQuery = dependencies.Threat;
 		_commands = dependencies.Commands;
+		_random = dependencies.Random;
 		_attackTimeout = int.MaxValue;
 		_globalAggro = -10; // 10 seconds timeout of ATTACK after respawn
 	}
@@ -430,7 +432,7 @@ public class AttackableAI: CreatureAI
 		}
 
 		// Chance to forget attackers after some time
-		if (npc.getCurrentHp() == npc.getMaxHp() && npc.getCurrentMp() == npc.getMaxMp() && !npc.getAttackByList().isEmpty() && Rnd.get(500) == 0)
+		if (npc.getCurrentHp() == npc.getMaxHp() && npc.getCurrentMp() == npc.getMaxMp() && !npc.getAttackByList().isEmpty() && _random.Next(500) == 0)
 		{
 			_commands.ClearCombatMemory(npc);
 		}
@@ -490,8 +492,8 @@ public class AttackableAI: CreatureAI
 
 			if (npc.DistanceSquare2D(leader) > offset * offset)
 			{
-				int x1 = Rnd.get(minRadius * 2, offset * 2); // x
-				int y1 = Rnd.get(x1, offset * 2); // distance
+				int x1 = _random.Next(minRadius * 2, offset * 2); // x
+				int y1 = _random.Next(x1, offset * 2); // distance
 				y1 = (int) Math.Sqrt(y1 * y1 - x1 * x1); // y
 				if (x1 > offset + minRadius)
 				{
@@ -513,7 +515,7 @@ public class AttackableAI: CreatureAI
 				// Move the actor to Location (x,y,z) server side AND client side by sending Server->Client packet MoveToLocation (broadcast)
 				_commands.MoveTo(this, new Location3D(x1, y1, leader.getZ()));
 			}
-			else if (Rnd.get(RANDOM_WALK_RATE) == 0)
+			else if (_random.Next(RANDOM_WALK_RATE) == 0)
 			{
 				foreach (Skill sk in npc.getTemplate().getAISkills(AISkillScope.BUFF))
 				{
@@ -527,7 +529,7 @@ public class AttackableAI: CreatureAI
 			}
 		}
 		// Order to the Monster to random walk (1/100)
-		else if (spawn != null && Rnd.get(RANDOM_WALK_RATE) == 0 && npc.isRandomWalkingEnabled())
+		else if (spawn != null && _random.Next(RANDOM_WALK_RATE) == 0 && npc.isRandomWalkingEnabled())
 		{
 			foreach (Skill sk in npc.getTemplate().getAISkills(AISkillScope.BUFF))
 			{
@@ -545,8 +547,8 @@ public class AttackableAI: CreatureAI
 			int z1 = spawn.Location.Z;
 			if (npc.IsInsideRadius2D(spawn, Config.Npc.MAX_DRIFT_RANGE))
 			{
-				int deltaX = Rnd.get(Config.Npc.MAX_DRIFT_RANGE * 2); // x
-				int deltaY = Rnd.get(deltaX, Config.Npc.MAX_DRIFT_RANGE * 2); // distance
+				int deltaX = _random.Next(Config.Npc.MAX_DRIFT_RANGE * 2); // x
+				int deltaY = _random.Next(deltaX, Config.Npc.MAX_DRIFT_RANGE * 2); // distance
 				deltaY = (int) Math.Sqrt(deltaY * deltaY - deltaX * deltaX); // y
 				x1 = deltaX + x1 - Config.Npc.MAX_DRIFT_RANGE;
 				y1 = deltaY + y1 - Config.Npc.MAX_DRIFT_RANGE;
@@ -761,7 +763,7 @@ public class AttackableAI: CreatureAI
 		List<Skill> aiSuicideSkills = template.getAISkills(AISkillScope.SUICIDE);
 		if (aiSuicideSkills.Count != 0 && (int)(npc.getCurrentHp() / npc.getMaxHp() * 100) < 30 && npc.hasSkillChance())
 		{
-			Skill skill = aiSuicideSkills.GetRandomElement();
+			Skill skill = _random.Pick(aiSuicideSkills);
 			if (SkillCaster.checkUseConditions(npc, skill) && checkSkillTarget(skill, target))
 			{
 				_commands.Cast(npc, skill);
@@ -775,14 +777,14 @@ public class AttackableAI: CreatureAI
 		// Note from Gnacik:
 		// On l2js because of that sometimes mobs don't attack player only running around player without any sense, so decrease chance for now.
 		int combinedCollision = collision + target.getTemplate().getCollisionRadius();
-		if (!npc.isMovementDisabled() && Rnd.get(100) <= 3)
+		if (!npc.isMovementDisabled() && _random.Next(100) <= 3)
 		{
 			foreach (Attackable nearby in _worldQuery.GetVisibleObjects<Attackable>(npc))
 			{
 				if (npc.IsInsideRadius2D(nearby, collision) && nearby != target)
 				{
-					int newX = combinedCollision + Rnd.get(40);
-					if (Rnd.nextBoolean())
+					int newX = combinedCollision + _random.Next(40);
+					if (_random.NextBoolean())
 					{
 						newX += target.getX();
 					}
@@ -790,8 +792,8 @@ public class AttackableAI: CreatureAI
 					{
 						newX = target.getX() - newX;
 					}
-					int newY = combinedCollision + Rnd.get(40);
-					if (Rnd.nextBoolean())
+					int newY = combinedCollision + _random.Next(40);
+					if (_random.NextBoolean())
 					{
 						newY += target.getY();
 					}
@@ -816,7 +818,7 @@ public class AttackableAI: CreatureAI
 		}
 
 		// Calculate Archer movement.
-		if (!npc.isMovementDisabled() && npc.getAiType() == AIType.ARCHER && Rnd.get(100) < 15)
+		if (!npc.isMovementDisabled() && npc.getAiType() == AIType.ARCHER && _random.Next(100) < 15)
 		{
 			double distance2 = npc.DistanceSquare2D(target);
 			if (Math.Sqrt(distance2) <= 60 + combinedCollision)
@@ -861,16 +863,16 @@ public class AttackableAI: CreatureAI
 			if (npc is RaidBoss && chaostime > Config.Npc.RAID_CHAOS_TIME)
 			{
 				double multiplier = ((Monster) npc).hasMinions() ? 200 : 100;
-				changeTarget = Rnd.get(100) <= 100 - npc.getCurrentHp() * multiplier / npc.getMaxHp();
+				changeTarget = _random.Next(100) <= 100 - npc.getCurrentHp() * multiplier / npc.getMaxHp();
 			}
 			else if (npc is GrandBoss && chaostime > Config.Npc.GRAND_CHAOS_TIME)
 			{
 				double chaosRate = 100 - npc.getCurrentHp() * 300 / npc.getMaxHp();
-				changeTarget = (chaosRate <= 10 && Rnd.get(100) <= 10) || (chaosRate > 10 && Rnd.get(100) <= chaosRate);
+				changeTarget = (chaosRate <= 10 && _random.Next(100) <= 10) || (chaosRate > 10 && _random.Next(100) <= chaosRate);
 			}
 			else if (chaostime > Config.Npc.MINION_CHAOS_TIME)
 			{
-				changeTarget = Rnd.get(100) <= 100 - npc.getCurrentHp() * 200 / npc.getMaxHp();
+				changeTarget = _random.Next(100) <= 100 - npc.getCurrentHp() * 200 / npc.getMaxHp();
 			}
 
 			if (changeTarget)
@@ -901,14 +903,14 @@ public class AttackableAI: CreatureAI
 			// First use the most important skill - heal. Even reconsider target.
 			if (template.getAISkills(AISkillScope.HEAL).Count != 0)
 			{
-				Skill healSkill = template.getAISkills(AISkillScope.HEAL).GetRandomElement();
+				Skill healSkill = _random.Pick(template.getAISkills(AISkillScope.HEAL));
 				if (SkillCaster.checkUseConditions(npc, healSkill))
 				{
 					Creature? healTarget = skillTargetReconsider(healSkill, false);
 					if (healTarget != null)
 					{
 						double healChance = (100 - healTarget.getCurrentHpPercent()) * 1.5; // Ensure heal chance is always 100% if HP is below 33%.
-						if (Rnd.get(100) < healChance && checkSkillTarget(healSkill, healTarget))
+						if (_random.Next(100) < healChance && checkSkillTarget(healSkill, healTarget))
 						{
 							setTarget(healTarget);
 							_commands.Cast(npc, healSkill);
@@ -922,7 +924,7 @@ public class AttackableAI: CreatureAI
 			// Then use the second most important skill - buff. Even reconsider target.
 			if (template.getAISkills(AISkillScope.BUFF).Count != 0)
 			{
-				Skill buffSkill = template.getAISkills(AISkillScope.BUFF).GetRandomElement();
+				Skill buffSkill = _random.Pick(template.getAISkills(AISkillScope.BUFF));
 				if (SkillCaster.checkUseConditions(npc, buffSkill))
 				{
 					Creature? buffTarget = skillTargetReconsider(buffSkill, true);
@@ -939,7 +941,7 @@ public class AttackableAI: CreatureAI
 			// Then try to immobolize target if moving.
 			if (target.isMoving() && template.getAISkills(AISkillScope.IMMOBILIZE).Count != 0)
 			{
-				Skill immobolizeSkill = template.getAISkills(AISkillScope.IMMOBILIZE).GetRandomElement();
+				Skill immobolizeSkill = _random.Pick(template.getAISkills(AISkillScope.IMMOBILIZE));
 				if (SkillCaster.checkUseConditions(npc, immobolizeSkill) && checkSkillTarget(immobolizeSkill, target))
 				{
 					_commands.Cast(npc, immobolizeSkill);
@@ -951,7 +953,7 @@ public class AttackableAI: CreatureAI
 			// Then try to mute target if he is casting.
 			if (target.isCastingNow() && template.getAISkills(AISkillScope.COT).Count != 0)
 			{
-				Skill muteSkill = template.getAISkills(AISkillScope.COT).GetRandomElement();
+				Skill muteSkill = _random.Pick(template.getAISkills(AISkillScope.COT));
 				if (SkillCaster.checkUseConditions(npc, muteSkill) && checkSkillTarget(muteSkill, target))
 				{
 					_commands.Cast(npc, muteSkill);
@@ -963,7 +965,7 @@ public class AttackableAI: CreatureAI
 			// Try cast short range skill.
 			if (npc.getShortRangeSkills().Count != 0 && npc.Distance2D(target) <= 150)
 			{
-				Skill shortRangeSkill = npc.getShortRangeSkills().GetRandomElement();
+				Skill shortRangeSkill = _random.Pick(npc.getShortRangeSkills());
 				if (SkillCaster.checkUseConditions(npc, shortRangeSkill) && checkSkillTarget(shortRangeSkill, target))
 				{
 					_commands.Cast(npc, shortRangeSkill);
@@ -975,7 +977,7 @@ public class AttackableAI: CreatureAI
 			// Try cast long range skill.
 			if (npc.getLongRangeSkills().Count != 0)
 			{
-				Skill longRangeSkill = npc.getLongRangeSkills().GetRandomElement();
+				Skill longRangeSkill = _random.Pick(npc.getLongRangeSkills());
 				if (SkillCaster.checkUseConditions(npc, longRangeSkill) && checkSkillTarget(longRangeSkill, target))
 				{
 					_commands.Cast(npc, longRangeSkill);
@@ -987,7 +989,7 @@ public class AttackableAI: CreatureAI
 			// Finally, if none succeed, try to cast any skill.
 			if (template.getAISkills(AISkillScope.GENERAL).Count != 0)
 			{
-				Skill generalSkill = template.getAISkills(AISkillScope.GENERAL).GetRandomElement();
+				Skill generalSkill = _random.Pick(template.getAISkills(AISkillScope.GENERAL));
 				if (SkillCaster.checkUseConditions(npc, generalSkill) && checkSkillTarget(generalSkill, target))
 				{
 					_commands.Cast(npc, generalSkill);
@@ -1188,7 +1190,7 @@ public class AttackableAI: CreatureAI
 		}
 
 		// Return any target.
-		return result.GetRandomElementOrDefault();
+		return _random.PickOrDefault(result);
 	}
 
 	private Creature? targetReconsider(bool randomTarget)
@@ -1219,7 +1221,7 @@ public class AttackableAI: CreatureAI
 
 			if (result.Count != 0)
 			{
-				return result.GetRandomElement();
+				return _random.Pick(result);
 			}
 		}
 
