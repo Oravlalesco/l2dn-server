@@ -1,17 +1,15 @@
 ﻿using System.Runtime.CompilerServices;
 using L2Dn.Events;
 using L2Dn.Extensions;
+using L2Dn.GameServer.AI.Runtime;
 using L2Dn.GameServer.Configuration;
 using L2Dn.GameServer.Enums;
-using L2Dn.GameServer.Geo;
-using L2Dn.GameServer.InstanceManagers;
 using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Model.Actor.Instances;
 using L2Dn.GameServer.Model.Actor.Templates;
 using L2Dn.GameServer.Model.Effects;
 using L2Dn.GameServer.Model.Events.Impl.Attackables;
-using L2Dn.GameServer.Model.Holders;
 using L2Dn.GameServer.Model.Items.Instances;
 using L2Dn.GameServer.Model.Skills;
 using L2Dn.GameServer.Model.Zones;
@@ -29,6 +27,10 @@ namespace L2Dn.GameServer.AI;
 public class AttackableAI: CreatureAI
 {
 	private static readonly Logger LOGGER = LogManager.GetLogger(nameof(AttackableAI));
+	private readonly INpcWorldQuery _worldQuery;
+	private readonly INpcGeoQuery _geoQuery;
+	private readonly INpcThreatQuery _threatQuery;
+	private readonly ILegacyNpcCommandExecutor _commands;
 
 	private const int RANDOM_WALK_RATE = 30; // confirmed
 	private const int MAX_ATTACK_TIMEOUT = 1200; // int ticks, i.e. 2min
@@ -48,8 +50,16 @@ public class AttackableAI: CreatureAI
 
 	private int chaostime;
 
-	public AttackableAI(Attackable attackable): base(attackable)
+	public AttackableAI(Attackable attackable): this(attackable, NpcAiDependencies.Legacy)
 	{
+	}
+
+	internal AttackableAI(Attackable attackable, NpcAiDependencies dependencies): base(attackable)
+	{
+		_worldQuery = dependencies.World;
+		_geoQuery = dependencies.Geo;
+		_threatQuery = dependencies.Threat;
+		_commands = dependencies.Commands;
 		_attackTimeout = int.MaxValue;
 		_globalAggro = -10; // 10 seconds timeout of ATTACK after respawn
 	}
@@ -108,12 +118,12 @@ public class AttackableAI: CreatureAI
 
 			if (me is Guard)
 			{
-				World.getInstance().forEachVisibleObjectInRange<Guard>(me, 500, guard =>
+				_worldQuery.ForEachVisibleObjectInRange<Guard>(me, 500, guard =>
 				{
 					if (guard.isAttackingNow() && guard.getTarget() == player)
 					{
-						me.getAI().startFollow(player);
-						me.addDamageHate(player, 0, 10);
+						_commands.StartFollow(me.getAI(), player);
+						_commands.AddThreat(me, player, 0, 10);
 					}
 				});
 				if (player.getReputation() < 0)
@@ -142,7 +152,7 @@ public class AttackableAI: CreatureAI
 			return false;
 		}
 
-		return target.isAutoAttackable(me) && GeoEngine.getInstance().canSeeTarget(me, target);
+		return target.isAutoAttackable(me) && _geoQuery.CanSeeTarget(me, target);
 	}
 
 	public void startAITask()
@@ -173,7 +183,7 @@ public class AttackableAI: CreatureAI
 			if (!npc.isAlikeDead())
 			{
 				// If its _knownPlayer isn't empty set the Intention to AI_INTENTION_ACTIVE
-				if (World.getInstance().getVisibleObjects<Player>(npc).Count != 0)
+				if (_worldQuery.GetVisibleObjects<Player>(npc).Count != 0)
 				{
 					intention = CtrlIntention.AI_INTENTION_ACTIVE;
 				}
@@ -218,7 +228,7 @@ public class AttackableAI: CreatureAI
 	protected override void onIntentionAttack(Creature target)
 	{
 		// Calculate the attack timeout
-		_attackTimeout = MAX_ATTACK_TIMEOUT + GameTimeTaskManager.getInstance().getGameTicks();
+		_attackTimeout = MAX_ATTACK_TIMEOUT + _worldQuery.GetWorldTick();
 
 		// Manage the Attack Intention : Stop current Attack (if necessary), Start a new Attack and Launch Think Event
 		base.onIntentionAttack(target);
@@ -241,8 +251,8 @@ public class AttackableAI: CreatureAI
 			return;
 		}
 
-		setIntention(CtrlIntention.AI_INTENTION_ACTIVE);
-		_actor.doCast(skill, _item, _forceUse, _dontMove);
+		_commands.SetIntention(this, CtrlIntention.AI_INTENTION_ACTIVE);
+		_commands.Cast(_actor, skill, _item, _forceUse, _dontMove);
 	}
 
 	/**
@@ -290,7 +300,7 @@ public class AttackableAI: CreatureAI
 				{
 					Creature? nearestTarget = null;
 					double closestDistance = double.MaxValue;
-					foreach (Creature t in World.getInstance().getVisibleObjectsInRange<Creature>(npc, npc.getAggroRange()))
+					foreach (Creature t in _worldQuery.GetVisibleObjectsInRange<Creature>(npc, npc.getAggroRange()))
 					{
 						if (t == _actor || t == null || t.isDead())
 						{
@@ -300,7 +310,7 @@ public class AttackableAI: CreatureAI
 							|| (Config.FakePlayers.FAKE_PLAYER_AGGRO_MONSTERS && t.isMonster() && !t.isFakePlayer()) //
 							|| (Config.FakePlayers.FAKE_PLAYER_AGGRO_PLAYERS && t.isPlayer()))
 						{
-							long hating = npc.getHating(t);
+							long hating = _threatQuery.GetHating(npc, t);
 							double distance = npc.Distance2D(t);
 							if (hating == 0 && closestDistance > distance)
 							{
@@ -311,7 +321,7 @@ public class AttackableAI: CreatureAI
 					}
 					if (nearestTarget != null)
 					{
-						npc.addDamageHate(nearestTarget, 0, 1);
+						_commands.AddThreat(npc, nearestTarget, 0, 1);
 					}
 				}
 				else if (!npc.isInCombat()) // must pick up items
@@ -322,37 +332,25 @@ public class AttackableAI: CreatureAI
 					{
 						if (npc.Distance2D(droppedItem) > 50)
 						{
-							moveTo(new Location3D(droppedItem.getX(), droppedItem.getY(), droppedItem.getZ()));
+							_commands.MoveTo(this, new Location3D(droppedItem.getX(), droppedItem.getY(), droppedItem.getZ()));
 						}
 						else
 						{
 							npc.getFakePlayerDrops().RemoveAt(itemIndex);
-							droppedItem.pickupMe(npc);
-							if (Config.General.SAVE_DROPPED_ITEM)
-							{
-								ItemsOnGroundManager.getInstance().removeObject(droppedItem);
-							}
-							if (droppedItem.getTemplate().hasExImmediateEffect())
-							{
-								foreach (ItemSkillHolder skillHolder in droppedItem.getTemplate().getAllSkills())
-								{
-									SkillCaster.triggerCast(npc, null, skillHolder.getSkill(), null, false);
-								}
-								npc.broadcastInfo(); // ? check if this is necessary
-							}
+							_commands.PickUpDroppedItem(npc, droppedItem);
 						}
 					}
 					else
 					{
 						npc.getFakePlayerDrops().RemoveAt(itemIndex);
 					}
-					npc.setRunning();
+					_commands.SetRunning(npc);
 				}
 			}
 			else if (npc.isAggressive() || npc is Guard)
 			{
 				int range = npc is Guard ? 500 : npc.getAggroRange(); // TODO Make sure how guards behave towards players.
-				World.getInstance().forEachVisibleObjectInRange<Creature>(npc, range, t =>
+				_worldQuery.ForEachVisibleObjectInRange<Creature>(npc, range, t =>
 				{
 					// For each Creature check if the target is autoattackable
 					if (isAggressiveTowards(t)) // check aggression
@@ -362,10 +360,10 @@ public class AttackableAI: CreatureAI
 						{
 							if (!npc.isFakePlayer() || (npc.isFakePlayer() && Config.FakePlayers.FAKE_PLAYER_AGGRO_FPC))
 							{
-								long hating = npc.getHating(t);
+								long hating = _threatQuery.GetHating(npc, t);
 								if (hating == 0)
 								{
-									npc.addDamageHate(t, 0, 0);
+									_commands.AddThreat(npc, t, 0, 0);
 								}
 							}
 						}
@@ -382,16 +380,17 @@ public class AttackableAI: CreatureAI
 							}
 
 							// Get the hate level of the Attackable against this Creature target contained in _aggroList
-							long hating = npc.getHating(t);
+							long hating = _threatQuery.GetHating(npc, t);
 
 							// Add the attacker to the Attackable _aggroList with 0 damage and 1 hate
 							if (hating == 0)
 							{
-								npc.addDamageHate(t, 0, 0);
+								_commands.AddThreat(npc, t, 0, 0);
 							}
 							if (npc is Guard)
 							{
-								World.getInstance().forEachVisibleObjectInRange<Guard>(npc, 500, guard => guard.addDamageHate(t, 0, 10));
+								_worldQuery.ForEachVisibleObjectInRange<Guard>(npc, 500,
+									guard => _commands.AddThreat(guard, t, 0, 10));
 							}
 						}
 					}
@@ -406,24 +405,24 @@ public class AttackableAI: CreatureAI
 			}
 			else
 			{
-				hated = npc.getMostHated();
+				hated = _threatQuery.GetMostHated(npc);
 			}
 
 			// Order to the Attackable to attack the target
 			if (hated != null && !npc.isCoreAIDisabled())
 			{
 				// Get the hate level of the Attackable against this Creature target contained in _aggroList
-				long aggro = npc.getHating(hated);
+				long aggro = _threatQuery.GetHating(npc, hated);
 				if (aggro + _globalAggro > 0)
 				{
 					// Set the Creature movement type to run and send Server->Client packet ChangeMoveType to all others Player
 					if (!npc.isRunning())
 					{
-						npc.setRunning();
+						_commands.SetRunning(npc);
 					}
 
 					// Set the AI Intention to AI_INTENTION_ATTACK
-					setIntention(CtrlIntention.AI_INTENTION_ATTACK, hated);
+					_commands.SetIntention(this, CtrlIntention.AI_INTENTION_ATTACK, hated);
 				}
 
 				return;
@@ -433,8 +432,7 @@ public class AttackableAI: CreatureAI
 		// Chance to forget attackers after some time
 		if (npc.getCurrentHp() == npc.getMaxHp() && npc.getCurrentMp() == npc.getMaxMp() && !npc.getAttackByList().isEmpty() && Rnd.get(500) == 0)
 		{
-			npc.clearAggroList();
-			npc.getAttackByList().clear();
+			_commands.ClearCombatMemory(npc);
 		}
 
 		// Check if the mob should not return to spawn point
@@ -453,8 +451,8 @@ public class AttackableAI: CreatureAI
                 target2.isInvisible() || (target2.isPlayer() && !Config.Npc.ATTACKABLES_CAMP_PLAYER_CORPSES &&
                     target2Player != null && target2Player.isAlikeDead())))
         {
-            npc.setWalking();
-            npc.returnHome();
+			_commands.SetWalking(npc);
+			_commands.ReturnHome(npc);
             return;
         }
 
@@ -483,11 +481,11 @@ public class AttackableAI: CreatureAI
 
 			if (leader.isRunning())
 			{
-				npc.setRunning();
+				_commands.SetRunning(npc);
 			}
 			else
 			{
-				npc.setWalking();
+				_commands.SetWalking(npc);
 			}
 
 			if (npc.DistanceSquare2D(leader) > offset * offset)
@@ -513,7 +511,7 @@ public class AttackableAI: CreatureAI
 				}
 
 				// Move the actor to Location (x,y,z) server side AND client side by sending Server->Client packet MoveToLocation (broadcast)
-				moveTo(new Location3D(x1, y1, leader.getZ()));
+				_commands.MoveTo(this, new Location3D(x1, y1, leader.getZ()));
 			}
 			else if (Rnd.get(RANDOM_WALK_RATE) == 0)
 			{
@@ -523,7 +521,7 @@ public class AttackableAI: CreatureAI
 					if (target != null)
 					{
 						setTarget(target);
-						npc.doCast(sk);
+						_commands.Cast(npc, sk);
 					}
 				}
 			}
@@ -537,7 +535,7 @@ public class AttackableAI: CreatureAI
 				if (target != null)
 				{
 					setTarget(target);
-					npc.doCast(sk);
+					_commands.Cast(npc, sk);
 					return;
 				}
 			}
@@ -559,11 +557,11 @@ public class AttackableAI: CreatureAI
 			Location3D loc = new(x1, y1, z1);
 			Location3D moveLoc = _actor.isFlying()
 				? loc
-				: GeoEngine.getInstance().getValidLocation(npc.Location.Location3D, loc, npc.getInstanceWorld());
+				: _geoQuery.GetValidLocation(npc.Location.Location3D, loc, npc.getInstanceWorld());
 
 			if (spawn.Distance2D(moveLoc) <= Config.Npc.MAX_DRIFT_RANGE)
 			{
-				moveTo(moveLoc);
+				_commands.MoveTo(this, moveLoc);
 			}
 		}
 	}
@@ -595,19 +593,17 @@ public class AttackableAI: CreatureAI
 				{
 					if (Config.Npc.AGGRO_DISTANCE_CHECK_RESTORE_LIFE)
 					{
-						npc.setCurrentHp(npc.getMaxHp());
-						npc.setCurrentMp(npc.getMaxMp());
+						_commands.RestoreFullHealth(npc);
 					}
-					npc.abortAttack();
-					npc.clearAggroList();
-					npc.getAttackByList().clear();
+					_commands.AbortAttack(npc);
+					_commands.ClearCombatMemory(npc);
 					if (npc.hasAI())
 					{
-						npc.getAI().setIntention(CtrlIntention.AI_INTENTION_MOVE_TO, spawn.Location.Location3D);
+						_commands.SetIntention(npc.getAI(), CtrlIntention.AI_INTENTION_MOVE_TO, spawn.Location.Location3D);
 					}
 					else
 					{
-						npc.teleToLocation(spawn.Location, true);
+						_commands.Teleport(npc, spawn.Location, true);
 					}
 
 					// Minions should return as well.
@@ -617,19 +613,17 @@ public class AttackableAI: CreatureAI
 						{
 							if (Config.Npc.AGGRO_DISTANCE_CHECK_RESTORE_LIFE)
 							{
-								minion.setCurrentHp(minion.getMaxHp());
-								minion.setCurrentMp(minion.getMaxMp());
+								_commands.RestoreFullHealth(minion);
 							}
-							minion.abortAttack();
-							minion.clearAggroList();
-							minion.getAttackByList().clear();
+							_commands.AbortAttack(minion);
+							_commands.ClearCombatMemory(minion);
 							if (minion.hasAI())
 							{
-								minion.getAI().setIntention(CtrlIntention.AI_INTENTION_MOVE_TO, spawn.Location.Location3D);
+								_commands.SetIntention(minion.getAI(), CtrlIntention.AI_INTENTION_MOVE_TO, spawn.Location.Location3D);
 							}
 							else
 							{
-								minion.teleToLocation(spawn.Location, true);
+								_commands.Teleport(minion, spawn.Location, true);
 							}
 						}
 					}
@@ -638,10 +632,10 @@ public class AttackableAI: CreatureAI
 			}
 		}
 
-		Creature? target = npc.getMostHated();
+		Creature? target = _threatQuery.GetMostHated(npc);
 		if (target == null)
 		{
-			setIntention(CtrlIntention.AI_INTENTION_ACTIVE);
+			_commands.SetIntention(this, CtrlIntention.AI_INTENTION_ACTIVE);
 			return;
 		}
 
@@ -654,34 +648,34 @@ public class AttackableAI: CreatureAI
 		if (target.isAlikeDead())
 		{
 			// Stop hating this target after the attack timeout or if target is dead
-			npc.stopHating(target);
+			_commands.StopHating(npc, target);
 			return;
 		}
 
-		if (_attackTimeout < GameTimeTaskManager.getInstance().getGameTicks())
+		if (_attackTimeout < _worldQuery.GetWorldTick())
 		{
 			// Set the AI Intention to AI_INTENTION_ACTIVE
-			setIntention(CtrlIntention.AI_INTENTION_ACTIVE);
+			_commands.SetIntention(this, CtrlIntention.AI_INTENTION_ACTIVE);
 
 			if (!_actor.isFakePlayer())
 			{
-				npc.setWalking();
+				_commands.SetWalking(npc);
 			}
 
 			// Monster teleport to spawn
 			if (npc.isMonster() && npc.getSpawn() is {} spawn && !npc.isInInstance() &&
-			    (npc.isInCombat() || World.getInstance().getVisibleObjects<Player>(npc).Count == 0))
+			    (npc.isInCombat() || _worldQuery.GetVisibleObjects<Player>(npc).Count == 0))
 			{
-				npc.teleToLocation(spawn.Location, false);
+				_commands.Teleport(npc, spawn.Location, false);
 			}
 
 			return;
 		}
 
 		// Actor should be able to see target.
-		if (!GeoEngine.getInstance().canSeeTarget(_actor, target))
+		if (!_geoQuery.CanSeeTarget(_actor, target))
 		{
-			moveTo(new Location3D(target.getX(), target.getY(), target.getZ()));
+			_commands.MoveTo(this, new Location3D(target.getX(), target.getY(), target.getZ()));
 			return;
 		}
 
@@ -711,7 +705,7 @@ public class AttackableAI: CreatureAI
 				}
 				if (targetExistsInAttackByList)
 				{
-					World.getInstance().forEachVisibleObjectInRange<Attackable>(npc, factionRange, nearby =>
+					_worldQuery.ForEachVisibleObjectInRange<Attackable>(npc, factionRange, nearby =>
 					{
 						// Don't call dead npcs, npcs without ai or npcs which are too far away.
 						if (nearby.isDead() || !nearby.hasAI() || Math.Abs(finalTarget.getZ() - nearby.getZ()) > 600)
@@ -747,8 +741,8 @@ public class AttackableAI: CreatureAI
 						}
 						else if (nearby.getAI().getIntention() != CtrlIntention.AI_INTENTION_ATTACK)
 						{
-							nearby.addDamageHate(finalTarget, 0, npc.getHating(finalTarget));
-							nearby.getAI().setIntention(CtrlIntention.AI_INTENTION_ATTACK, finalTarget);
+							_commands.AddThreat(nearby, finalTarget, 0, _threatQuery.GetHating(npc, finalTarget));
+							_commands.SetIntention(nearby.getAI(), CtrlIntention.AI_INTENTION_ATTACK, finalTarget);
 						}
 					});
 				}
@@ -770,7 +764,7 @@ public class AttackableAI: CreatureAI
 			Skill skill = aiSuicideSkills.GetRandomElement();
 			if (SkillCaster.checkUseConditions(npc, skill) && checkSkillTarget(skill, target))
 			{
-				npc.doCast(skill);
+				_commands.Cast(npc, skill);
 				//LOGGER.Info(this + " used suicide skill " + skill);
 				return;
 			}
@@ -783,7 +777,7 @@ public class AttackableAI: CreatureAI
 		int combinedCollision = collision + target.getTemplate().getCollisionRadius();
 		if (!npc.isMovementDisabled() && Rnd.get(100) <= 3)
 		{
-			foreach (Attackable nearby in World.getInstance().getVisibleObjects<Attackable>(npc))
+			foreach (Attackable nearby in _worldQuery.GetVisibleObjects<Attackable>(npc))
 			{
 				if (npc.IsInsideRadius2D(nearby, collision) && nearby != target)
 				{
@@ -811,10 +805,10 @@ public class AttackableAI: CreatureAI
 						int newZ = npc.getZ() + 30;
 
 						// Verify destination. Prevents wall collision issues and fixes monsters not avoiding obstacles.
-						Location3D loc = GeoEngine.getInstance().getValidLocation(npc.Location.Location3D,
+						Location3D loc = _geoQuery.GetValidLocation(npc.Location.Location3D,
 							new Location3D(newX, newY, newZ), npc.getInstanceWorld());
 
-						moveTo(loc);
+						_commands.MoveTo(this, loc);
 					}
 					return;
 				}
@@ -849,9 +843,9 @@ public class AttackableAI: CreatureAI
 				}
 
 				Location3D newLocation = new(posX, posY, posZ);
-				if (GeoEngine.getInstance().canMoveToTarget(npc.Location.Location3D, newLocation, npc.getInstanceWorld()))
+				if (_geoQuery.CanMoveToTarget(npc.Location.Location3D, newLocation, npc.getInstanceWorld()))
 				{
-					setIntention(CtrlIntention.AI_INTENTION_MOVE_TO, newLocation);
+					_commands.SetIntention(this, CtrlIntention.AI_INTENTION_MOVE_TO, newLocation);
 				}
 
 				return;
@@ -917,7 +911,7 @@ public class AttackableAI: CreatureAI
 						if (Rnd.get(100) < healChance && checkSkillTarget(healSkill, healTarget))
 						{
 							setTarget(healTarget);
-							npc.doCast(healSkill);
+							_commands.Cast(npc, healSkill);
 							//LOGGER.Info(this + " used heal skill " + healSkill + " with target " + getTarget());
 							return;
 						}
@@ -935,7 +929,7 @@ public class AttackableAI: CreatureAI
 					if (checkSkillTarget(buffSkill, buffTarget))
 					{
 						setTarget(buffTarget);
-						npc.doCast(buffSkill);
+						_commands.Cast(npc, buffSkill);
 						//LOGGER.Info(this + " used buff skill " + buffSkill + " with target " + getTarget());
 						return;
 					}
@@ -948,7 +942,7 @@ public class AttackableAI: CreatureAI
 				Skill immobolizeSkill = template.getAISkills(AISkillScope.IMMOBILIZE).GetRandomElement();
 				if (SkillCaster.checkUseConditions(npc, immobolizeSkill) && checkSkillTarget(immobolizeSkill, target))
 				{
-					npc.doCast(immobolizeSkill);
+					_commands.Cast(npc, immobolizeSkill);
 					//LOGGER.Info(this + " used immobolize skill " + immobolizeSkill + " with target " + getTarget());
 					return;
 				}
@@ -960,7 +954,7 @@ public class AttackableAI: CreatureAI
 				Skill muteSkill = template.getAISkills(AISkillScope.COT).GetRandomElement();
 				if (SkillCaster.checkUseConditions(npc, muteSkill) && checkSkillTarget(muteSkill, target))
 				{
-					npc.doCast(muteSkill);
+					_commands.Cast(npc, muteSkill);
 					//LOGGER.Info(this + " used mute skill " + muteSkill + " with target " + getTarget());
 					return;
 				}
@@ -972,7 +966,7 @@ public class AttackableAI: CreatureAI
 				Skill shortRangeSkill = npc.getShortRangeSkills().GetRandomElement();
 				if (SkillCaster.checkUseConditions(npc, shortRangeSkill) && checkSkillTarget(shortRangeSkill, target))
 				{
-					npc.doCast(shortRangeSkill);
+					_commands.Cast(npc, shortRangeSkill);
 					//LOGGER.Info(this + " used short range skill " + shortRangeSkill + " with target " + getTarget());
 					return;
 				}
@@ -984,7 +978,7 @@ public class AttackableAI: CreatureAI
 				Skill longRangeSkill = npc.getLongRangeSkills().GetRandomElement();
 				if (SkillCaster.checkUseConditions(npc, longRangeSkill) && checkSkillTarget(longRangeSkill, target))
 				{
-					npc.doCast(longRangeSkill);
+					_commands.Cast(npc, longRangeSkill);
 					//LOGGER.Info(this + " used long range skill " + longRangeSkill + " with target " + getTarget());
 					return;
 				}
@@ -996,7 +990,7 @@ public class AttackableAI: CreatureAI
 				Skill generalSkill = template.getAISkills(AISkillScope.GENERAL).GetRandomElement();
 				if (SkillCaster.checkUseConditions(npc, generalSkill) && checkSkillTarget(generalSkill, target))
 				{
-					npc.doCast(generalSkill);
+					_commands.Cast(npc, generalSkill);
 					//LOGGER.Info(this + " used general skill " + generalSkill + " with target " + getTarget());
 					return;
 				}
@@ -1027,7 +1021,7 @@ public class AttackableAI: CreatureAI
 		}
 
 		// Attacks target
-		_actor.doAutoAttack(target);
+		_commands.AutoAttack(_actor, target);
 	}
 
 	private bool checkSkillTarget(Skill skill, WorldObject? target)
@@ -1113,7 +1107,7 @@ public class AttackableAI: CreatureAI
 					return false;
 				}
 
-				if (!GeoEngine.getInstance().canSeeTarget(npc, target))
+				if (!_geoQuery.CanSeeTarget(npc, target))
 				{
 					return false;
 				}
@@ -1125,8 +1119,7 @@ public class AttackableAI: CreatureAI
 			}
 		}
 
-		// fixes monsters not avoiding obstacles
-		return true; // GeoEngine.getInstance().canMoveToTarget(npc.getX(), npc.getY(), npc.getZ(), target.getX(), target.getY(), target.getZ(), npc.getInstanceWorld());
+		return true;
 	}
 
 	private Creature? skillTargetReconsider(Skill skill, bool insideCastRange)
@@ -1147,7 +1140,7 @@ public class AttackableAI: CreatureAI
 		List<Creature> result = new();
 		if (isBad)
 		{
-			foreach (AggroInfo aggro in npc.getAggroList().Values)
+			foreach (AggroInfo aggro in _threatQuery.GetAggroEntries(npc))
 			{
 				if (checkSkillTarget(skill, aggro.getAttacker()))
 				{
@@ -1157,7 +1150,7 @@ public class AttackableAI: CreatureAI
 		}
 		else
 		{
-			foreach (Creature creature in World.getInstance().getVisibleObjectsInRange<Creature>(npc, range))
+			foreach (Creature creature in _worldQuery.GetVisibleObjectsInRange<Creature>(npc, range))
 			{
 				if (checkSkillTarget(skill, creature))
 				{
@@ -1204,7 +1197,7 @@ public class AttackableAI: CreatureAI
 		if (randomTarget)
 		{
 			List<Creature> result = new();
-			foreach (AggroInfo aggro in npc.getAggroList().Values)
+			foreach (AggroInfo aggro in _threatQuery.GetAggroEntries(npc))
 			{
 				if (checkTarget(aggro.getAttacker()))
 				{
@@ -1215,7 +1208,7 @@ public class AttackableAI: CreatureAI
 			// If npc is aggressive, add characters within aggro range too.
 			if (npc.isAggressive())
 			{
-				foreach (Creature creature in World.getInstance().getVisibleObjectsInRange<Creature>(npc, npc.getAggroRange()))
+				foreach (Creature creature in _worldQuery.GetVisibleObjectsInRange<Creature>(npc, npc.getAggroRange()))
 				{
 					if (checkTarget(creature))
 					{
@@ -1232,7 +1225,7 @@ public class AttackableAI: CreatureAI
 
 		long searchValue = long.MinValue;
 		Creature? creature1 = null;
-		foreach (AggroInfo aggro in npc.getAggroList().Values)
+		foreach (AggroInfo aggro in _threatQuery.GetAggroEntries(npc))
 		{
 			if (checkTarget(aggro.getAttacker()) && aggro.getHate() > searchValue)
 			{
@@ -1243,7 +1236,7 @@ public class AttackableAI: CreatureAI
 
 		if (creature1 == null && npc.isAggressive())
 		{
-			foreach (Creature nearby in World.getInstance().getVisibleObjectsInRange<Creature>(npc, npc.getAggroRange()))
+			foreach (Creature nearby in _worldQuery.GetVisibleObjectsInRange<Creature>(npc, npc.getAggroRange()))
 			{
 				if (checkTarget(nearby))
 				{
@@ -1306,6 +1299,7 @@ public class AttackableAI: CreatureAI
 		}
 		catch (Exception e)
 		{
+			NpcAiTelemetry.RecordThinkError(this, getIntention());
 			LOGGER.Error(GetType().Name + ": " + getActor().getName() + " - onEvtThink() failed: " + e);
 		}
 		finally
@@ -1331,7 +1325,7 @@ public class AttackableAI: CreatureAI
 		Attackable me = getActiveChar();
 		WorldObject? target = getTarget();
 		// Calculate the attack timeout
-		_attackTimeout = MAX_ATTACK_TIMEOUT + GameTimeTaskManager.getInstance().getGameTicks();
+		_attackTimeout = MAX_ATTACK_TIMEOUT + _worldQuery.GetWorldTick();
 
 		// Set the _globalAggro to 0 to permit attack even just after spawn
 		if (_globalAggro < 0)
@@ -1340,12 +1334,12 @@ public class AttackableAI: CreatureAI
 		}
 
 		// Add the attacker to the _aggroList of the actor
-		me.addDamageHate(attacker, 0, 1);
+		_commands.AddThreat(me, attacker, 0, 1);
 
 		// Set the Creature movement type to run and send Server->Client packet ChangeMoveType to all others Player
 		if (!me.isRunning())
 		{
-			me.setRunning();
+			_commands.SetRunning(me);
 		}
 
 		if (!getActiveChar().isCoreAIDisabled())
@@ -1353,11 +1347,11 @@ public class AttackableAI: CreatureAI
 			// Set the Intention to AI_INTENTION_ATTACK
 			if (getIntention() != CtrlIntention.AI_INTENTION_ATTACK)
 			{
-				setIntention(CtrlIntention.AI_INTENTION_ATTACK, attacker);
+				_commands.SetIntention(this, CtrlIntention.AI_INTENTION_ATTACK, attacker);
 			}
-			else if (me.getMostHated() != target)
+			else if (_threatQuery.GetMostHated(me) != target)
 			{
-				setIntention(CtrlIntention.AI_INTENTION_ATTACK, attacker);
+				_commands.SetIntention(this, CtrlIntention.AI_INTENTION_ATTACK, attacker);
 			}
 		}
 
@@ -1400,7 +1394,7 @@ public class AttackableAI: CreatureAI
 		if (target != null)
 		{
 			// Add the target to the actor _aggroList or update hate if already present
-			me.addDamageHate(target, 0, aggro);
+			_commands.AddThreat(me, target, 0, aggro);
 
 			// Set the actor AI Intention to AI_INTENTION_ATTACK
 			if (getIntention() != CtrlIntention.AI_INTENTION_ATTACK)
@@ -1408,10 +1402,10 @@ public class AttackableAI: CreatureAI
 				// Set the Creature movement type to run and send Server->Client packet ChangeMoveType to all others Player
 				if (!me.isRunning())
 				{
-					me.setRunning();
+					_commands.SetRunning(me);
 				}
 
-				setIntention(CtrlIntention.AI_INTENTION_ATTACK, target);
+				_commands.SetIntention(this, CtrlIntention.AI_INTENTION_ATTACK, target);
 			}
 
 			if (me.isMonster())
@@ -1446,7 +1440,7 @@ public class AttackableAI: CreatureAI
 	public override void setTarget(WorldObject? target)
 	{
 		// NPCs share their regular target with AI target.
-		_actor.setTarget(target);
+		_commands.SetTarget(_actor, target);
 	}
 
 	public override WorldObject? getTarget()

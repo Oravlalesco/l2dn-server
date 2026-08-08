@@ -2,6 +2,7 @@
 using L2Dn.Events;
 using L2Dn.Extensions;
 using L2Dn.GameServer.AI;
+using L2Dn.GameServer.AI.Runtime;
 using L2Dn.GameServer.Cache;
 using L2Dn.GameServer.Data.Xml;
 using L2Dn.GameServer.Enums;
@@ -3503,7 +3504,9 @@ public abstract class Creature: WorldObject, ISkillsHolder, IEventContainerProvi
 				if (!directMove && originalDistance - distance > 30 && !isControlBlocked() && !isInVehicle)
 				{
 					// Path calculation -- overrides previous movement check
-					move.geoPath = PathFinding.getInstance().findPath(curLoc, originalLoc, getInstanceWorld(), isPlayer());
+					string actorKind = isPlayer() ? "player" : isNpc() ? "npc" : "other";
+					move.geoPath = NpcAiTelemetry.ObservePathfinding(actorKind,
+						() => PathFinding.getInstance().findPath(curLoc, originalLoc, getInstanceWorld(), isPlayer()));
 
 					bool found = move.geoPath != null && move.geoPath.Count > 1;
 
@@ -3529,7 +3532,9 @@ public abstract class Creature: WorldObject, ISkillsHolder, IEventContainerProvi
 								double tempDistance = double.Hypot(sX - originalLoc.X, sY - originalLoc.Y);
 								if (tempDistance < shortDistance)
 								{
-									List<AbstractNodeLoc>? tempPath = PathFinding.getInstance().findPath(curLoc, new Location3D(sX, sY, originalLoc.Z), getInstanceWorld(), false);
+									List<AbstractNodeLoc>? tempPath = NpcAiTelemetry.ObservePathfinding(actorKind,
+										() => PathFinding.getInstance().findPath(curLoc,
+											new Location3D(sX, sY, originalLoc.Z), getInstanceWorld(), false));
 
 									if (tempPath != null && tempPath.Count > 1)
 									{

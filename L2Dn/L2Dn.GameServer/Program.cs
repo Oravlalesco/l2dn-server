@@ -2,6 +2,7 @@
 using L2Dn.GameServer.Configuration;
 using L2Dn.Utilities;
 using NLog;
+using OpenTelemetry.Metrics;
 
 Logger logger = LogManager.GetLogger(nameof(GameServer));
 
@@ -22,6 +23,8 @@ catch (Exception exception)
     logger.Fatal($"Exception during server start: {exception}");
     return;
 }
+
+using MeterProvider? telemetryProvider = TelemetryBootstrap.Start(logger);
 
 if (args is ["-UpdateDatabase"])
 {

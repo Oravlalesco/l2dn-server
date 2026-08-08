@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using L2Dn.GameServer.AI;
+using L2Dn.GameServer.AI.Runtime;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Utilities;
 using ThreadPool = L2Dn.GameServer.Utilities.ThreadPool;
@@ -43,7 +44,26 @@ public class AttackableThinkTaskManager
 					ai = attackable.getAI();
 					if (ai != null)
 					{
-						ai.onEvtThink();
+						CtrlIntention intention = ai.getIntention();
+						bool measure = NpcAiTelemetry.ThinkMeasurementsEnabled;
+						long startedAt = measure ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
+						long allocatedBytesBefore = measure ? GC.GetAllocatedBytesForCurrentThread() : 0;
+						try
+						{
+							ai.onEvtThink();
+						}
+						catch
+						{
+							NpcAiTelemetry.RecordThinkError(ai, intention);
+							throw;
+						}
+						finally
+						{
+							if (measure)
+							{
+								NpcAiTelemetry.RecordThink(ai, intention, startedAt, allocatedBytesBefore);
+							}
+						}
 					}
 					else
 					{
@@ -93,6 +113,11 @@ public class AttackableThinkTaskManager
 				return;
 			}
 		}
+	}
+
+	internal Attackable[] GetAttackablesSnapshot()
+	{
+		return POOLS.SelectMany(static pool => pool).ToArray();
 	}
 	
 	public static AttackableThinkTaskManager getInstance()
