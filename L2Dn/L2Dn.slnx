@@ -13,6 +13,7 @@
     <Project Path="Tests\L2Dn.GameServer.Model.Tests\L2Dn.GameServer.Model.Tests.csproj" Type="Classic C#" />
     <Project Path="Tests\L2Dn.GameServer.StaticData.Tests\L2Dn.GameServer.StaticData.Tests.csproj" Type="Classic C#" />
     <Project Path="Tests\L2Dn.Unsafe.Tests\L2Dn.Unsafe.Tests.csproj" Type="Classic C#" />
+    <Project Path="Tests\L2Dn.Npc.Contracts.Tests\L2Dn.Npc.Contracts.Tests.csproj" Type="Classic C#" />
   </Folder>
   <Folder Name="/Tools/">
     <Project Path="Tools\BuildDataPackDb\BuildDataPackDb.csproj" Type="Classic C#" />
@@ -36,6 +37,7 @@
   <Project Path="L2Dn.GameServer.StaticData\L2Dn.GameServer.StaticData.csproj" Type="Classic C#" />
   <Project Path="L2Dn.GameServer\L2Dn.GameServer.csproj" Type="Classic C#" />
   <Project Path="L2Dn.Model\L2Dn.Model.csproj" Type="Classic C#" />
+  <Project Path="L2Dn.Npc.Contracts\L2Dn.Npc.Contracts.csproj" Type="Classic C#" />
   <Project Path="L2Dn.Protocol\L2Dn.Protocol.csproj" Type="Classic C#" />
   <Project Path="L2Dn.Unsafe\L2Dn.Unsafe.csproj" Type="Classic C#" />
 </Solution>
