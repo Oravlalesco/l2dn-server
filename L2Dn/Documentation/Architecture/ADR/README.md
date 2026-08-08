@@ -14,3 +14,4 @@ This directory records the decisions that govern the NPC brain modernization pro
 | 008 | Inter-process contracts cannot depend on GameServer.Model |
 | 009 | Partitions use instance and region affinity |
 | 010 | World Director operates through directives and policies |
+| 011 | Entity keys encode NPC incarnation; non-NPC generation zero is best effort |
