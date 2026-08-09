@@ -123,6 +123,9 @@ public class NpcPerceptionContractTests
             {
                 Envelope = before.Envelope with { SchemaVersion = 2 }
             }, delta).Status.Should().Be(NpcPerceptionApplyStatus.SchemaMismatch);
+        NpcPerceptionDelta unknownMask = new(delta.Envelope, (NpcPerceptionChangeMask)(1 << 20),
+            null, null, null, null, null, [], [], []);
+        NpcPerceptionDeltaApplier.Apply(before, unknownMask).Status.Should().Be(NpcPerceptionApplyStatus.InvalidDelta);
     }
 
     [Fact]
@@ -175,6 +178,23 @@ public class NpcPerceptionContractTests
         batch.BatchSequence.Should().Be(4);
         batch.FullSnapshots.IsDefault.Should().BeFalse();
         batch.Deltas.IsDefault.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Replay_codec_round_trip_preserves_batch_and_format_version()
+    {
+        NpcPerceptionSnapshot snapshot = new(
+            new NpcPerceptionEnvelope(1, new NpcKey(7, 2), 10, 100, 1_000), CreateState());
+        NpcPerceptionRegionBatch batch = new(100, snapshot.State.Environment.Region, 3, 4, [snapshot], []);
+
+        byte[] payload = NpcPerceptionJsonCodec.Serialize(batch);
+        NpcPerceptionReplayRecord replay = NpcPerceptionJsonCodec.Deserialize(payload)!;
+
+        replay.FormatVersion.Should().Be(NpcPerceptionReplayRecord.CurrentFormatVersion);
+        replay.Batch.SourcePoolId.Should().Be(3);
+        replay.Batch.BatchSequence.Should().Be(4);
+        replay.Batch.FullSnapshots.Should().ContainSingle();
+        NpcPerceptionExactComparer.Instance.Equals(replay.Batch.FullSnapshots[0], snapshot).Should().BeTrue();
     }
 
     private static NpcPerceptionState CreateState()

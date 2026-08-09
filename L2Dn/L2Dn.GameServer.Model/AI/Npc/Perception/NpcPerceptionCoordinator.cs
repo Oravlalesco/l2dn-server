@@ -7,13 +7,15 @@ namespace L2Dn.GameServer.AI.Runtime;
 internal enum NpcPerceptionPublicationKind
 {
     None = 0,
-    Full = 1
+    Full = 1,
+    Delta = 2
 }
 
 internal sealed record NpcPerceptionCycle(
     NpcPerceptionSnapshot Snapshot,
     NpcPerceptionPublicationKind Publication,
-    bool SemanticStateChanged);
+    bool SemanticStateChanged,
+    NpcPerceptionDelta? Delta);
 
 internal sealed class NpcPerceptionCoordinator
 {
@@ -35,6 +37,8 @@ internal sealed class NpcPerceptionCoordinator
 
     public NpcPerceptionMode Mode => _options.Mode;
 
+    public void Remove(int objectId) => _published.TryRemove(objectId, out _);
+
     public NpcPerceptionCycle? Capture(Attackable actor)
     {
         if (_options.Mode == NpcPerceptionMode.Disabled)
@@ -44,6 +48,7 @@ internal sealed class NpcPerceptionCoordinator
 
         long startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        using System.Diagnostics.Activity? activity = NpcAiTelemetry.StartPerceptionActivity(_options.Mode);
         try
         {
             if (!_builder.TryCapture(actor, out NpcPerceptionCapture? capture) || capture == null)
@@ -61,14 +66,16 @@ internal sealed class NpcPerceptionCoordinator
                     published.Reset(capture.Npc);
                 }
 
-                bool changed = published.State == null ||
-                    !NpcPerceptionStateComparer.Instance.Equals(published.State, capture.State);
-                bool fullDue = published.State == null || IsPeriodicFullDue(capture, published);
-                NpcPerceptionPublicationKind publication = changed || fullDue
+                bool changed = published.Snapshot == null ||
+                    !NpcPerceptionStateComparer.Instance.Equals(published.Snapshot.State, capture.State);
+                bool fullDue = published.Snapshot == null || IsPeriodicFullDue(capture, published);
+                NpcPerceptionPublicationKind publication = fullDue
                     ? NpcPerceptionPublicationKind.Full
-                    : NpcPerceptionPublicationKind.None;
+                    : changed
+                        ? NpcPerceptionPublicationKind.Delta
+                        : NpcPerceptionPublicationKind.None;
                 long candidateRevision = published.Revision +
-                    (publication == NpcPerceptionPublicationKind.Full ? 1 : 0);
+                    (publication == NpcPerceptionPublicationKind.None ? 0 : 1);
                 if (!capture.TryCreateSnapshot(actor, candidateRevision, out NpcPerceptionSnapshot? snapshot) ||
                     snapshot == null)
                 {
@@ -76,11 +83,19 @@ internal sealed class NpcPerceptionCoordinator
                     return null;
                 }
 
-                // Revision and published state are committed only after lifecycle validation succeeds.
-                if (publication == NpcPerceptionPublicationKind.Full)
+                NpcPerceptionDelta? delta = publication == NpcPerceptionPublicationKind.Delta
+                    ? NpcPerceptionDiff.Create(published.Snapshot!, snapshot)
+                    : null;
+
+                // Revision and published state are committed only after lifecycle validation and diff succeed.
+                if (publication != NpcPerceptionPublicationKind.None)
                 {
                     published.Revision = candidateRevision;
-                    published.State = capture.State;
+                    published.Snapshot = snapshot;
+                }
+
+                if (publication == NpcPerceptionPublicationKind.Full)
+                {
                     published.LastFullMonotonicMilliseconds = capture.CaptureMonotonicMilliseconds;
                 }
 
@@ -89,9 +104,9 @@ internal sealed class NpcPerceptionCoordinator
                     NpcPerceptionValidator.Validate(actor, snapshot);
                 }
 
-                NpcAiTelemetry.RecordPerceptionCapture(snapshot, publication, changed, _options.Mode,
+                NpcAiTelemetry.RecordPerceptionCapture(snapshot, delta, publication, changed, _options.Mode,
                     startedAt, allocatedBefore);
-                return new NpcPerceptionCycle(snapshot, publication, changed);
+                return new NpcPerceptionCycle(snapshot, publication, changed, delta);
             }
         }
         catch
@@ -112,22 +127,23 @@ internal sealed class NpcPerceptionCoordinator
         long jitterWindow = (long)_options.FullSnapshotJitter.TotalMilliseconds;
         long jitter = jitterWindow <= 0
             ? 0
-            : (uint)HashCode.Combine(capture.Npc.ObjectId, capture.Npc.Generation) % jitterWindow;
-        return capture.CaptureMonotonicMilliseconds - published.LastFullMonotonicMilliseconds >= interval + jitter;
+            : (uint)HashCode.Combine(capture.Npc.ObjectId, capture.Npc.Generation) % jitterWindow - jitterWindow / 2;
+        long dueAfter = Math.Max(1, interval + jitter);
+        return capture.CaptureMonotonicMilliseconds - published.LastFullMonotonicMilliseconds >= dueAfter;
     }
 
     private sealed class PublishedState
     {
         public NpcKey Npc { get; private set; }
         public long Revision { get; set; }
-        public NpcPerceptionState? State { get; set; }
+        public NpcPerceptionSnapshot? Snapshot { get; set; }
         public long LastFullMonotonicMilliseconds { get; set; }
 
         public void Reset(NpcKey npc)
         {
             Npc = npc;
             Revision = 0;
-            State = null;
+            Snapshot = null;
             LastFullMonotonicMilliseconds = 0;
         }
     }

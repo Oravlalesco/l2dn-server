@@ -15,7 +15,13 @@ public static class NpcPerceptionDeltaApplier
             return new NpcPerceptionApplyResult(NpcPerceptionApplyStatus.GenerationMismatch, null);
         if (current.Envelope.StateRevision != delta.Envelope.BaseRevision)
             return new NpcPerceptionApplyResult(NpcPerceptionApplyStatus.RevisionGap, null);
+        const NpcPerceptionChangeMask allChanges = NpcPerceptionChangeMask.Identity |
+            NpcPerceptionChangeMask.Physical | NpcPerceptionChangeMask.Combat |
+            NpcPerceptionChangeMask.Environment | NpcPerceptionChangeMask.VisibleEntities |
+            NpcPerceptionChangeMask.Threats | NpcPerceptionChangeMask.Affordances |
+            NpcPerceptionChangeMask.SpatialObservations;
         if (delta.Envelope.Revision <= delta.Envelope.BaseRevision || delta.Changes == NpcPerceptionChangeMask.None ||
+            (delta.Changes & ~allChanges) != 0 ||
             !HasValidSections(delta))
             return new NpcPerceptionApplyResult(NpcPerceptionApplyStatus.InvalidDelta, null);
 
@@ -96,7 +102,7 @@ public static class NpcPerceptionDeltaApplier
         }
 
         VisibleEntity[] ordered = entities.Values.OrderBy(static entity => entity.ObservationOrdinal).ToArray();
-        if (ordered.Select(static entity => entity.ObservationOrdinal).Distinct().Count() != ordered.Length)
+        if (ordered.Where((entity, index) => entity.ObservationOrdinal != index).Any())
         {
             result = default;
             return false;

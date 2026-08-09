@@ -15,6 +15,7 @@ public class AttackableThinkTaskManager
 	private static readonly Set<Set<Attackable>> POOLS = new();
 	private const int POOL_SIZE = 1000;
 	private const int TASK_DELAY = 1000;
+	private static int _nextPoolId;
 	
 	protected AttackableThinkTaskManager()
 	{
@@ -23,10 +24,13 @@ public class AttackableThinkTaskManager
 	private class AttackableThink: Runnable
 	{
 		private readonly Set<Attackable> _attackables;
+		private readonly int _sourcePoolId;
+		private long _batchSequence;
 		
-		public AttackableThink(Set<Attackable> attackables)
+		public AttackableThink(Set<Attackable> attackables, int sourcePoolId)
 		{
 			_attackables = attackables;
+			_sourcePoolId = sourcePoolId;
 		}
 		
 		public void run()
@@ -39,6 +43,7 @@ public class AttackableThinkTaskManager
 			}
 			
 			CreatureAI ai;
+			List<NpcPerceptionCycle> perceptionPublications = [];
 			foreach (Attackable attackable in _attackables)
 			{
 				if (attackable.hasAI())
@@ -50,18 +55,26 @@ public class AttackableThinkTaskManager
 						bool measure = NpcAiTelemetry.ThinkMeasurementsEnabled;
 						long startedAt = measure ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
 						long allocatedBytesBefore = measure ? GC.GetAllocatedBytesForCurrentThread() : 0;
+						using System.Diagnostics.Activity? thinkActivity = NpcAiTelemetry.StartThinkActivity(ai, intention);
 						try
 						{
 							NpcPerceptionCoordinator coordinator = NpcPerceptionCoordinator.Instance;
 							NpcPerceptionCycle? perception = coordinator.Capture(attackable);
-							if (coordinator.Mode == NpcPerceptionMode.SnapshotRead && perception != null &&
-							    ai is AttackableAI attackableAi)
+							if (perception is { Publication: not NpcPerceptionPublicationKind.None })
 							{
-								attackableAi.onEvtThink(perception.Snapshot);
+								perceptionPublications.Add(perception);
 							}
-							else
+							using (NpcAiTelemetry.StartDecisionActivity(ai))
 							{
-								ai.onEvtThink();
+								if (coordinator.Mode == NpcPerceptionMode.SnapshotRead && perception != null &&
+								    ai is AttackableAI attackableAi)
+								{
+									attackableAi.onEvtThink(perception.Snapshot);
+								}
+								else
+								{
+									ai.onEvtThink();
+								}
 							}
 						}
 						catch
@@ -86,6 +99,13 @@ public class AttackableThinkTaskManager
 				{
 					_attackables.remove(attackable);
 				}
+			}
+
+			long batchSequence = Interlocked.Increment(ref _batchSequence);
+			foreach (L2Dn.NpcContracts.NpcPerceptionRegionBatch batch in
+			         NpcPerceptionBatchBuilder.Build(_sourcePoolId, batchSequence, perceptionPublications))
+			{
+				NpcPerceptionBatchHub.Publish(batch);
 			}
 
 			NpcAiTelemetry.RecordPoolIteration(_attackables.Count, poolStartedAt);
@@ -114,7 +134,8 @@ public class AttackableThinkTaskManager
 		
 		Set<Attackable> pool1 = new();
 		pool1.add(attackable);
-		ThreadPool.scheduleAtFixedRate(new AttackableThink(pool1), TASK_DELAY, TASK_DELAY); // TODO: high priority task
+		int sourcePoolId = Interlocked.Increment(ref _nextPoolId);
+		ThreadPool.scheduleAtFixedRate(new AttackableThink(pool1, sourcePoolId), TASK_DELAY, TASK_DELAY); // TODO: high priority task
 		POOLS.add(pool1);
 	}
 	
@@ -124,6 +145,7 @@ public class AttackableThinkTaskManager
 		{
 			if (pool.remove(attackable))
 			{
+				NpcPerceptionCoordinator.Instance.Remove(attackable.ObjectId);
 				return;
 			}
 		}

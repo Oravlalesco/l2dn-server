@@ -11,9 +11,12 @@ internal sealed class LegacyNpcThreatQuery: INpcThreatQuery
     {
     }
 
-    public long GetHating(Attackable npc, Creature target) => npc.getHating(target);
+    public long GetHating(Attackable npc, Creature target) =>
+        NpcAiTelemetry.ObserveThreatQuery("get_hating", () => npc.getHating(target));
 
-    public Creature? GetMostHated(Attackable npc) => npc.getMostHated();
+    public Creature? GetMostHated(Attackable npc) =>
+        NpcAiTelemetry.ObserveThreatQuery("get_most_hated", npc.getMostHated);
 
-    public IEnumerable<AggroInfo> GetAggroEntries(Attackable npc) => npc.getAggroList().Values;
+    public IEnumerable<AggroInfo> GetAggroEntries(Attackable npc) =>
+        NpcAiTelemetry.ObserveThreatQuery("get_aggro_entries", () => npc.getAggroList().Values);
 }

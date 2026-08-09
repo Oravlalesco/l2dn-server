@@ -10,6 +10,7 @@ using L2Dn.GameServer.Model.Items.Instances;
 using L2Dn.GameServer.Model.Skills;
 using L2Dn.Geometry;
 using L2Dn.NpcContracts;
+using System.Collections.Immutable;
 
 namespace L2Dn.GameServer.Model.Tests;
 
@@ -135,6 +136,28 @@ public class NpcAiRuntimeTests
     }
 
     [Fact]
+    public void Direct_scripted_spawns_receive_a_new_generation_without_spawn_manager()
+    {
+        PassiveTestAttackable actor = new(CreateNpcTemplate());
+        try
+        {
+            actor.spawnMe(new Location3D(100, 100, 0));
+            actor.getSpawnGeneration().Should().Be(1);
+            actor.decayMe();
+
+            actor.spawnMe(new Location3D(110, 110, 0));
+            actor.getSpawnGeneration().Should().Be(2);
+        }
+        finally
+        {
+            if (actor.isSpawned())
+            {
+                actor.decayMe();
+            }
+        }
+    }
+
+    [Fact]
     public void Perception_builder_copies_state_and_remains_observationally_pure()
     {
         Attackable actor = CreateSpawnedAttackable();
@@ -211,6 +234,37 @@ public class NpcAiRuntimeTests
     }
 
     [Fact]
+    public async Task Perception_capture_tolerates_concurrent_weakly_consistent_world_mutation()
+    {
+        Attackable actor = CreateSpawnedAttackable();
+        Attackable firstTarget = CreateSpawnedAttackable();
+        Attackable secondTarget = CreateSpawnedAttackable();
+        List<WorldObject> visible = [firstTarget, secondTarget];
+        NpcPerceptionBuilder builder = new(new TestWorldQuery(visible, 1), new TestGeoQuery(),
+            LegacyNpcThreatQuery.Instance, new TestClock(1));
+
+        Task mutator = Task.Run(() =>
+        {
+            for (int index = 0; index < 2_000; index++)
+            {
+                Attackable target = (index & 1) == 0 ? firstTarget : secondTarget;
+                actor.setTarget(target);
+                actor.addDamageHate(target, 0, 1);
+                if (index % 3 == 0)
+                {
+                    actor.stopHating(target);
+                }
+            }
+        });
+
+        for (int index = 0; index < 200; index++)
+        {
+            builder.TryCapture(actor, out _).Should().BeTrue();
+        }
+        await mutator;
+    }
+
+    [Fact]
     public void Perception_coordinator_advances_revision_only_for_publications_and_resets_on_generation()
     {
         Attackable actor = CreateSpawnedAttackable();
@@ -229,8 +283,12 @@ public class NpcAiRuntimeTests
         first.Snapshot.Envelope.StateRevision.Should().Be(1);
         unchanged.Publication.Should().Be(NpcPerceptionPublicationKind.None);
         unchanged.Snapshot.Envelope.StateRevision.Should().Be(1);
-        changed.Publication.Should().Be(NpcPerceptionPublicationKind.Full);
+        changed.Publication.Should().Be(NpcPerceptionPublicationKind.Delta);
         changed.Snapshot.Envelope.StateRevision.Should().Be(2);
+        changed.Delta.Should().NotBeNull();
+        NpcPerceptionExactComparer.Instance.Equals(
+            NpcPerceptionDeltaApplier.Apply(first.Snapshot, changed.Delta!).Snapshot,
+            changed.Snapshot).Should().BeTrue();
 
         actor.beginRespawnLifecycle();
         actor.onRespawn();
@@ -264,6 +322,73 @@ public class NpcAiRuntimeTests
     }
 
     [Fact]
+    public void Batch_builder_groups_partial_updates_by_region_and_preserves_source_identity()
+    {
+        Attackable actor = CreateSpawnedAttackable();
+        NpcPerceptionCoordinator coordinator = new(
+            new NpcPerceptionBuilder(new TestWorldQuery([], 9), new TestGeoQuery(), new FixedThreatQuery([]),
+                new TestClock(1)),
+            new NpcPerceptionOptions(NpcPerceptionMode.CaptureOnly, TimeSpan.Zero, TimeSpan.Zero));
+        NpcPerceptionCycle full = coordinator.Capture(actor)!;
+        actor.setXYZ(1, 2, 3);
+        NpcPerceptionCycle delta = coordinator.Capture(actor)!;
+
+        ImmutableArray<NpcPerceptionRegionBatch> batches =
+            NpcPerceptionBatchBuilder.Build(12, 34, [full, delta]);
+
+        NpcPerceptionRegionBatch batch = batches.Should().ContainSingle().Which;
+        batch.SourcePoolId.Should().Be(12);
+        batch.BatchSequence.Should().Be(34);
+        batch.WorldTick.Should().Be(9);
+        batch.FullSnapshots.Should().ContainSingle();
+        batch.Deltas.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Batch_hub_isolates_failed_non_authoritative_consumers()
+    {
+        bool secondConsumerCalled = false;
+        Action<NpcPerceptionRegionBatch> failing = static _ => throw new InvalidOperationException("consumer failed");
+        Action<NpcPerceptionRegionBatch> succeeding = _ => secondConsumerCalled = true;
+        NpcPerceptionBatchHub.Published += failing;
+        NpcPerceptionBatchHub.Published += succeeding;
+        try
+        {
+            NpcPerceptionBatchHub.Publish(new NpcPerceptionRegionBatch(1, default, 1, 1, [], []));
+        }
+        finally
+        {
+            NpcPerceptionBatchHub.Published -= failing;
+            NpcPerceptionBatchHub.Published -= succeeding;
+        }
+
+        secondConsumerCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Replica_detects_out_of_order_delta_and_requires_full_recovery()
+    {
+        Attackable actor = CreateSpawnedAttackable();
+        NpcPerceptionCoordinator coordinator = new(
+            new NpcPerceptionBuilder(new TestWorldQuery([], 1), new TestGeoQuery(), new FixedThreatQuery([]),
+                new TestClock(1)),
+            new NpcPerceptionOptions(NpcPerceptionMode.CaptureOnly, TimeSpan.Zero, TimeSpan.Zero));
+        NpcPerceptionCycle full = coordinator.Capture(actor)!;
+        actor.setXYZ(1, 2, 3);
+        NpcPerceptionCycle delta = coordinator.Capture(actor)!;
+        NpcPerceptionReplica replica = new();
+
+        replica.ApplyFull(full.Snapshot).Status.Should().Be(NpcPerceptionReplicaStatus.Applied);
+        replica.ApplyDelta(delta.Delta!).Status.Should().Be(NpcPerceptionReplicaStatus.Applied);
+        NpcPerceptionReplicaResult duplicate = replica.ApplyDelta(delta.Delta!);
+
+        duplicate.Status.Should().Be(NpcPerceptionReplicaStatus.FullSnapshotRequired);
+        duplicate.DeltaStatus.Should().Be(NpcPerceptionApplyStatus.RevisionGap);
+        replica.GetCurrent(actor.ObjectId).Should().BeNull();
+        replica.ApplyFull(delta.Snapshot).Status.Should().Be(NpcPerceptionReplicaStatus.Applied);
+    }
+
+    [Fact]
     public void Snapshot_read_resolves_current_target_only_at_the_legacy_edge()
     {
         Attackable actor = CreateSpawnedAttackable();
@@ -277,10 +402,46 @@ public class NpcAiRuntimeTests
         TargetReadingAttackableAI ai = new(actor, new NpcAiDependencies(new EmptyWorldQuery(), new EmptyGeoQuery(),
             new EmptyThreatQuery(), new RecordingCommandExecutor(), new DeterministicRandomSource(), resolver));
 
+        ai.onEvtThink();
+        WorldObject? legacyTarget = ai.ObservedTarget;
         ai.onEvtThink(snapshot!);
 
+        legacyTarget.Should().BeSameAs(target);
         ai.ObservedTarget.Should().BeSameAs(target);
         resolver.ResolveCalls.Should().Be(1);
+    }
+
+    [Fact]
+    public void Npc_trace_nests_perception_queries_and_decision_under_think()
+    {
+        List<(string Name, string? Id, string? ParentId)> started = [];
+        using ActivityListener listener = new();
+        listener.ShouldListenTo = source => source.Name == NpcAiTelemetry.ActivitySourceName;
+        listener.Sample = static (ref ActivityCreationOptions<ActivityContext> _) =>
+            ActivitySamplingResult.AllData;
+        listener.ActivityStarted = activity => started.Add((activity.OperationName, activity.Id, activity.ParentId));
+        ActivitySource.AddActivityListener(listener);
+        Attackable actor = CreateAttackable();
+        CreatureAI ai = new(actor);
+
+        using (Activity? think = NpcAiTelemetry.StartThinkActivity(ai, CtrlIntention.AI_INTENTION_ACTIVE))
+        {
+            using (NpcAiTelemetry.StartPerceptionActivity(NpcPerceptionMode.CaptureOnly))
+            {
+                NpcAiTelemetry.ObserveWorldQuery("test", typeof(WorldObject), static () => true);
+            }
+            using (NpcAiTelemetry.StartDecisionActivity(ai))
+            {
+                NpcAiTelemetry.ObserveCommand("test", static () => { });
+            }
+        }
+
+        started.Select(static item => item.Name).Should().ContainInOrder(
+            "npc.think", "npc.perception.capture", "npc.world.query", "npc.decision", "npc.command.execute");
+        string? thinkId = started.Single(item => item.Name == "npc.think").Id;
+        started.Single(item => item.Name == "npc.think").ParentId.Should().BeNull();
+        started.Single(item => item.Name == "npc.perception.capture").ParentId.Should().Be(thinkId);
+        started.Single(item => item.Name == "npc.decision").ParentId.Should().Be(thinkId);
     }
 
     [Theory]
@@ -346,13 +507,18 @@ public class NpcAiRuntimeTests
 
     private static Attackable CreateAttackable()
     {
+        return new Attackable(CreateNpcTemplate());
+    }
+
+    private static NpcTemplate CreateNpcTemplate()
+    {
         StatSet set = new();
         set.set("id", Interlocked.Increment(ref _nextTemplateId));
         set.set("type", "Monster");
         set.set("name", "Test NPC");
         set.set("baseHpMax", 100d);
         set.set("baseMpMax", 100d);
-        return new Attackable(new NpcTemplate(set));
+        return new NpcTemplate(set);
     }
 
     private static Attackable CreateSpawnedAttackable()
@@ -477,6 +643,13 @@ public class NpcAiRuntimeTests
     {
         public WorldObject? ObservedTarget { get; private set; }
         public override void onEvtThink() => ObservedTarget = getTarget();
+    }
+
+    private sealed class PassiveTestAttackable(NpcTemplate template): Attackable(template)
+    {
+        public override void onSpawn()
+        {
+        }
     }
 
     private sealed class RecordingCommandExecutor: ILegacyNpcCommandExecutor

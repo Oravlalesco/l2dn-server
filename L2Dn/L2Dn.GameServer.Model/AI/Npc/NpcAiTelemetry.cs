@@ -10,8 +10,10 @@ namespace L2Dn.GameServer.AI.Runtime;
 public static class NpcAiTelemetry
 {
     public const string MeterName = "L2Dn.GameServer.NpcAI";
+    public const string ActivitySourceName = "L2Dn.GameServer.NpcAI";
 
     private static readonly Meter Meter = new(MeterName, "1.0.0");
+    private static readonly ActivitySource Activities = new(ActivitySourceName, "1.0.0");
 
     private static readonly Counter<long> ThinkCalls =
         Meter.CreateCounter<long>("l2dn.npc.think.calls", "{call}", "NPC AI think callbacks executed.");
@@ -70,6 +72,18 @@ public static class NpcAiTelemetry
     private static readonly Counter<long> PerceptionFullSnapshots =
         Meter.CreateCounter<long>("l2dn.npc.perception.full.count", "{snapshot}", "Full NPC perception snapshots published.");
 
+    private static readonly Counter<long> PerceptionDeltas =
+        Meter.CreateCounter<long>("l2dn.npc.perception.delta.count", "{delta}", "NPC perception deltas published.");
+
+    private static readonly Histogram<long> PerceptionDeltaBytes =
+        Meter.CreateHistogram<long>("l2dn.npc.perception.delta.bytes", "By", "Estimated logical NPC perception delta size.");
+
+    private static readonly Histogram<double> PerceptionCompressionRatio =
+        Meter.CreateHistogram<double>("l2dn.npc.perception.compression_ratio", "1", "Estimated delta-to-full logical payload ratio.");
+
+    private static readonly Counter<long> PerceptionRevisionGaps =
+        Meter.CreateCounter<long>("l2dn.npc.perception.revision_gap", "{gap}", "NPC perception delta revision gaps detected.");
+
     private static readonly Counter<long> PerceptionCaptureFailures =
         Meter.CreateCounter<long>("l2dn.npc.perception.capture.failures", "{failure}", "NPC perception captures rejected or failed.");
 
@@ -84,6 +98,18 @@ public static class NpcAiTelemetry
 
     private static readonly Counter<long> PoolIterationOverruns =
         Meter.CreateCounter<long>("l2dn.npc.scheduler.pool_iteration.overrun", "{overrun}", "Legacy NPC scheduler pool iterations exceeding their one-second cadence.");
+
+    private static readonly Counter<long> PerceptionBatches =
+        Meter.CreateCounter<long>("l2dn.npc.perception.batch.count", "{batch}", "Partial region perception batches published in process.");
+
+    private static readonly Counter<long> PerceptionBatchConsumerFailures =
+        Meter.CreateCounter<long>("l2dn.npc.perception.batch.consumer_failures", "{failure}", "Failures isolated from in-process perception batch consumers.");
+
+    private static readonly Counter<long> PerceptionReplayDrops =
+        Meter.CreateCounter<long>("l2dn.npc.perception.replay.dropped", "{batch}", "Replay batches dropped to keep the scheduler non-blocking.");
+
+    private static readonly Counter<long> PerceptionReplayFailures =
+        Meter.CreateCounter<long>("l2dn.npc.perception.replay.failures", "{failure}", "Replay recorder initialization or write failures.");
 
     private static readonly object SnapshotLock = new();
     private static StateSnapshot _snapshot = StateSnapshot.Empty;
@@ -108,6 +134,19 @@ public static class NpcAiTelemetry
     internal static bool ThinkMeasurementsEnabled =>
         ThinkCalls.Enabled || ThinkBusyTime.Enabled || ThinkDuration.Enabled || ThinkAllocations.Enabled;
 
+    internal static Activity? StartThinkActivity(CreatureAI ai, CtrlIntention intention) =>
+        Activities.StartActivity("npc.think", ActivityKind.Internal, default(ActivityContext),
+            [new KeyValuePair<string, object?>("ai_type", ai.GetType().Name),
+                new KeyValuePair<string, object?>("intention", intention.ToString())]);
+
+    internal static Activity? StartPerceptionActivity(NpcPerceptionMode mode) =>
+        Activities.StartActivity("npc.perception.capture", ActivityKind.Internal, default(ActivityContext),
+            [new KeyValuePair<string, object?>("mode", mode.ToString())]);
+
+    internal static Activity? StartDecisionActivity(CreatureAI ai) =>
+        Activities.StartActivity("npc.decision", ActivityKind.Internal, default(ActivityContext),
+            [new KeyValuePair<string, object?>("ai_type", ai.GetType().Name)]);
+
     internal static void RecordThink(CreatureAI ai, CtrlIntention intention, long startedAt, long allocatedBytesBefore)
     {
         double elapsedSeconds = Stopwatch.GetElapsedTime(startedAt).TotalSeconds;
@@ -129,7 +168,7 @@ public static class NpcAiTelemetry
     internal static void SetPerceptionMode(NpcPerceptionMode mode) =>
         Volatile.Write(ref _perceptionMode, (int)mode);
 
-    internal static void RecordPerceptionCapture(NpcPerceptionSnapshot snapshot,
+    internal static void RecordPerceptionCapture(NpcPerceptionSnapshot snapshot, NpcPerceptionDelta? delta,
         NpcPerceptionPublicationKind publication, bool semanticStateChanged, NpcPerceptionMode mode,
         long startedAt, long allocatedBytesBefore)
     {
@@ -148,6 +187,14 @@ public static class NpcAiTelemetry
         {
             PerceptionFullSnapshots.Add(1, tags);
         }
+        else if (publication == NpcPerceptionPublicationKind.Delta && delta != null)
+        {
+            long fullBytes = EstimatePayloadBytes(snapshot);
+            long deltaBytes = EstimateDeltaBytes(delta);
+            PerceptionDeltas.Add(1, tags);
+            PerceptionDeltaBytes.Record(deltaBytes, tags);
+            PerceptionCompressionRatio.Record(fullBytes == 0 ? 1 : (double)deltaBytes / fullBytes, tags);
+        }
     }
 
     internal static void RecordPerceptionCaptureFailure(string reason, NpcPerceptionMode mode) =>
@@ -161,6 +208,8 @@ public static class NpcAiTelemetry
             new KeyValuePair<string, object?>("validation_kind", validationKind));
 
     internal static void RecordLegacyResolve() => LegacyEntityResolves.Add(1);
+
+    internal static void RecordPerceptionRevisionGap() => PerceptionRevisionGaps.Add(1);
 
     internal static void RecordPoolIteration(int npcCount, long startedAt)
     {
@@ -180,6 +229,24 @@ public static class NpcAiTelemetry
         }
     }
 
+    internal static void RecordPerceptionBatch(NpcPerceptionRegionBatch batch)
+    {
+        TagList tags = default;
+        tags.Add("source_pool_id", batch.SourcePoolId);
+        tags.Add("instance_id", batch.Region.InstanceId);
+        tags.Add("region_x", batch.Region.RegionX);
+        tags.Add("region_y", batch.Region.RegionY);
+        tags.Add("full_count", batch.FullSnapshots.Length);
+        tags.Add("delta_count", batch.Deltas.Length);
+        PerceptionBatches.Add(1, tags);
+    }
+
+    internal static void RecordPerceptionBatchConsumerFailure() => PerceptionBatchConsumerFailures.Add(1);
+
+    internal static void RecordPerceptionReplayDrop() => PerceptionReplayDrops.Add(1);
+
+    internal static void RecordPerceptionReplayFailure() => PerceptionReplayFailures.Add(1);
+
     private static long EstimatePayloadBytes(NpcPerceptionSnapshot snapshot)
     {
         const int EnvelopeAndScalarEstimate = 256;
@@ -196,8 +263,30 @@ public static class NpcAiTelemetry
                snapshot.State.Identity.ClanIds.Length * ClanIdEstimate;
     }
 
+    private static long EstimateDeltaBytes(NpcPerceptionDelta delta)
+    {
+        long bytes = 96;
+        if (delta.Identity != null) bytes += 64 + delta.Identity.ClanIds.Length * sizeof(int);
+        if (delta.Physical != null) bytes += 96;
+        if (delta.Combat != null) bytes += 48;
+        if (delta.Environment != null) bytes += 64;
+        if (delta.VisibleEntities != null)
+        {
+            bytes += delta.VisibleEntities.Added.Length * 96L;
+            bytes += delta.VisibleEntities.Updated.Length * 96L;
+            bytes += delta.VisibleEntities.Removed.Length * 24L;
+        }
+        bytes += delta.Threats.Length * 56L;
+        bytes += delta.Affordances.Length * 24L;
+        bytes += delta.SpatialObservations.Length * 24L;
+        return bytes;
+    }
+
     internal static T ObserveWorldQuery<T>(string operation, Type entityType, Func<T> query)
     {
+        using Activity? activity = Activities.StartActivity("npc.world.query", ActivityKind.Internal);
+        activity?.SetTag("operation", operation);
+        activity?.SetTag("entity_type", entityType.Name);
         if (!WorldQueryCalls.Enabled && !WorldQueryDuration.Enabled)
         {
             return query();
@@ -220,6 +309,8 @@ public static class NpcAiTelemetry
 
     internal static T ObserveGeoQuery<T>(string operation, Func<T> query, Func<T, string> outcomeSelector)
     {
+        using Activity? activity = Activities.StartActivity("npc.geo.query", ActivityKind.Internal);
+        activity?.SetTag("operation", operation);
         if (!GeoQueryCalls.Enabled && !GeoQueryDuration.Enabled)
         {
             return query();
@@ -231,6 +322,7 @@ public static class NpcAiTelemetry
         {
             T result = query();
             outcome = outcomeSelector(result);
+            activity?.SetTag("outcome", outcome);
             return result;
         }
         finally
@@ -246,6 +338,8 @@ public static class NpcAiTelemetry
     internal static T? ObservePathfinding<T>(string actorKind, Func<T?> query)
         where T: class
     {
+        using Activity? activity = Activities.StartActivity("npc.pathfinding", ActivityKind.Internal);
+        activity?.SetTag("actor_kind", actorKind);
         if (!PathfindingCalls.Enabled && !PathfindingDuration.Enabled)
         {
             return query();
@@ -257,6 +351,7 @@ public static class NpcAiTelemetry
         {
             T? result = query();
             outcome = result is null ? "no_path" : "success";
+            activity?.SetTag("outcome", outcome);
             return result;
         }
         finally
@@ -271,6 +366,8 @@ public static class NpcAiTelemetry
 
     internal static void ObserveCommand(string command, Action action)
     {
+        using Activity? activity = Activities.StartActivity("npc.command.execute", ActivityKind.Internal);
+        activity?.SetTag("command", command);
         if (!CommandCalls.Enabled)
         {
             action();
@@ -282,12 +379,20 @@ public static class NpcAiTelemetry
         {
             action();
             outcome = "success";
+            activity?.SetTag("outcome", outcome);
         }
         finally
         {
             CommandCalls.Add(1, new KeyValuePair<string, object?>("command", command),
                 new KeyValuePair<string, object?>("outcome", outcome));
         }
+    }
+
+    internal static T ObserveThreatQuery<T>(string operation, Func<T> query)
+    {
+        using Activity? activity = Activities.StartActivity("npc.threat.query", ActivityKind.Internal);
+        activity?.SetTag("operation", operation);
+        return query();
     }
 
     private static TagList CreateAiTags(CreatureAI ai, CtrlIntention intention)

@@ -97,6 +97,7 @@ public class Npc: Creature
 	private RaidBossStatus _raidStatus;
 	private int _spawnGeneration;
 	private int _lifecycleSequence;
+	private int _generationPreparedForSpawn;
 
 	/** Contains information about local tax payments. */
 	private TaxZone? _taxZone;
@@ -1062,6 +1063,7 @@ public class Npc: Creature
 		}
 
 		Interlocked.Increment(ref _spawnGeneration);
+		Volatile.Write(ref _generationPreparedForSpawn, 1);
 	}
 
 	internal void completeRespawnLifecycle()
@@ -1095,6 +1097,19 @@ public class Npc: Creature
 	}
 
 	public int getSpawnGeneration() => Volatile.Read(ref _spawnGeneration);
+
+	public override bool spawnMe()
+	{
+		// Scripted/minion spawns do not pass through Spawn.initializeNpc(). Give them the same incarnation semantics.
+		if (Interlocked.Exchange(ref _generationPreparedForSpawn, 0) == 0)
+		{
+			beginRespawnLifecycle();
+			completeRespawnLifecycle();
+			Interlocked.Exchange(ref _generationPreparedForSpawn, 0);
+		}
+
+		return base.spawnMe();
+	}
 
 	/**
 	 * Remove the Npc from the world and update its spawn object (for a complete removal use the deleteMe method).<br>
