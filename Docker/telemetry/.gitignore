@@ -1,0 +1,5 @@
+*.json
+*.json.*
+snapshots/
+!.gitignore
+!README.md

@@ -143,6 +143,34 @@ The 2026-08-09 local Docker run used 16 workers and zero synthetic Think cost. I
 
 The mixed-priority Critical reaction was 32.93 ms P95 and 33.64 ms P99. The hot-path allocation reduction is material: removing per-wake telemetry tag creation and a captured `GetOrAdd` lambda reduced R3 from roughly 200 B/event in the first run to 7 B/event. No benchmark scenario exceeded one concurrent Think per NPC.
 
+## Live Docker validation — 2026-08-09
+
+A low-load Scenario A acceptance run used the development Docker stack with OTLP metrics exported every five seconds. The capture window was 18.03 minutes; the player session itself ran from 21:25:50 to 21:41:14 UTC (15 minutes 24 seconds). The world contained approximately 38,550 loaded NPCs, one online player, and up to 37 NPCs observed in combat.
+
+The manual sequence covered aggressive proximity acquisition in Dragon Valley Cave, immediate retaliation, pursuit, death/return-to-post behavior, target loss, and guard assistance. Behavior was accepted by the tester with no intentional legacy behavior regression observed.
+
+The following values are deltas between the pre-session and post-session Prometheus snapshots. Histogram percentiles use the configured explicit buckets.
+
+| Signal | Count | Average | P50 | P95 | P99 |
+|---|---:|---:|---:|---:|---:|
+| Critical reaction | 745 | 22.59 ms | 0.89 ms | 92.39 ms | 99.01 ms |
+| `Attacked` reaction | 641 | 25.13 ms | 0.97 ms | 93.28 ms | 99.21 ms |
+| `PlayerBecameRelevant` reaction | 96 | 7.49 ms | 0.59 ms | 73.33 ms | 94.67 ms |
+| `TargetLost` reaction | 8 | 0.34 ms | 0.50 ms | 0.95 ms | 0.99 ms |
+| Critical queue delay | 1,638 | 16.89 ms | 0.75 ms | 88.40 ms | 98.03 ms |
+| Combat queue delay | 93 | 94.03 ms | 80.07 ms | 208.97 ms | 241.79 ms |
+| Normal queue delay | 355,130 | 1.37 ms | 0.55 ms | 2.44 ms | 12.38 ms |
+
+Critical wake-ups numbered 1,962 and Combat wake-ups 283. The coordinator coalesced 555 Critical wake-ups (28.29%) and 94 Combat wake-ups (33.22%), for a combined reactive coalescing ratio of 28.91%. It recorded zero drops and zero scheduler execution failures. There were 171 single-flight collisions and 167 pending follow-ups; these were contained without concurrent execution or worker failure.
+
+All 216 five-second queue-depth samples were zero for Critical, Combat, and Normal. This shows that queues drained between export intervals and agrees with the queue-delay distribution, but it is not a high-water mark for sub-five-second bursts. A peak-depth or enqueue-depth histogram would be required if exact transient depth becomes an operational requirement.
+
+The Collector emitted no warnings or errors during the session. Three GameServer `FormatException` warnings came from `AdminAdmin.showMainPage()` parsing an empty admin-panel command at `AdminAdmin.cs:381`; they are unrelated to NPC scheduling and OTLP. Login also reported pre-existing skill-level and quest-data warnings. The reactive scheduler execution-failure counter remained zero.
+
+Artifacts are retained locally as `ready-before-session.prom`, `after-player-test.prom`, and the filtered `metrics.json` OTLP stream under `Docker/telemetry`.
+
+The final checkpoint was rebuilt with the .NET 9 Alpine SDK in Docker. The Release GameServer image completed successfully, the NPC contracts suite passed 10/10, and the GameServer model/scheduler suite passed 80/80. The build retains the pre-existing `Microsoft.XmlSerializer.Generator` warning for `L2Dn.Model`; no new build or test errors were introduced.
+
 ## Validation status
 
 Locally automated:
@@ -155,10 +183,10 @@ Locally automated:
 
 Environment-dependent and intentionally not fabricated:
 
-- A/B/C with real DataPack, database, player load generator, siege/raid, and OTLP backend.
-- Human/video player-passes-near-mob comparison.
+- Scenario B/C with a real player load generator and siege/raid hotspot.
+- A repeatable multi-player run on a dedicated performance environment.
 
-These two checks remain deployment validation work. Enabled mode should not become a production default until they are recorded.
+Low-load Scenario A, OTLP capture, and human player-visible reaction validation are now recorded above. Scenario B/C remain deployment validation work. Enabled mode should not become a production default until those load scenarios are recorded.
 
 ## Rollback
 

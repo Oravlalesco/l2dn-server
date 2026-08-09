@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using L2Dn.GameServer.AI.Runtime;
 using NLog;
 using OpenTelemetry;
@@ -30,6 +31,7 @@ internal static class TelemetryBootstrap
             string? version = Assembly.GetExecutingAssembly().GetName().Version?.ToString();
             if (!string.IsNullOrWhiteSpace(metricsEndpoint))
             {
+                RuntimeHelpers.RunClassConstructor(typeof(NpcAiTelemetry).TypeHandle);
                 metrics = Sdk.CreateMeterProviderBuilder()
                     .ConfigureResource(resource => resource.AddService("L2Dn.GameServer", serviceVersion: version))
                     .AddMeter(NpcAiTelemetry.MeterName)
@@ -54,11 +56,23 @@ internal static class TelemetryBootstrap
                     {
                         Boundaries = [0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5]
                     })
+                    .AddView("l2dn.npc.scheduler.queue_delay", new ExplicitBucketHistogramConfiguration
+                    {
+                        Boundaries = [0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+                    })
+                    .AddView("l2dn.npc.reaction.latency", new ExplicitBucketHistogramConfiguration
+                    {
+                        Boundaries = [0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+                    })
+                    .AddView("l2dn.npc.reaction.legacy_periodic_delay", new ExplicitBucketHistogramConfiguration
+                    {
+                        Boundaries = [0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+                    })
                     .AddView("l2dn.npc.region.loaded", new MetricStreamConfiguration
                     {
                         CardinalityLimit = 8192
                     })
-                    .AddOtlpExporter()
+                    .AddOtlpExporter(options => options.Endpoint = new Uri(metricsEndpoint))
                     .Build();
             }
 
@@ -67,7 +81,7 @@ internal static class TelemetryBootstrap
                 traces = Sdk.CreateTracerProviderBuilder()
                     .ConfigureResource(resource => resource.AddService("L2Dn.GameServer", serviceVersion: version))
                     .AddSource(NpcAiTelemetry.ActivitySourceName)
-                    .AddOtlpExporter()
+                    .AddOtlpExporter(options => options.Endpoint = new Uri(tracesEndpoint))
                     .Build();
             }
 

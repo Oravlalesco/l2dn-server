@@ -1,0 +1,42 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+  filter/npc-reactivity:
+    error_mode: ignore
+    metric_conditions:
+      - 'not IsMatch(metric.name, "^l2dn\\.(players\\.online|npc\\.(reaction|scheduler|wakeup|think|combat|loaded|thinking))")'
+  batch:
+    timeout: 2s
+    send_batch_size: 1024
+
+exporters:
+  file/metrics:
+    path: /var/lib/otel/metrics.json
+    format: json
+    rotation:
+      max_megabytes: 100
+      max_days: 7
+      max_backups: 10
+      localtime: true
+  prometheus:
+    endpoint: 0.0.0.0:9464
+    send_timestamps: true
+    metric_expiration: 1h
+    enable_open_metrics: true
+    resource_to_telemetry_conversion:
+      enabled: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/npc-reactivity, batch]
+      exporters: [file/metrics, prometheus]
