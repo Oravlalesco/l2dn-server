@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text.Json;
 using FluentAssertions;
 using L2Dn.NpcContracts;
 
@@ -59,6 +60,123 @@ public class NpcPerceptionContractTests
         NpcPerceptionStateComparer.Instance.Equals(first, reversed).Should().BeFalse();
     }
 
+    [Fact]
+    public void Diff_and_apply_reconstructs_added_updated_removed_visibility_in_exact_order()
+    {
+        NpcKey key = new(7, 2);
+        NpcPerceptionSnapshot before = new(new NpcPerceptionEnvelope(1, key, 10, 100, 1_000), CreateState());
+        VisibleEntity updatedMonster = before.State.VisibleEntities[1] with
+        {
+            ObservationOrdinal = 0,
+            Position = new NpcPosition(31, 21, 30, 100),
+            Distance2D = 22
+        };
+        VisibleEntity addedPlayer = new(1, new EntityKey(4, 0, EntityKind.Player),
+            new NpcPosition(40, 20, 30, 0), 22, 5, 10, 30, EntityStateFlags.Alive,
+            EntityRelationFlags.Player);
+        NpcPerceptionState afterState = new(
+            before.State.Identity,
+            before.State.Physical with { CurrentHp = 60 },
+            before.State.Combat with { CurrentTarget = addedPlayer.Entity },
+            before.State.Environment,
+            [updatedMonster, addedPlayer],
+            [new ThreatEntry(addedPlayer.Entity, 20, 3, 30, true, true)],
+            [new NpcAffordanceObservation(addedPlayer.Entity, NpcAffordanceFlags.CanTarget)],
+            [new SpatialObservation(addedPlayer.Entity, SpatialObservationFlags.HasLineOfSight)]);
+        NpcPerceptionSnapshot after = new(new NpcPerceptionEnvelope(1, key, 11, 101, 1_100), afterState);
+
+        NpcPerceptionDelta delta = NpcPerceptionDiff.Create(before, after);
+        NpcPerceptionApplyResult result = NpcPerceptionDeltaApplier.Apply(before, delta);
+
+        delta.Changes.Should().HaveFlag(NpcPerceptionChangeMask.VisibleEntities);
+        delta.VisibleEntities!.Added.Should().ContainSingle().Which.Should().Be(addedPlayer);
+        delta.VisibleEntities.Updated.Should().ContainSingle().Which.Should().Be(updatedMonster);
+        delta.VisibleEntities.Removed.Should().ContainSingle().Which.Should().Be(before.State.VisibleEntities[0].Entity);
+        result.Status.Should().Be(NpcPerceptionApplyStatus.Applied);
+        NpcPerceptionExactComparer.Instance.Equals(result.Snapshot, after).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Delta_apply_reports_protocol_mismatches_without_exceptions()
+    {
+        NpcPerceptionSnapshot before = new(new NpcPerceptionEnvelope(1, new NpcKey(7, 2), 10, 100, 1_000),
+            CreateState());
+        NpcPerceptionSnapshot after = new(new NpcPerceptionEnvelope(1, new NpcKey(7, 2), 11, 101, 1_100),
+            new NpcPerceptionState(before.State.Identity, before.State.Physical with { CurrentHp = 50 },
+                before.State.Combat, before.State.Environment, before.State.VisibleEntities,
+                before.State.Threats, before.State.Affordances, before.State.SpatialObservations));
+        NpcPerceptionDelta delta = NpcPerceptionDiff.Create(before, after);
+
+        NpcPerceptionDeltaApplier.Apply(before with
+            {
+                Envelope = before.Envelope with { StateRevision = 9 }
+            }, delta).Status.Should().Be(NpcPerceptionApplyStatus.RevisionGap);
+        NpcPerceptionDeltaApplier.Apply(before with
+            {
+                Envelope = before.Envelope with { Npc = new NpcKey(8, 2) }
+            }, delta).Status.Should().Be(NpcPerceptionApplyStatus.NpcMismatch);
+        NpcPerceptionDeltaApplier.Apply(before with
+            {
+                Envelope = before.Envelope with { Npc = new NpcKey(7, 3) }
+            }, delta).Status.Should().Be(NpcPerceptionApplyStatus.GenerationMismatch);
+        NpcPerceptionDeltaApplier.Apply(before with
+            {
+                Envelope = before.Envelope with { SchemaVersion = 2 }
+            }, delta).Status.Should().Be(NpcPerceptionApplyStatus.SchemaMismatch);
+    }
+
+    [Fact]
+    public void Diff_apply_property_holds_for_generated_states()
+    {
+        NpcKey key = new(77, 4);
+        for (int seed = 0; seed < 100; seed++)
+        {
+            NpcPerceptionState firstState = CreateGeneratedState(seed);
+            NpcPerceptionState secondState = CreateGeneratedState(seed + 10_000);
+            NpcPerceptionSnapshot first = new(new NpcPerceptionEnvelope(1, key, seed * 2 + 1, seed, seed),
+                firstState);
+            NpcPerceptionSnapshot second = new(new NpcPerceptionEnvelope(1, key, seed * 2 + 2, seed + 1, seed + 1),
+                secondState);
+
+            NpcPerceptionDelta delta = NpcPerceptionDiff.Create(first, second);
+            NpcPerceptionApplyResult applied = NpcPerceptionDeltaApplier.Apply(first, delta);
+
+            applied.Status.Should().Be(NpcPerceptionApplyStatus.Applied);
+            NpcPerceptionExactComparer.Instance.Equals(applied.Snapshot, second).Should().BeTrue();
+        }
+    }
+
+    [Fact]
+    public void Snapshot_and_delta_json_round_trip_preserve_exact_values()
+    {
+        NpcKey key = new(7, 2);
+        NpcPerceptionSnapshot before = new(new NpcPerceptionEnvelope(1, key, 10, 100, 1_000), CreateState());
+        NpcPerceptionSnapshot after = new(new NpcPerceptionEnvelope(1, key, 11, 101, 1_100),
+            CreateGeneratedState(123));
+        NpcPerceptionDelta delta = NpcPerceptionDiff.Create(before, after);
+
+        NpcPerceptionSnapshot snapshotRoundTrip = JsonSerializer.Deserialize<NpcPerceptionSnapshot>(
+            JsonSerializer.Serialize(after))!;
+        NpcPerceptionDelta deltaRoundTrip = JsonSerializer.Deserialize<NpcPerceptionDelta>(
+            JsonSerializer.Serialize(delta))!;
+        NpcPerceptionApplyResult applied = NpcPerceptionDeltaApplier.Apply(before, deltaRoundTrip);
+
+        NpcPerceptionExactComparer.Instance.Equals(snapshotRoundTrip, after).Should().BeTrue();
+        applied.Status.Should().Be(NpcPerceptionApplyStatus.Applied);
+        NpcPerceptionExactComparer.Instance.Equals(applied.Snapshot, after).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Region_batch_normalizes_arrays_and_is_explicitly_partial()
+    {
+        NpcPerceptionRegionBatch batch = new(10, new RegionKey(0, 1, 2), 3, 4, default, default);
+
+        batch.SourcePoolId.Should().Be(3);
+        batch.BatchSequence.Should().Be(4);
+        batch.FullSnapshots.IsDefault.Should().BeFalse();
+        batch.Deltas.IsDefault.Should().BeFalse();
+    }
+
     private static NpcPerceptionState CreateState()
     {
         NpcIdentity identity = new(100, NpcKind.Monster, LegacyNpcAiType.Fighter, 20, 300,
@@ -76,5 +194,30 @@ public class NpcPerceptionContractTests
         ];
 
         return new NpcPerceptionState(identity, physical, combat, environment, visible, [], [], []);
+    }
+
+    private static NpcPerceptionState CreateGeneratedState(int seed)
+    {
+        Random random = new(seed);
+        int count = random.Next(1, 8);
+        ImmutableArray<VisibleEntity>.Builder visible = ImmutableArray.CreateBuilder<VisibleEntity>(count);
+        for (int ordinal = 0; ordinal < count; ordinal++)
+        {
+            int objectId = seed * 100 + ordinal + 10;
+            visible.Add(new VisibleEntity(ordinal, new EntityKey(objectId, 0, EntityKind.Player),
+                new NpcPosition(random.Next(-10_000, 10_000), random.Next(-10_000, 10_000), random.Next(-500, 500),
+                    random.Next(0, 65_535)), random.Next(1, 120), 5, 10, random.NextDouble() * 2_000,
+                EntityStateFlags.Alive | EntityStateFlags.Spawned, EntityRelationFlags.Player));
+        }
+
+        NpcIdentity identity = new(100 + seed, NpcKind.Monster, LegacyNpcAiType.Fighter, random.Next(1, 120),
+            300, [seed, seed + 1], NpcCapabilities.CanMove | NpcCapabilities.CanAttack);
+        NpcPhysicalState physical = new(new NpcPosition(seed + 1, seed + 2, seed + 3, seed + 4),
+            random.NextDouble() * 100, 100, random.NextDouble() * 50, 50, 8, 16,
+            NpcPhysicalFlags.Alive | NpcPhysicalFlags.Spawned);
+        NpcCombatFacts combat = new(visible[0].Entity, 40, 500, NpcCombatFlags.InCombat);
+        NpcEnvironment environment = new(new RegionKey(0, seed % 10, seed % 7), null, true, true, false, false,
+            true);
+        return new NpcPerceptionState(identity, physical, combat, environment, visible.MoveToImmutable(), [], [], []);
     }
 }
