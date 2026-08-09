@@ -28,9 +28,14 @@ internal sealed class NpcThinkCoordinator: IAsyncDisposable
     private long _dequeueSequence;
     private int _disposed;
 
-    public static NpcThinkCoordinator Instance { get; } = new(
-        NpcReactiveSchedulerOptions.FromEnvironment(), LegacyNpcThinkExecutor.Instance,
-        LegacyNpcThinkExecutor.Instance);
+    public static NpcThinkCoordinator Instance { get; } = CreateDefault();
+
+    private static NpcThinkCoordinator CreateDefault()
+    {
+        INpcThinkExecutor executor = NpcThinkExecutorFactory.Create(NpcBrainOptions.FromEnvironment());
+        return new NpcThinkCoordinator(NpcReactiveSchedulerOptions.FromEnvironment(), executor,
+            LegacyNpcThinkExecutor.Instance);
+    }
 
     internal NpcThinkCoordinator(NpcReactiveSchedulerOptions options, INpcThinkExecutor executor,
         INpcGenerationValidator generationValidator, INpcThinkClock? clock = null)
@@ -183,6 +188,10 @@ internal sealed class NpcThinkCoordinator: IAsyncDisposable
         }
         _criticalOverflow.TryRemove(state.Npc, out _);
         _combatOverflow.TryRemove(state.Npc, out _);
+        if (_executor is INpcThinkLifecycle lifecycle)
+        {
+            lifecycle.Remove(state.Npc);
+        }
     }
 
     internal async Task<bool> WaitForIdleAsync(TimeSpan timeout)

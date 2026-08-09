@@ -2,6 +2,7 @@
 using L2Dn.Events;
 using L2Dn.Extensions;
 using L2Dn.GameServer.AI.Runtime;
+using L2Dn.GameServer.AI.Scheduling;
 using L2Dn.GameServer.Configuration;
 using L2Dn.GameServer.Enums;
 using L2Dn.GameServer.Model;
@@ -1262,6 +1263,13 @@ public class AttackableAI: CreatureAI
 	 */
 	public override void onEvtThink()
 	{
+		if (NpcBrainRuntime.Mode == NpcBrainMode.Intent &&
+		    NpcReactivity.Mode == NpcReactiveSchedulerMode.Enabled)
+		{
+			NpcReactivity.Wake(getActiveChar(), NpcWakeReason.ActionReady);
+			return;
+		}
+
 		// Check if a thinking action is already in progress.
 		if (_thinking)
 		{
@@ -1359,22 +1367,25 @@ public class AttackableAI: CreatureAI
 		// Add the attacker to the _aggroList of the actor
 		_commands.AddThreat(me, attacker, 0, 1);
 
-		// Set the Creature movement type to run and send Server->Client packet ChangeMoveType to all others Player
-		if (!me.isRunning())
+		if (NpcBrainRuntime.Mode != NpcBrainMode.Intent)
 		{
-			_commands.SetRunning(me);
-		}
-
-		if (!getActiveChar().isCoreAIDisabled())
-		{
-			// Set the Intention to AI_INTENTION_ATTACK
-			if (getIntention() != CtrlIntention.AI_INTENTION_ATTACK)
+			// Set the Creature movement type to run and send Server->Client packet ChangeMoveType to all others Player
+			if (!me.isRunning())
 			{
-				_commands.SetIntention(this, CtrlIntention.AI_INTENTION_ATTACK, attacker);
+				_commands.SetRunning(me);
 			}
-			else if (_threatQuery.GetMostHated(me) != target)
+
+			if (!getActiveChar().isCoreAIDisabled())
 			{
-				_commands.SetIntention(this, CtrlIntention.AI_INTENTION_ATTACK, attacker);
+				// Set the Intention to AI_INTENTION_ATTACK
+				if (getIntention() != CtrlIntention.AI_INTENTION_ATTACK)
+				{
+					_commands.SetIntention(this, CtrlIntention.AI_INTENTION_ATTACK, attacker);
+				}
+				else if (_threatQuery.GetMostHated(me) != target)
+				{
+					_commands.SetIntention(this, CtrlIntention.AI_INTENTION_ATTACK, attacker);
+				}
 			}
 		}
 
@@ -1419,8 +1430,9 @@ public class AttackableAI: CreatureAI
 			// Add the target to the actor _aggroList or update hate if already present
 			_commands.AddThreat(me, target, 0, aggro);
 
-			// Set the actor AI Intention to AI_INTENTION_ATTACK
-			if (getIntention() != CtrlIntention.AI_INTENTION_ATTACK)
+			// In Intent mode, threat is authoritative world input; target/running/intention are Brain decisions.
+			if (NpcBrainRuntime.Mode != NpcBrainMode.Intent &&
+			    getIntention() != CtrlIntention.AI_INTENTION_ATTACK)
 			{
 				// Set the Creature movement type to run and send Server->Client packet ChangeMoveType to all others Player
 				if (!me.isRunning())
@@ -1446,6 +1458,16 @@ public class AttackableAI: CreatureAI
 				}
 			}
 		}
+	}
+
+	protected override void onEvtForgetObject(WorldObject @object)
+	{
+		if (NpcBrainRuntime.Mode == NpcBrainMode.Intent && ReferenceEquals(_actor.getTarget(), @object))
+		{
+			return;
+		}
+
+		base.onEvtForgetObject(@object);
 	}
 
 	protected override void onIntentionActive()
