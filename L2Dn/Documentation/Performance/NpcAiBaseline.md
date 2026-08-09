@@ -8,6 +8,7 @@ This runbook captures a comparable baseline for the NPC brain modernization work
 - Record the exact DataPack, server configuration, geodata set and database snapshot.
 - Export GameServer metrics to an OTLP collector. Running `L2Dn.Dashboard` supplies the Aspire dashboard endpoint; a direct launch must set `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`.
 - Keep NPC spawns, client scripts and test routes identical between comparisons.
+- Record `NPC_PERCEPTION_MODE` and the full/replay interval settings for every run.
 
 ## Capture procedure
 
@@ -37,6 +38,11 @@ This runbook captures a comparable baseline for the NPC brain modernization work
 | World query calls/s and p99 |  |  |  |
 | Geo query calls/s and p99 |  |  |  |
 | Pathfinding calls/s and p99 |  |  |  |
+| Perception capture count/s and p50 / p95 / p99 |  |  |  |
+| Perception allocations and estimated payload bytes |  |  |  |
+| Full / delta count and delta compression ratio |  |  |  |
+| Legacy entity resolves/s |  |  |  |
+| Scheduler pool iteration p95 / p99 and overruns |  |  |  |
 | Process CPU time rate |  |  |  |
 | GC pause and allocation rate |  |  |  |
 | Thread-pool queue length |  |  |  |
@@ -49,3 +55,21 @@ Use `l2dn.npc.think.busy_time` as synchronous NPC AI demand, not as exclusive th
 - Compare the same 15-minute window and configuration.
 - Flag a regression when think p99, process CPU rate or allocation rate increases by more than 5% in two of three runs.
 - Attach decision/behavior observations separately; performance equivalence alone does not prove behavior equivalence.
+
+## Phase 2 mode matrix
+
+Run A/B/C once per mode without changing any other input:
+
+| Scenario | Disabled | CaptureOnly | ShadowValidate | SnapshotRead |
+| --- | --- | --- | --- | --- |
+| A | reference | measure | measure | measure |
+| B | reference | measure | measure | measure |
+| C | reference | measure | measure | measure |
+
+Use `Tools/L2Dn.NpcPerception.Benchmark` for a deterministic synthetic allocation and Diff/Apply report before a live run:
+
+```text
+dotnet run --project Tools/L2Dn.NpcPerception.Benchmark -- --npc-count 5000 --visible-per-npc 30
+```
+
+This tool reports rather than gates elapsed time because shared runners are noisy. Use a dedicated runner for timing regression gates; correctness and allocation budgets are suitable for shared CI.

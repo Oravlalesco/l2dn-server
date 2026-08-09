@@ -10,10 +10,10 @@ This matrix is the migration checklist for the base `AttackableAI`. Every decisi
 | In-combat, casting, attacking, disabled/confused flags and attack/aggro ranges | `CombatFacts` | Snapshot |
 | Effective current target | `CombatFacts.CurrentTarget` | Snapshot; resolve only for legacy execution/skill APIs |
 | Spawn position, instance, region, random-walk and return-to-spawn facts | `Environment` | Snapshot |
-| Visible players, creatures, attackables and guards | `VisibleEntities` | Snapshot, preserving observation ordinal |
+| Visible players, creatures, attackables and guards | `VisibleEntities` | Contract/builder complete; command-interleaved legacy reads remain ACL-transitional |
 | Entity kind, life, invocation, zone and relationship facts | `VisibleEntity` | Snapshot |
 | Auto-attack/target/assist capability | Pure relation/affordance evaluator | Snapshot fact; never calls side-effecting aggression logic |
-| Hate, damage, most-hated selection and aggro enumeration | `Threats` | Snapshot; independent from visible list |
+| Hate, damage, most-hated selection and aggro enumeration | `Threats` | Contract/builder complete; same-tick post-command reads remain ACL-transitional |
 | Current-target/primary-threat line of sight and direct reachability | `SpatialObservations` | Snapshot |
 | A position invented during a decision | `INpcGeoQuery` | Transitional dynamic query |
 | Skill lists, `Skill` instances, target rules and `SkillCaster.checkUseConditions` | Live skill engine | Transitional until intent/brain phase |
@@ -28,7 +28,7 @@ This matrix is the migration checklist for the base `AttackableAI`. Every decisi
 
 ## Completion checks
 
-- No direct world or threat query remains in base `AttackableAI` snapshot-enabled paths except explicit live fallback.
+- Every direct world or threat query remaining in `AttackableAI` is an explicit ACL fallback needed for same-tick legacy command interleaving.
 - Resolving an entity never permits reading a value already supplied by perception.
 - Every remaining live read is listed above as geo, skill, brain state, execution or specialized override.
 - Capture-only mode cannot change any authoritative state.

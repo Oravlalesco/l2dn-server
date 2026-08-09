@@ -2,6 +2,8 @@
 
 Phase 2 introduces an immutable, process-independent description of what an NPC observes. GameServer remains authoritative and the legacy command executor remains the only write boundary.
 
+The assembly remains named `L2Dn.Npc.Contracts`; its CLR namespace is `L2Dn.NpcContracts` to avoid colliding with the existing `Npc` actor type throughout namespaces rooted at `L2Dn.GameServer`.
+
 ## Delivery gates
 
 Phase 2A ends with full perception capture and snapshot-backed reads in the base `AttackableAI`. Phase 2B starts only after 2A passes correctness, isolation, deterministic-decision and performance gates; it adds diff/apply, partial region batches and replay serialization.
@@ -38,7 +40,7 @@ The array position of a visible entity is its legacy observation ordinal. It is 
 
 ## Transitional boundaries
 
-The base `AttackableAI` reads world visibility and threat state through the snapshot-backed decision read model in `SnapshotRead` mode. Dynamic geodata, skill-engine validation, specialized AI overrides and command execution remain transitional.
+The base `AttackableAI` reads lifecycle, region activity, current target and core HP/MP facts through the snapshot-backed decision context in `SnapshotRead` mode. World/threat slices that depend on commands performed earlier in the same legacy think callback remain behind their ACL until the intent phase can make the entire decision atomic. Dynamic geodata, skill-engine validation, specialized AI overrides and command execution remain transitional.
 
 The legacy resolver may resolve an `EntityKey` only at execution and explicitly documented compatibility boundaries. It may not use the resolved object to reread state already present in perception. Resolver usage is measured as migration debt.
 
@@ -46,6 +48,22 @@ NPC entity keys validate exact generation. Generation zero is a temporary best-e
 
 ## Publication and batching
 
-The first observation of a generation is a full snapshot. Further full snapshots are emitted every 60 seconds by default with a deterministic, centered jitter derived from the NPC key. State changes between fulls are deltas in shadow and snapshot-read modes; capture-only mode remains full-only.
+The first observation of a generation is a full snapshot. Further full snapshots are emitted every 60 seconds by default with a deterministic, centered jitter derived from the NPC key. State changes between fulls are represented as deltas in every enabled mode; `CaptureOnly` builds and measures them but no brain consumes them.
 
 `NpcPerceptionRegionBatch` is a partial update batch produced by one legacy scheduler pool. It carries source pool and batch sequence. Multiple batches may cover the same region and world tick; it never claims to be a complete region frame.
+
+## Operations
+
+Configuration is read once when the perception coordinator starts:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `NPC_PERCEPTION_MODE` | `Disabled` | `Disabled`, `CaptureOnly`, `ShadowValidate` or `SnapshotRead` |
+| `NPC_PERCEPTION_FULL_INTERVAL_SECONDS` | `60` | Periodic recovery full interval; `0` disables periodic fulls |
+| `NPC_PERCEPTION_FULL_JITTER_SECONDS` | `10` | Deterministic centered staggering window |
+| `NPC_PERCEPTION_REPLAY_DIRECTORY` | unset | Enables optional JSONL replay capture in this explicit directory |
+| `NPC_PERCEPTION_REPLAY_CAPACITY` | `1000` | Bounded non-blocking replay queue capacity |
+
+Replay is disabled by default. When enabled, serialization is queued through a bounded channel; a slow or failed replay consumer cannot block NPC thinking. JSON is a fixture/debug format, not an estimate of future protobuf wire bytes.
+
+Delta receivers must require `BaseRevision == current StateRevision`. A gap or generation mismatch discards the replica and requires a full snapshot. Expected protocol conditions return typed statuses rather than exceptions.

@@ -23,6 +23,7 @@
     <Project Path="Tools\L2Dn.DataPack.Editor\L2Dn.DataPack.Editor.csproj" Type="Classic C#" />
     <Project Path="Tools\L2Dn.Packages\L2Dn.Packages.csproj" Type="Classic C#" />
     <Project Path="Tools\L2Dn.UnitTests\L2Dn.UnitTests.csproj" Type="Classic C#" />
+    <Project Path="Tools\L2Dn.NpcPerception.Benchmark\L2Dn.NpcPerception.Benchmark.csproj" Type="Classic C#" />
     <Project Path="Tools\XmlSchemaGenerator\XmlSchemaGenerator.csproj" Type="Classic C#" />
   </Folder>
   <Project Path="L2Dn.AuthServer.Db\L2Dn.AuthServer.Db.csproj" Type="Classic C#" />
