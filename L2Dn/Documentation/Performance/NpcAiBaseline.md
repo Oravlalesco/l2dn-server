@@ -9,6 +9,7 @@ This runbook captures a comparable baseline for the NPC brain modernization work
 - Export GameServer metrics to an OTLP collector. Running `L2Dn.Dashboard` supplies the Aspire dashboard endpoint; a direct launch must set `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`.
 - Keep NPC spawns, client scripts and test routes identical between comparisons.
 - Record `NPC_PERCEPTION_MODE` and the full/replay interval settings for every run.
+- Record `NPC_REACTIVE_SCHEDULER_MODE`, worker count, queue capacity, minimum intervals, and event flags.
 
 ## Capture procedure
 
@@ -43,6 +44,11 @@ This runbook captures a comparable baseline for the NPC brain modernization work
 | Full / delta count and delta compression ratio |  |  |  |
 | Legacy entity resolves/s |  |  |  |
 | Scheduler pool iteration p95 / p99 and overruns |  |  |  |
+| Wake-ups/s by reason and coalescing ratio |  |  |  |
+| Queue depth by priority and queue delay p50 / p95 / p99 |  |  |  |
+| Reaction latency p50 / p95 / p99 by priority |  |  |  |
+| Legacy event-to-periodic delay in Observe mode |  |  |  |
+| Active reactive workers / single-flight collisions |  |  |  |
 | Process CPU time rate |  |  |  |
 | GC pause and allocation rate |  |  |  |
 | Thread-pool queue length |  |  |  |
@@ -73,3 +79,21 @@ dotnet run --project Tools/L2Dn.NpcPerception.Benchmark -- --npc-count 5000 --vi
 ```
 
 This tool reports rather than gates elapsed time because shared runners are noisy. Use a dedicated runner for timing regression gates; correctness and allocation budgets are suitable for shared CI.
+
+## Phase 2.5 mode matrix
+
+Run Observe first to quantify the legacy event-to-next-periodic delay. Repeat the same input in all modes:
+
+| Scenario | Disabled | Observe | Shadow | Enabled |
+| --- | --- | --- | --- | --- |
+| A | legacy reference | latency reference | scheduler validation | compare |
+| B | legacy reference | latency reference | scheduler validation | compare |
+| C | legacy reference | latency reference | scheduler validation | compare |
+
+For the deterministic synthetic R1-R5 report:
+
+```text
+dotnet run --project Tools/L2Dn.NpcReactiveScheduler.Benchmark -- --npc-count 5000 --events 100000
+```
+
+Do not use shared-runner elapsed time as a hard CI gate. Gate correctness, maximum concurrent Think per NPC, queue bounds, and allocations in shared CI; calibrate P50/P95/P99 gates on a dedicated runner and validate player-visible reaction in A/B/C.

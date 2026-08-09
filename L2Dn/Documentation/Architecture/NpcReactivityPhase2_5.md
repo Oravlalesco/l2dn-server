@@ -56,6 +56,7 @@ The coordinator schedules opportunity to think; it does not decide gameplay.
 | `PlayerBecameRelevant` | Critical | Player spawn or player region transition already evaluated by `World` | Wake only candidate `Attackable` objects in newly relevant regions |
 | `RegionActivated` | Normal | `WorldRegion.SetActive(true)` | Wake resident attackables once on activation |
 | `Respawned` | Normal | NPC spawn lifecycle | Defer until the actor is registered with its AI scheduler |
+| `ActionReady` | Combat | Legacy `EVT_THINK` callbacks | Route explicit think callbacks through single-flight in Enabled mode |
 | `CombatStarted` | Combat | Derivable from intention changes | Observe through existing combat events; no duplicate source in v1 |
 | `CombatEnded` | Normal | No single authoritative event | Deferred |
 | `AllyAttacked` | Combat | Existing aggression/minion assist propagation | Covered as `ThreatChanged`; dedicated classification deferred |
@@ -109,7 +110,56 @@ The initial reaction SLO under nominal load is Critical P50 below 100 ms, P95 be
 - Release build succeeds.
 - Real A/B/C and visual player-passes-near-mob validation are recorded when the DataPack, database, load generator, and telemetry backend are available.
 
+## Telemetry
+
+The OTLP meter exposes:
+
+- `l2dn.npc.wakeup.total`, `l2dn.npc.wakeup.coalesced`, and `l2dn.npc.wakeup.dropped`.
+- `l2dn.npc.scheduler.queue.depth` and `l2dn.npc.scheduler.queue_delay`.
+- `l2dn.npc.scheduler.active_workers` and `l2dn.npc.scheduler.singleflight.collision`.
+- `l2dn.npc.think.pending_followup` and `l2dn.npc.scheduler.execution.failure`.
+- `l2dn.npc.reaction.legacy_periodic_delay` in Observe mode.
+- `l2dn.npc.reaction.latency` when the first legacy command begins in Enabled mode.
+
+Wake and queue telemetry avoids tag construction when no listener is enabled. Reaction correlation uses an async-local execution scope; it does not add an NPC identifier to metric tags.
+
+## Synthetic validation
+
+Run the real coordinator benchmark with:
+
+```text
+dotnet run --project Tools/L2Dn.NpcReactiveScheduler.Benchmark -- --npc-count 5000 --events 100000
+```
+
+The 2026-08-09 local Docker run used 16 workers and zero synthetic Think cost. It is an engineering baseline, not a replacement for the live A/B/C scenarios.
+
+| Scenario | Events | Thinks | Reaction p50 / p95 / p99 | Coalescing | Allocation/event | Max concurrent/NPC |
+|---|---:|---:|---:|---:|---:|---:|
+| R1: one event/NPC | 5,000 | 5,000 | 9.78 / 11.74 / 11.75 ms | 0% | 724 B | 1 |
+| R2: ten events/NPC | 50,000 | 5,001 | 7.85 / 8.76 / 8.95 ms | 90.00% | 72 B | 1 |
+| R3: storm | 100,000 | 1,011 | 6.86 / 11.76 / 13.73 ms | 98.99% | 7 B | 1 |
+| R4: mixed priority | 100,000 | 5,016 | 29.77 / 33.37 / 34.36 ms | 94.98% | 39 B | 1 |
+| R5: concurrent hotspot | 100,000 | 501 | 3.75 / 3.83 / 3.83 ms | 99.50% | 4 B | 1 |
+
+The mixed-priority Critical reaction was 32.93 ms P95 and 33.64 ms P99. The hot-path allocation reduction is material: removing per-wake telemetry tag creation and a captured `GetOrAdd` lambda reduced R3 from roughly 200 B/event in the first run to 7 B/event. No benchmark scenario exceeded one concurrent Think per NPC.
+
+## Validation status
+
+Locally automated:
+
+- Operating-mode parsing and feature flags.
+- Single-flight, coalescing, event-during-think follow-up, priority, fairness, queue bounds, stale generation, remove, exception isolation, Observe, Shadow, Disabled rollback, and per-priority cooldown tests.
+- R1-R5 with 5,000 NPC and 100,000-event storm/hotspot workloads.
+- Existing Phase 2 model and contract suites.
+- Release GameServer build.
+
+Environment-dependent and intentionally not fabricated:
+
+- A/B/C with real DataPack, database, player load generator, siege/raid, and OTLP backend.
+- Human/video player-passes-near-mob comparison.
+
+These two checks remain deployment validation work. Enabled mode should not become a production default until they are recorded.
+
 ## Rollback
 
 Set `NPC_REACTIVE_SCHEDULER_MODE=Disabled` and restart. `AttackableThinkTaskManager` then executes the same legacy periodic path directly. Per-event flags allow a noisy source to be disabled independently while the coordinator remains enabled.
-
