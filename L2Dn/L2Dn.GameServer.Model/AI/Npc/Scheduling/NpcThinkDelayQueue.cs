@@ -55,9 +55,20 @@ internal sealed class NpcThinkDelayQueue: IAsyncDisposable
                     : _clock.GetElapsedTime(now, dueTimestamp);
                 if (remaining > TimeSpan.Zero)
                 {
-                    Task delay = Task.Delay(remaining, cancellationToken);
-                    Task<bool> newEntry = _incoming.Reader.WaitToReadAsync(cancellationToken).AsTask();
+                    using CancellationTokenSource waitCancellation =
+                        CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    Task delay = Task.Delay(remaining, waitCancellation.Token);
+                    Task<bool> newEntry = _incoming.Reader.WaitToReadAsync(waitCancellation.Token).AsTask();
                     await Task.WhenAny(delay, newEntry).ConfigureAwait(false);
+                    waitCancellation.Cancel();
+                    try
+                    {
+                        await Task.WhenAll(delay, newEntry).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                    {
+                        // Cancel the losing wait so thousands of dormant WaitToRead tasks cannot accumulate.
+                    }
                     continue;
                 }
 

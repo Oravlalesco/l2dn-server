@@ -232,11 +232,7 @@ public abstract class AbstractAI : Ctrl
 		{
 			case CtrlEvent.EVT_THINK:
 			{
-				if (reactiveActor != null && NpcReactivity.Mode == NpcReactiveSchedulerMode.Enabled)
-				{
-					NpcReactivity.Wake(reactiveActor, wakeReason, eventTimestamp);
-				}
-				else
+				if (reactiveActor == null || NpcReactivity.Mode != NpcReactiveSchedulerMode.Enabled)
 				{
 					onEvtThink();
 				}
@@ -372,7 +368,8 @@ public abstract class AbstractAI : Ctrl
 			_nextAction.DoAction();
 		}
 
-		if (reactiveActor != null && wakeReason != NpcWakeReason.None && evt != CtrlEvent.EVT_THINK)
+		if (reactiveActor != null && wakeReason != NpcWakeReason.None &&
+		    (evt != CtrlEvent.EVT_THINK || NpcReactivity.Mode == NpcReactiveSchedulerMode.Enabled))
 		{
 			NpcReactivity.Wake(reactiveActor, wakeReason, eventTimestamp);
 		}

@@ -4,6 +4,7 @@ using L2Dn.GameServer.AI.Runtime;
 using L2Dn.GameServer.AI.Scheduling;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Utilities;
+using NLog;
 using ThreadPool = L2Dn.GameServer.Utilities.ThreadPool;
 
 namespace L2Dn.GameServer.TaskManagers;
@@ -13,6 +14,7 @@ namespace L2Dn.GameServer.TaskManagers;
  */
 public class AttackableThinkTaskManager
 {
+	private static readonly Logger LOGGER = LogManager.GetLogger(nameof(AttackableThinkTaskManager));
 	private static readonly Set<Set<Attackable>> POOLS = new();
 	private const int POOL_SIZE = 1000;
 	private const int TASK_DELAY = 1000;
@@ -77,9 +79,10 @@ public class AttackableThinkTaskManager
 						perceptionPublications.Add(perception);
 					}
 				}
-				catch
+				catch (Exception exception)
 				{
 					// A single actor must not abort the remaining pool iteration.
+					LOGGER.Error(exception, $"NPC think failed for object {attackable.ObjectId}; continuing pool {_sourcePoolId}.");
 				}
 			}
 
@@ -134,6 +137,10 @@ public class AttackableThinkTaskManager
 				return;
 			}
 		}
+
+		// Event wake-ups can create coordination state before the periodic pool registration completes.
+		NpcPerceptionCoordinator.Instance.Remove(attackable.ObjectId);
+		NpcReactivity.Remove(attackable);
 	}
 
 	internal Attackable[] GetAttackablesSnapshot()
