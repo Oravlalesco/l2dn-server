@@ -18,6 +18,7 @@ using L2Dn.GameServer.Utilities;
 using L2Dn.Geometry;
 using L2Dn.Utilities;
 using NLog;
+using L2Dn.NpcContracts;
 
 namespace L2Dn.GameServer.AI;
 
@@ -32,6 +33,9 @@ public class AttackableAI: CreatureAI
 	private readonly INpcThreatQuery _threatQuery;
 	private readonly ILegacyNpcCommandExecutor _commands;
 	private readonly INpcRandomSource _random;
+	private readonly ILegacyNpcEntityResolver _entityResolver;
+	[ThreadStatic]
+	private static NpcDecisionContext? _decisionContext;
 
 	private const int RANDOM_WALK_RATE = 30; // confirmed
 	private const int MAX_ATTACK_TIMEOUT = 1200; // int ticks, i.e. 2min
@@ -62,6 +66,7 @@ public class AttackableAI: CreatureAI
 		_threatQuery = dependencies.Threat;
 		_commands = dependencies.Commands;
 		_random = dependencies.Random;
+		_entityResolver = dependencies.EntityResolver;
 		_attackTimeout = int.MaxValue;
 		_globalAggro = -10; // 10 seconds timeout of ATTACK after respawn
 	}
@@ -182,7 +187,7 @@ public class AttackableAI: CreatureAI
 		{
 			// Check if actor is not dead
 			Attackable npc = getActiveChar();
-			if (!npc.isAlikeDead())
+			if (!IsActorAlikeDead(npc))
 			{
 				// If its _knownPlayer isn't empty set the Intention to AI_INTENTION_ACTIVE
 				if (_worldQuery.GetVisibleObjects<Player>(npc).Count != 0)
@@ -270,7 +275,7 @@ public class AttackableAI: CreatureAI
 	{
 		// Check if region and its neighbors are active.
 		WorldRegion region = _actor.getWorldRegion();
-		if (region == null || !region.AreNeighborsActive)
+		if (region == null || !AreActorNeighborsActive(region))
 		{
 			return;
 		}
@@ -432,7 +437,9 @@ public class AttackableAI: CreatureAI
 		}
 
 		// Chance to forget attackers after some time
-		if (npc.getCurrentHp() == npc.getMaxHp() && npc.getCurrentMp() == npc.getMaxMp() && !npc.getAttackByList().isEmpty() && _random.Next(500) == 0)
+		if (GetActorCurrentHp(npc) == GetActorMaximumHp(npc) &&
+		    GetActorCurrentMp(npc) == GetActorMaximumMp(npc) &&
+		    !npc.getAttackByList().isEmpty() && _random.Next(500) == 0)
 		{
 			_commands.ClearCombatMemory(npc);
 		}
@@ -761,7 +768,7 @@ public class AttackableAI: CreatureAI
 		}
 
 		List<Skill> aiSuicideSkills = template.getAISkills(AISkillScope.SUICIDE);
-		if (aiSuicideSkills.Count != 0 && (int)(npc.getCurrentHp() / npc.getMaxHp() * 100) < 30 && npc.hasSkillChance())
+		if (aiSuicideSkills.Count != 0 && (int)(GetActorCurrentHp(npc) / GetActorMaximumHp(npc) * 100) < 30 && npc.hasSkillChance())
 		{
 			Skill skill = _random.Pick(aiSuicideSkills);
 			if (SkillCaster.checkUseConditions(npc, skill) && checkSkillTarget(skill, target))
@@ -863,16 +870,16 @@ public class AttackableAI: CreatureAI
 			if (npc is RaidBoss && chaostime > Config.Npc.RAID_CHAOS_TIME)
 			{
 				double multiplier = ((Monster) npc).hasMinions() ? 200 : 100;
-				changeTarget = _random.Next(100) <= 100 - npc.getCurrentHp() * multiplier / npc.getMaxHp();
+				changeTarget = _random.Next(100) <= 100 - GetActorCurrentHp(npc) * multiplier / GetActorMaximumHp(npc);
 			}
 			else if (npc is GrandBoss && chaostime > Config.Npc.GRAND_CHAOS_TIME)
 			{
-				double chaosRate = 100 - npc.getCurrentHp() * 300 / npc.getMaxHp();
+				double chaosRate = 100 - GetActorCurrentHp(npc) * 300 / GetActorMaximumHp(npc);
 				changeTarget = (chaosRate <= 10 && _random.Next(100) <= 10) || (chaosRate > 10 && _random.Next(100) <= chaosRate);
 			}
 			else if (chaostime > Config.Npc.MINION_CHAOS_TIME)
 			{
-				changeTarget = _random.Next(100) <= 100 - npc.getCurrentHp() * 200 / npc.getMaxHp();
+				changeTarget = _random.Next(100) <= 100 - GetActorCurrentHp(npc) * 200 / GetActorMaximumHp(npc);
 			}
 
 			if (changeTarget)
@@ -1263,7 +1270,7 @@ public class AttackableAI: CreatureAI
 
 		// Check if region and its neighbors are active.
 		WorldRegion region = _actor.getWorldRegion();
-		if (region == null || !region.AreNeighborsActive)
+		if (region == null || !AreActorNeighborsActive(region))
 		{
 			return;
 		}
@@ -1308,6 +1315,20 @@ public class AttackableAI: CreatureAI
 		{
 			// Stop thinking action
 			_thinking = false;
+		}
+	}
+
+	internal void onEvtThink(NpcPerceptionSnapshot perception)
+	{
+		NpcDecisionContext? previous = _decisionContext;
+		_decisionContext = new NpcDecisionContext(perception, _geoQuery);
+		try
+		{
+			onEvtThink();
+		}
+		finally
+		{
+			_decisionContext = previous;
 		}
 	}
 
@@ -1448,11 +1469,39 @@ public class AttackableAI: CreatureAI
 	public override WorldObject? getTarget()
 	{
 		// NPCs share their regular target with AI target.
-		return _actor.getTarget();
+		NpcPerceptionSnapshot? perception = GetCurrentPerception();
+		EntityKey? target = perception?.State.Combat.CurrentTarget;
+		return target == null ? _actor.getTarget() : _entityResolver.Resolve(getActiveChar(), target.Value);
 	}
 
 	public Attackable getActiveChar()
 	{
 		return (Attackable) _actor;
 	}
+
+	private NpcPerceptionSnapshot? GetCurrentPerception()
+	{
+		NpcPerceptionSnapshot? perception = _decisionContext?.Perception;
+		return perception?.Envelope.Npc.ObjectId == _actor.ObjectId ? perception : null;
+	}
+
+	private bool IsActorAlikeDead(Attackable actor) => GetCurrentPerception() is { } perception
+		? perception.State.Physical.Flags.HasFlag(NpcPhysicalFlags.AlikeDead)
+		: actor.isAlikeDead();
+
+	private bool AreActorNeighborsActive(WorldRegion liveRegion) => GetCurrentPerception() is { } perception
+		? perception.State.Environment.NeighborsActive
+		: liveRegion.AreNeighborsActive;
+
+	private double GetActorCurrentHp(Attackable actor) =>
+		GetCurrentPerception()?.State.Physical.CurrentHp ?? actor.getCurrentHp();
+
+	private double GetActorMaximumHp(Attackable actor) =>
+		GetCurrentPerception()?.State.Physical.MaximumHp ?? actor.getMaxHp();
+
+	private double GetActorCurrentMp(Attackable actor) =>
+		GetCurrentPerception()?.State.Physical.CurrentMp ?? actor.getCurrentMp();
+
+	private double GetActorMaximumMp(Attackable actor) =>
+		GetCurrentPerception()?.State.Physical.MaximumMp ?? actor.getMaxMp();
 }

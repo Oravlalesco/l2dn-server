@@ -31,8 +31,10 @@ public class AttackableThinkTaskManager
 		
 		public void run()
 		{
+			long poolStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
 			if (_attackables.isEmpty())
 			{
+				NpcAiTelemetry.RecordPoolIteration(_attackables.Count, poolStartedAt);
 				return;
 			}
 			
@@ -50,7 +52,17 @@ public class AttackableThinkTaskManager
 						long allocatedBytesBefore = measure ? GC.GetAllocatedBytesForCurrentThread() : 0;
 						try
 						{
-							ai.onEvtThink();
+							NpcPerceptionCoordinator coordinator = NpcPerceptionCoordinator.Instance;
+							NpcPerceptionCycle? perception = coordinator.Capture(attackable);
+							if (coordinator.Mode == NpcPerceptionMode.SnapshotRead && perception != null &&
+							    ai is AttackableAI attackableAi)
+							{
+								attackableAi.onEvtThink(perception.Snapshot);
+							}
+							else
+							{
+								ai.onEvtThink();
+							}
 						}
 						catch
 						{
@@ -75,6 +87,8 @@ public class AttackableThinkTaskManager
 					_attackables.remove(attackable);
 				}
 			}
+
+			NpcAiTelemetry.RecordPoolIteration(_attackables.Count, poolStartedAt);
 		}
 	}
 	

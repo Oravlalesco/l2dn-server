@@ -104,7 +104,7 @@ public class NpcAiRuntimeTests
         TestWorldObject target = new(GetNextObjectId());
         RecordingCommandExecutor commands = new();
         NpcAiDependencies dependencies = new(new EmptyWorldQuery(), new EmptyGeoQuery(),
-            new EmptyThreatQuery(), commands, new DeterministicRandomSource());
+            new EmptyThreatQuery(), commands, new DeterministicRandomSource(), new NullEntityResolver());
         AttackableAI ai = new(actor, dependencies);
 
         ai.setTarget(target);
@@ -208,6 +208,96 @@ public class NpcAiRuntimeTests
 
         worldTickReads.Should().Be(2);
         capture!.Npc.Generation.Should().Be(2);
+    }
+
+    [Fact]
+    public void Perception_coordinator_advances_revision_only_for_publications_and_resets_on_generation()
+    {
+        Attackable actor = CreateSpawnedAttackable();
+        TestClock clock = new(1_000);
+        NpcPerceptionBuilder builder = new(new TestWorldQuery([], 11), new TestGeoQuery(),
+            new FixedThreatQuery([]), clock);
+        NpcPerceptionCoordinator coordinator = new(builder,
+            new NpcPerceptionOptions(NpcPerceptionMode.CaptureOnly, TimeSpan.Zero, TimeSpan.Zero));
+
+        NpcPerceptionCycle first = coordinator.Capture(actor)!;
+        NpcPerceptionCycle unchanged = coordinator.Capture(actor)!;
+        actor.setXYZ(12, 34, 56);
+        NpcPerceptionCycle changed = coordinator.Capture(actor)!;
+
+        first.Publication.Should().Be(NpcPerceptionPublicationKind.Full);
+        first.Snapshot.Envelope.StateRevision.Should().Be(1);
+        unchanged.Publication.Should().Be(NpcPerceptionPublicationKind.None);
+        unchanged.Snapshot.Envelope.StateRevision.Should().Be(1);
+        changed.Publication.Should().Be(NpcPerceptionPublicationKind.Full);
+        changed.Snapshot.Envelope.StateRevision.Should().Be(2);
+
+        actor.beginRespawnLifecycle();
+        actor.onRespawn();
+        actor.completeRespawnLifecycle();
+        NpcPerceptionCycle respawned = coordinator.Capture(actor)!;
+
+        respawned.Snapshot.Envelope.Npc.Generation.Should().Be(2);
+        respawned.Snapshot.Envelope.StateRevision.Should().Be(1);
+    }
+
+    [Fact]
+    public void Perception_coordinator_periodic_full_is_deterministic_and_revisioned()
+    {
+        Attackable actor = CreateSpawnedAttackable();
+        TestClock clock = new(1_000);
+        NpcPerceptionCoordinator coordinator = new(
+            new NpcPerceptionBuilder(new TestWorldQuery([], 1), new TestGeoQuery(), new FixedThreatQuery([]), clock),
+            new NpcPerceptionOptions(NpcPerceptionMode.CaptureOnly, TimeSpan.FromSeconds(60), TimeSpan.Zero));
+
+        NpcPerceptionCycle first = coordinator.Capture(actor)!;
+        clock.Value = 60_999;
+        NpcPerceptionCycle notDue = coordinator.Capture(actor)!;
+        clock.Value = 61_000;
+        NpcPerceptionCycle due = coordinator.Capture(actor)!;
+
+        first.Snapshot.Envelope.StateRevision.Should().Be(1);
+        notDue.Publication.Should().Be(NpcPerceptionPublicationKind.None);
+        notDue.Snapshot.Envelope.StateRevision.Should().Be(1);
+        due.Publication.Should().Be(NpcPerceptionPublicationKind.Full);
+        due.Snapshot.Envelope.StateRevision.Should().Be(2);
+    }
+
+    [Fact]
+    public void Snapshot_read_resolves_current_target_only_at_the_legacy_edge()
+    {
+        Attackable actor = CreateSpawnedAttackable();
+        Attackable target = CreateSpawnedAttackable();
+        actor.setTarget(target);
+        NpcPerceptionBuilder builder = new(new TestWorldQuery([target], 1), new TestGeoQuery(),
+            new FixedThreatQuery([]), new TestClock(1));
+        builder.TryCapture(actor, out NpcPerceptionCapture? capture).Should().BeTrue();
+        capture!.TryCreateSnapshot(actor, 1, out NpcPerceptionSnapshot? snapshot).Should().BeTrue();
+        FixedEntityResolver resolver = new(target);
+        TargetReadingAttackableAI ai = new(actor, new NpcAiDependencies(new EmptyWorldQuery(), new EmptyGeoQuery(),
+            new EmptyThreatQuery(), new RecordingCommandExecutor(), new DeterministicRandomSource(), resolver));
+
+        ai.onEvtThink(snapshot!);
+
+        ai.ObservedTarget.Should().BeSameAs(target);
+        resolver.ResolveCalls.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData("Disabled", (int)NpcPerceptionMode.Disabled)]
+    [InlineData("CAPTURE_ONLY", (int)NpcPerceptionMode.CaptureOnly)]
+    [InlineData("shadow-validate", (int)NpcPerceptionMode.ShadowValidate)]
+    [InlineData("SnapshotRead", (int)NpcPerceptionMode.SnapshotRead)]
+    [InlineData("invalid", (int)NpcPerceptionMode.Disabled)]
+    public void Perception_mode_parses_operational_configuration(string configured, int expected)
+    {
+        NpcPerceptionOptions options = NpcPerceptionOptions.FromEnvironment(name => name switch
+        {
+            "NPC_PERCEPTION_MODE" => configured,
+            _ => null
+        });
+
+        options.Mode.Should().Be((NpcPerceptionMode)expected);
     }
 
     [Fact]
@@ -359,6 +449,34 @@ public class NpcAiRuntimeTests
     private sealed class FixedClock(long value): INpcPerceptionClock
     {
         public long GetMonotonicMilliseconds() => value;
+    }
+
+    private sealed class TestClock(long value): INpcPerceptionClock
+    {
+        public long Value { get; set; } = value;
+        public long GetMonotonicMilliseconds() => Value;
+    }
+
+    private sealed class NullEntityResolver: ILegacyNpcEntityResolver
+    {
+        public WorldObject? Resolve(Attackable observer, EntityKey key) => null;
+    }
+
+    private sealed class FixedEntityResolver(WorldObject target): ILegacyNpcEntityResolver
+    {
+        public int ResolveCalls { get; private set; }
+        public WorldObject? Resolve(Attackable observer, EntityKey key)
+        {
+            ResolveCalls++;
+            return target.ObjectId == key.ObjectId ? target : null;
+        }
+    }
+
+    private sealed class TargetReadingAttackableAI(Attackable actor, NpcAiDependencies dependencies):
+        AttackableAI(actor, dependencies)
+    {
+        public WorldObject? ObservedTarget { get; private set; }
+        public override void onEvtThink() => ObservedTarget = getTarget();
     }
 
     private sealed class RecordingCommandExecutor: ILegacyNpcCommandExecutor

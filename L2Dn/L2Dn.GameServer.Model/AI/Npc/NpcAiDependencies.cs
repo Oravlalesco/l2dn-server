@@ -5,12 +5,14 @@ internal sealed record NpcAiDependencies(
     INpcGeoQuery Geo,
     INpcThreatQuery Threat,
     ILegacyNpcCommandExecutor Commands,
-    INpcRandomSource Random)
+    INpcRandomSource Random,
+    ILegacyNpcEntityResolver EntityResolver)
 {
     public static NpcAiDependencies Legacy { get; } = new(
         LegacyNpcWorldQuery.Instance,
         LegacyNpcGeoQuery.Instance,
         LegacyNpcThreatQuery.Instance,
         LegacyNpcCommandExecutor.Instance,
-        ProductionNpcRandomSource.Instance);
+        ProductionNpcRandomSource.Instance,
+        LegacyNpcEntityResolver.Instance);
 }

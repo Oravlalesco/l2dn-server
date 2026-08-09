@@ -3,6 +3,7 @@ using System.Diagnostics.Metrics;
 using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.TaskManagers;
+using L2Dn.NpcContracts;
 
 namespace L2Dn.GameServer.AI.Runtime;
 
@@ -48,9 +49,46 @@ public static class NpcAiTelemetry
     private static readonly Counter<long> CommandCalls =
         Meter.CreateCounter<long>("l2dn.npc.command.calls", "{call}", "Commands executed by the legacy NPC command adapter.");
 
+    private static readonly Counter<long> PerceptionCaptureCalls =
+        Meter.CreateCounter<long>("l2dn.npc.perception.capture.count", "{capture}", "NPC perception captures completed.");
+
+    private static readonly Histogram<double> PerceptionCaptureDuration =
+        Meter.CreateHistogram<double>("l2dn.npc.perception.capture.duration", "s", "NPC perception capture duration.");
+
+    private static readonly Histogram<long> PerceptionCaptureAllocations =
+        Meter.CreateHistogram<long>("l2dn.npc.perception.alloc.bytes", "By", "Managed bytes allocated while capturing NPC perception.");
+
+    private static readonly Histogram<long> PerceptionEstimatedBytes =
+        Meter.CreateHistogram<long>("l2dn.npc.perception.estimated_payload_bytes", "By", "Estimated logical NPC perception payload size.");
+
+    private static readonly Histogram<long> PerceptionVisibleEntities =
+        Meter.CreateHistogram<long>("l2dn.npc.perception.visible_entities", "{entity}", "Visible entities copied into NPC perception.");
+
+    private static readonly Histogram<long> PerceptionThreatEntries =
+        Meter.CreateHistogram<long>("l2dn.npc.perception.threat_entries", "{entry}", "Threat entries copied into NPC perception.");
+
+    private static readonly Counter<long> PerceptionFullSnapshots =
+        Meter.CreateCounter<long>("l2dn.npc.perception.full.count", "{snapshot}", "Full NPC perception snapshots published.");
+
+    private static readonly Counter<long> PerceptionCaptureFailures =
+        Meter.CreateCounter<long>("l2dn.npc.perception.capture.failures", "{failure}", "NPC perception captures rejected or failed.");
+
+    private static readonly Counter<long> PerceptionValidationMismatches =
+        Meter.CreateCounter<long>("l2dn.npc.perception.validation.mismatch", "{mismatch}", "NPC perception validation mismatches.");
+
+    private static readonly Counter<long> LegacyEntityResolves =
+        Meter.CreateCounter<long>("l2dn.npc.perception.legacy_resolve.count", "{resolve}", "Snapshot entity keys resolved back to legacy world objects.");
+
+    private static readonly Histogram<double> PoolIterationDuration =
+        Meter.CreateHistogram<double>("l2dn.npc.scheduler.pool_iteration.duration", "s", "Legacy NPC scheduler pool iteration duration.");
+
+    private static readonly Counter<long> PoolIterationOverruns =
+        Meter.CreateCounter<long>("l2dn.npc.scheduler.pool_iteration.overrun", "{overrun}", "Legacy NPC scheduler pool iterations exceeding their one-second cadence.");
+
     private static readonly object SnapshotLock = new();
     private static StateSnapshot _snapshot = StateSnapshot.Empty;
     private static long _snapshotTimestamp;
+    private static int _perceptionMode;
 
     static NpcAiTelemetry()
     {
@@ -62,6 +100,9 @@ public static class NpcAiTelemetry
         Meter.CreateObservableGauge("l2dn.players.online", () => GetStateSnapshot().PlayersOnline, "{player}", "Players currently registered in the world.");
         Meter.CreateObservableGauge("l2dn.npc.intention", () => GetStateSnapshot().Intentions, "{npc}", "Thinking NPCs grouped by current legacy intention.");
         Meter.CreateObservableGauge("l2dn.npc.region.loaded", () => GetStateSnapshot().Regions, "{npc}", "Loaded NPCs grouped by instance and world region.");
+        Meter.CreateObservableGauge("l2dn.npc.perception.mode", () => new Measurement<long>(1,
+            new KeyValuePair<string, object?>("mode", ((NpcPerceptionMode)Volatile.Read(ref _perceptionMode)).ToString())),
+            "{mode}", "Configured NPC perception operating mode.");
     }
 
     internal static bool ThinkMeasurementsEnabled =>
@@ -83,6 +124,76 @@ public static class NpcAiTelemetry
     {
         TagList tags = CreateAiTags(ai, intention);
         ThinkErrors.Add(1, tags);
+    }
+
+    internal static void SetPerceptionMode(NpcPerceptionMode mode) =>
+        Volatile.Write(ref _perceptionMode, (int)mode);
+
+    internal static void RecordPerceptionCapture(NpcPerceptionSnapshot snapshot,
+        NpcPerceptionPublicationKind publication, bool semanticStateChanged, NpcPerceptionMode mode,
+        long startedAt, long allocatedBytesBefore)
+    {
+        TagList tags = default;
+        tags.Add("mode", mode.ToString());
+        tags.Add("publication", publication.ToString());
+        tags.Add("semantic_change", semanticStateChanged);
+        PerceptionCaptureCalls.Add(1, tags);
+        PerceptionCaptureDuration.Record(Stopwatch.GetElapsedTime(startedAt).TotalSeconds, tags);
+        PerceptionCaptureAllocations.Record(
+            Math.Max(0, GC.GetAllocatedBytesForCurrentThread() - allocatedBytesBefore), tags);
+        PerceptionVisibleEntities.Record(snapshot.State.VisibleEntities.Length, tags);
+        PerceptionThreatEntries.Record(snapshot.State.Threats.Length, tags);
+        PerceptionEstimatedBytes.Record(EstimatePayloadBytes(snapshot), tags);
+        if (publication == NpcPerceptionPublicationKind.Full)
+        {
+            PerceptionFullSnapshots.Add(1, tags);
+        }
+    }
+
+    internal static void RecordPerceptionCaptureFailure(string reason, NpcPerceptionMode mode) =>
+        PerceptionCaptureFailures.Add(1,
+            new KeyValuePair<string, object?>("reason", reason),
+            new KeyValuePair<string, object?>("mode", mode.ToString()));
+
+    internal static void RecordPerceptionValidationMismatch(string field, string validationKind) =>
+        PerceptionValidationMismatches.Add(1,
+            new KeyValuePair<string, object?>("field", field),
+            new KeyValuePair<string, object?>("validation_kind", validationKind));
+
+    internal static void RecordLegacyResolve() => LegacyEntityResolves.Add(1);
+
+    internal static void RecordPoolIteration(int npcCount, long startedAt)
+    {
+        double elapsedSeconds = Stopwatch.GetElapsedTime(startedAt).TotalSeconds;
+        KeyValuePair<string, object?> countBand = new("npc_count_band", npcCount switch
+        {
+            0 => "empty",
+            <= 250 => "1_250",
+            <= 500 => "251_500",
+            <= 750 => "501_750",
+            _ => "751_1000"
+        });
+        PoolIterationDuration.Record(elapsedSeconds, countBand);
+        if (elapsedSeconds > 1)
+        {
+            PoolIterationOverruns.Add(1, countBand);
+        }
+    }
+
+    private static long EstimatePayloadBytes(NpcPerceptionSnapshot snapshot)
+    {
+        const int EnvelopeAndScalarEstimate = 256;
+        const int VisibleEntityEstimate = 96;
+        const int ThreatEntryEstimate = 56;
+        const int AffordanceEstimate = 24;
+        const int SpatialEstimate = 24;
+        const int ClanIdEstimate = sizeof(int);
+        return EnvelopeAndScalarEstimate +
+               snapshot.State.VisibleEntities.Length * VisibleEntityEstimate +
+               snapshot.State.Threats.Length * ThreatEntryEstimate +
+               snapshot.State.Affordances.Length * AffordanceEstimate +
+               snapshot.State.SpatialObservations.Length * SpatialEstimate +
+               snapshot.State.Identity.ClanIds.Length * ClanIdEstimate;
     }
 
     internal static T ObserveWorldQuery<T>(string operation, Type entityType, Func<T> query)
