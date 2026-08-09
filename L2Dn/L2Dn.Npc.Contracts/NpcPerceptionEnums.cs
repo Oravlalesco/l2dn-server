@@ -127,3 +127,26 @@ public enum SpatialObservationFlags
     HasLineOfSight = 1 << 0,
     CanReachDirectly = 1 << 1
 }
+
+public enum NpcSkillCategory
+{
+    Unknown = 0,
+    Offensive = 1,
+    Heal = 2,
+    Buff = 3,
+    Debuff = 4,
+    Control = 5,
+    Resurrection = 6,
+    Suicide = 7
+}
+
+[Flags]
+public enum NpcSkillObservationFlags
+{
+    None = 0,
+    Ready = 1 << 0,
+    Cooldown = 1 << 1,
+    InsufficientMana = 1 << 2,
+    Magic = 1 << 3,
+    Bad = 1 << 4
+}

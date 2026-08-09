@@ -34,6 +34,7 @@ public class NpcPerceptionContractTests
         state.Threats.IsDefault.Should().BeFalse();
         state.Affordances.IsDefault.Should().BeFalse();
         state.SpatialObservations.IsDefault.Should().BeFalse();
+        state.Skills.IsDefault.Should().BeFalse();
     }
 
     [Fact]

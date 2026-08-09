@@ -62,7 +62,8 @@ public sealed record NpcPerceptionState
     public NpcPerceptionState(NpcIdentity identity, NpcPhysicalState physical, NpcCombatFacts combat,
         NpcEnvironment environment, ImmutableArray<VisibleEntity> visibleEntities,
         ImmutableArray<ThreatEntry> threats, ImmutableArray<NpcAffordanceObservation> affordances,
-        ImmutableArray<SpatialObservation> spatialObservations)
+        ImmutableArray<SpatialObservation> spatialObservations,
+        ImmutableArray<NpcSkillObservation> skills = default)
     {
         Identity = identity;
         Physical = physical;
@@ -72,6 +73,7 @@ public sealed record NpcPerceptionState
         Threats = threats.IsDefault ? [] : threats;
         Affordances = affordances.IsDefault ? [] : affordances;
         SpatialObservations = spatialObservations.IsDefault ? [] : spatialObservations;
+        Skills = skills.IsDefault ? [] : skills;
     }
 
     public NpcIdentity Identity { get; }
@@ -82,6 +84,7 @@ public sealed record NpcPerceptionState
     public ImmutableArray<ThreatEntry> Threats { get; }
     public ImmutableArray<NpcAffordanceObservation> Affordances { get; }
     public ImmutableArray<SpatialObservation> SpatialObservations { get; }
+    public ImmutableArray<NpcSkillObservation> Skills { get; }
 }
 
 public sealed record NpcPerceptionSnapshot(NpcPerceptionEnvelope Envelope, NpcPerceptionState State)

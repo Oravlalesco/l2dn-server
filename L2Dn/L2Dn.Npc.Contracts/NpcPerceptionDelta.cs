@@ -13,7 +13,8 @@ public enum NpcPerceptionChangeMask
     VisibleEntities = 1 << 4,
     Threats = 1 << 5,
     Affordances = 1 << 6,
-    SpatialObservations = 1 << 7
+    SpatialObservations = 1 << 7,
+    Skills = 1 << 8
 }
 
 public sealed record NpcPerceptionDeltaEnvelope(
@@ -51,7 +52,8 @@ public sealed record NpcPerceptionDelta
         VisibleEntityDelta? visibleEntities,
         ImmutableArray<ThreatEntry> threats,
         ImmutableArray<NpcAffordanceObservation> affordances,
-        ImmutableArray<SpatialObservation> spatialObservations)
+        ImmutableArray<SpatialObservation> spatialObservations,
+        ImmutableArray<NpcSkillObservation> skills = default)
     {
         Envelope = envelope;
         Changes = changes;
@@ -63,6 +65,7 @@ public sealed record NpcPerceptionDelta
         Threats = threats.IsDefault ? [] : threats;
         Affordances = affordances.IsDefault ? [] : affordances;
         SpatialObservations = spatialObservations.IsDefault ? [] : spatialObservations;
+        Skills = skills.IsDefault ? [] : skills;
     }
 
     public NpcPerceptionDeltaEnvelope Envelope { get; }
@@ -75,6 +78,7 @@ public sealed record NpcPerceptionDelta
     public ImmutableArray<ThreatEntry> Threats { get; }
     public ImmutableArray<NpcAffordanceObservation> Affordances { get; }
     public ImmutableArray<SpatialObservation> SpatialObservations { get; }
+    public ImmutableArray<NpcSkillObservation> Skills { get; }
 }
 
 public enum NpcPerceptionApplyStatus

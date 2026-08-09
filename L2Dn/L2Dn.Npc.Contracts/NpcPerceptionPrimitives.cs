@@ -30,3 +30,11 @@ public readonly record struct ThreatEntry(
 public readonly record struct NpcAffordanceObservation(EntityKey Target, NpcAffordanceFlags Affordances);
 
 public readonly record struct SpatialObservation(EntityKey Target, SpatialObservationFlags Spatial);
+
+public readonly record struct NpcSkillObservation(
+    int SkillId,
+    int Level,
+    int Range,
+    int MpCost,
+    NpcSkillCategory Category,
+    NpcSkillObservationFlags Flags);

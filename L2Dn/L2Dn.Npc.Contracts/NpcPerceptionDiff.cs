@@ -20,6 +20,7 @@ public static class NpcPerceptionDiff
         ImmutableArray<ThreatEntry> threats = [];
         ImmutableArray<NpcAffordanceObservation> affordances = [];
         ImmutableArray<SpatialObservation> spatial = [];
+        ImmutableArray<NpcSkillObservation> skills = [];
 
         if (!IdentityEquals(from.State.Identity, to.State.Identity))
         {
@@ -69,6 +70,12 @@ public static class NpcPerceptionDiff
             spatial = to.State.SpatialObservations;
         }
 
+        if (!from.State.Skills.SequenceEqual(to.State.Skills))
+        {
+            changes |= NpcPerceptionChangeMask.Skills;
+            skills = to.State.Skills;
+        }
+
         return new NpcPerceptionDelta(
             new NpcPerceptionDeltaEnvelope(NpcPerceptionSnapshot.CurrentSchemaVersion, to.Envelope.Npc,
                 from.Envelope.StateRevision, to.Envelope.StateRevision, to.Envelope.WorldTick,
@@ -81,7 +88,8 @@ public static class NpcPerceptionDiff
             visibleEntities,
             threats,
             affordances,
-            spatial);
+            spatial,
+            skills);
     }
 
     private static VisibleEntityDelta DiffVisibleEntities(ImmutableArray<VisibleEntity> from,

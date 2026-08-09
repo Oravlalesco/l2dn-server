@@ -4,6 +4,7 @@ using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Model.Actor.Instances;
 using L2Dn.GameServer.Model.Actor.Templates;
+using L2Dn.GameServer.Model.Skills;
 using L2Dn.GameServer.Model.Zones;
 using L2Dn.GameServer.Utilities;
 using L2Dn.NpcContracts;
@@ -126,7 +127,8 @@ internal sealed class NpcPerceptionBuilder
             visible.MoveToImmutable(),
             threats.MoveToImmutable(),
             affordances.MoveToImmutable(),
-            spatial.MoveToImmutable());
+            spatial.MoveToImmutable(),
+            MapSkills(actor));
 
         if (!actor.tryGetStableLifecycleStamp(out NpcLifecycleStamp after) || after != before)
         {
@@ -218,6 +220,55 @@ internal sealed class NpcPerceptionBuilder
             actor.isRandomWalkingEnabled(),
             false,
             actor.canReturnToSpawnPoint());
+    }
+
+    private static ImmutableArray<NpcSkillObservation> MapSkills(Attackable actor)
+    {
+        Dictionary<(int Id, int Level), (Skill Skill, NpcSkillCategory Category)> observations = [];
+        AddSkills(observations, actor, AISkillScope.HEAL, NpcSkillCategory.Heal);
+        AddSkills(observations, actor, AISkillScope.RES, NpcSkillCategory.Resurrection);
+        AddSkills(observations, actor, AISkillScope.BUFF, NpcSkillCategory.Buff);
+        AddSkills(observations, actor, AISkillScope.DEBUFF, NpcSkillCategory.Debuff);
+        AddSkills(observations, actor, AISkillScope.NEGATIVE, NpcSkillCategory.Debuff);
+        AddSkills(observations, actor, AISkillScope.IMMOBILIZE, NpcSkillCategory.Control);
+        AddSkills(observations, actor, AISkillScope.COT, NpcSkillCategory.Control);
+        AddSkills(observations, actor, AISkillScope.SUICIDE, NpcSkillCategory.Suicide);
+        AddSkills(observations, actor, AISkillScope.ATTACK, NpcSkillCategory.Offensive);
+        AddSkills(observations, actor, AISkillScope.LONG_RANGE, NpcSkillCategory.Offensive);
+        AddSkills(observations, actor, AISkillScope.SHORT_RANGE, NpcSkillCategory.Offensive);
+        AddSkills(observations, actor, AISkillScope.GENERAL, NpcSkillCategory.Offensive);
+        AddSkills(observations, actor, AISkillScope.UNIVERSAL, NpcSkillCategory.Offensive);
+
+        return [.. observations.Values
+            .OrderBy(static item => item.Skill.getId())
+            .ThenBy(static item => item.Skill.getLevel())
+            .Select(item => MapSkill(actor, item.Skill, item.Category))];
+    }
+
+    private static void AddSkills(
+        Dictionary<(int Id, int Level), (Skill Skill, NpcSkillCategory Category)> observations,
+        Attackable actor, AISkillScope scope, NpcSkillCategory category)
+    {
+        foreach (Skill skill in actor.getTemplate().getAISkills(scope))
+        {
+            observations.TryAdd((skill.getId(), skill.getLevel()), (skill, category));
+        }
+    }
+
+    private static NpcSkillObservation MapSkill(Attackable actor, Skill skill, NpcSkillCategory category)
+    {
+        int mpCost = skill.getMpConsume() + skill.getMpInitialConsume();
+        bool cooldown = actor.hasSkillReuse(skill.getReuseHashCode()) || actor.isSkillDisabled(skill);
+        bool insufficientMana = actor.getCurrentMp() < mpCost;
+        NpcSkillObservationFlags flags = NpcSkillObservationFlags.None;
+        if (!cooldown && !insufficientMana && !actor.isAllSkillsDisabled())
+            flags |= NpcSkillObservationFlags.Ready;
+        if (cooldown) flags |= NpcSkillObservationFlags.Cooldown;
+        if (insufficientMana) flags |= NpcSkillObservationFlags.InsufficientMana;
+        if (skill.isMagic()) flags |= NpcSkillObservationFlags.Magic;
+        if (skill.isBad()) flags |= NpcSkillObservationFlags.Bad;
+        return new NpcSkillObservation(skill.getId(), skill.getLevel(), skill.getCastRange(), mpCost,
+            category, flags);
     }
 
     private static VisibleEntity MapVisibleEntity(Attackable observer, WorldObject observed, int ordinal,

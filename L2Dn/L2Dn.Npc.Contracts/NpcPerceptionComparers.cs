@@ -27,7 +27,8 @@ public sealed class NpcPerceptionStateComparer: IEqualityComparer<NpcPerceptionS
                x.VisibleEntities.SequenceEqual(y.VisibleEntities) &&
                x.Threats.SequenceEqual(y.Threats) &&
                x.Affordances.SequenceEqual(y.Affordances) &&
-               x.SpatialObservations.SequenceEqual(y.SpatialObservations);
+               x.SpatialObservations.SequenceEqual(y.SpatialObservations) &&
+               x.Skills.SequenceEqual(y.Skills);
     }
 
     public int GetHashCode(NpcPerceptionState obj)
@@ -47,6 +48,7 @@ public sealed class NpcPerceptionStateComparer: IEqualityComparer<NpcPerceptionS
         AddValues(ref hash, obj.Threats);
         AddValues(ref hash, obj.Affordances);
         AddValues(ref hash, obj.SpatialObservations);
+        AddValues(ref hash, obj.Skills);
         return hash.ToHashCode();
     }
 

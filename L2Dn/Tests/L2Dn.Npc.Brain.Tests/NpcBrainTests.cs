@@ -109,6 +109,49 @@ public class NpcBrainTests
     }
 
     [Fact]
+    public void Ready_offensive_skill_in_range_is_selected_deterministically()
+    {
+        NpcSkillObservation skill = new(107, 2, 600, 20, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 300)], skills: [skill]);
+
+        NpcIntent intent = new NpcBrainCoordinator().Decide(perception, Context()).Intents.Single();
+
+        intent.Should().BeOfType<CastSkillIntent>().Which.Should().Match<CastSkillIntent>(cast =>
+            cast.SkillId == 107 && cast.SkillLevel == 2 && cast.Target == Player);
+    }
+
+    [Theory]
+    [InlineData(NpcSkillObservationFlags.Cooldown)]
+    [InlineData(NpcSkillObservationFlags.InsufficientMana)]
+    public void Unavailable_skill_is_not_selected(NpcSkillObservationFlags flags)
+    {
+        NpcSkillObservation skill = new(107, 2, 600, 20, NpcSkillCategory.Offensive, flags);
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 30)], skills: [skill]);
+
+        NpcIntent intent = new NpcBrainCoordinator().Decide(perception, Context()).Intents.Single();
+
+        intent.Should().BeOfType<BasicAttackIntent>();
+    }
+
+    [Fact]
+    public void Low_health_actor_uses_ready_heal()
+    {
+        NpcSkillObservation skill = new(205, 1, 0, 10, NpcSkillCategory.Heal,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 30)], skills: [skill], hp: 20);
+
+        CastSkillIntent intent = (CastSkillIntent)new NpcBrainCoordinator().Decide(perception, Context())
+            .Intents.Single();
+
+        intent.SkillId.Should().Be(205);
+        intent.Target.Should().Be(new EntityKey(Actor.ObjectId, Actor.Generation, EntityKind.Npc));
+    }
+
+    [Fact]
     public void Actor_outside_leash_returns_home_without_target()
     {
         NpcPerceptionSnapshot perception = CreatePerception(position: new NpcPosition(500, 0, 0, 0),
@@ -179,6 +222,7 @@ public class NpcBrainTests
         EntityKey? target = null,
         ImmutableArray<VisibleEntity> visible = default,
         ImmutableArray<ThreatEntry> threats = default,
+        ImmutableArray<NpcSkillObservation> skills = default,
         NpcCapabilities capabilities = NpcCapabilities.CanMove | NpcCapabilities.CanAttack | NpcCapabilities.Aggressive,
         NpcPhysicalFlags physicalFlags = NpcPhysicalFlags.Alive | NpcPhysicalFlags.Spawned,
         NpcPosition? position = null,
@@ -192,7 +236,7 @@ public class NpcBrainTests
             physicalFlags);
         NpcCombatFacts combat = new(target, 40, 500, NpcCombatFlags.None);
         NpcEnvironment environment = new(new RegionKey(0, 1, 1), spawn, true, true, false, false, true);
-        NpcPerceptionState state = new(identity, physical, combat, environment, visible, threats, [], []);
+        NpcPerceptionState state = new(identity, physical, combat, environment, visible, threats, [], [], skills);
         return new NpcPerceptionSnapshot(new NpcPerceptionEnvelope(1, npc, revision, revision, revision), state);
     }
 }

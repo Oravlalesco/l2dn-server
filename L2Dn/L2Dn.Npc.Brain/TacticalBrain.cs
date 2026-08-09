@@ -30,6 +30,11 @@ public sealed class TacticalBrain
                 profile.PreferredRange > 0 ? profile.PreferredRange : perception.State.Combat.PhysicalAttackRange),
             NpcTacticalAction.Flee => new FleeIntent(
                 Envelope(snapshot, decisionSequence, NpcIntentType.Flee), target),
+            NpcTacticalAction.CastSkill when score.Skill is { } skill => new CastSkillIntent(
+                Envelope(snapshot, decisionSequence, NpcIntentType.CastSkill), skill.SkillId, skill.Level,
+                skill.Category is NpcSkillCategory.Heal or NpcSkillCategory.Buff
+                    ? new EntityKey(snapshot.Npc.ObjectId, snapshot.Npc.Generation, EntityKind.Npc)
+                    : target),
             _ => null
         };
     }

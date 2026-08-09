@@ -19,7 +19,7 @@ public static class NpcPerceptionDeltaApplier
             NpcPerceptionChangeMask.Physical | NpcPerceptionChangeMask.Combat |
             NpcPerceptionChangeMask.Environment | NpcPerceptionChangeMask.VisibleEntities |
             NpcPerceptionChangeMask.Threats | NpcPerceptionChangeMask.Affordances |
-            NpcPerceptionChangeMask.SpatialObservations;
+            NpcPerceptionChangeMask.SpatialObservations | NpcPerceptionChangeMask.Skills;
         if (delta.Envelope.Revision <= delta.Envelope.BaseRevision || delta.Changes == NpcPerceptionChangeMask.None ||
             (delta.Changes & ~allChanges) != 0 ||
             !HasValidSections(delta))
@@ -43,7 +43,8 @@ public static class NpcPerceptionDeltaApplier
             delta.Changes.HasFlag(NpcPerceptionChangeMask.Affordances) ? delta.Affordances : state.Affordances,
             delta.Changes.HasFlag(NpcPerceptionChangeMask.SpatialObservations)
                 ? delta.SpatialObservations
-                : state.SpatialObservations);
+                : state.SpatialObservations,
+            delta.Changes.HasFlag(NpcPerceptionChangeMask.Skills) ? delta.Skills : state.Skills);
 
         NpcPerceptionSnapshot snapshot = new(
             new NpcPerceptionEnvelope(delta.Envelope.SchemaVersion, delta.Envelope.Npc, delta.Envelope.Revision,
