@@ -3,6 +3,7 @@ using System.Diagnostics.Metrics;
 using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.TaskManagers;
+using L2Dn.GameServer.AI.Scheduling;
 using L2Dn.NpcContracts;
 
 namespace L2Dn.GameServer.AI.Runtime;
@@ -111,10 +112,42 @@ public static class NpcAiTelemetry
     private static readonly Counter<long> PerceptionReplayFailures =
         Meter.CreateCounter<long>("l2dn.npc.perception.replay.failures", "{failure}", "Replay recorder initialization or write failures.");
 
+    private static readonly Counter<long> Wakeups =
+        Meter.CreateCounter<long>("l2dn.npc.wakeup.total", "{wakeup}", "NPC wake-up requests received.");
+
+    private static readonly Counter<long> WakeupsCoalesced =
+        Meter.CreateCounter<long>("l2dn.npc.wakeup.coalesced", "{wakeup}", "NPC wake-ups merged into pending work.");
+
+    private static readonly Counter<long> WakeupsDropped =
+        Meter.CreateCounter<long>("l2dn.npc.wakeup.dropped", "{wakeup}", "NPC wake-ups dropped or invalidated under explicit policy.");
+
+    private static readonly Histogram<double> SchedulerQueueDelay =
+        Meter.CreateHistogram<double>("l2dn.npc.scheduler.queue_delay", "s", "Time between NPC wake request and think start.");
+
+    private static readonly Histogram<double> LegacyEventToPeriodicDelay =
+        Meter.CreateHistogram<double>("l2dn.npc.reaction.legacy_periodic_delay", "s", "Observed event-to-next-periodic-think delay in legacy mode.");
+
+    private static readonly Histogram<double> ReactionLatency =
+        Meter.CreateHistogram<double>("l2dn.npc.reaction.latency", "s", "Time between a relevant event and first command execution.");
+
+    private static readonly Counter<long> SingleFlightCollisions =
+        Meter.CreateCounter<long>("l2dn.npc.scheduler.singleflight.collision", "{collision}", "Wake-ups received while an NPC think was running.");
+
+    private static readonly Counter<long> PendingFollowups =
+        Meter.CreateCounter<long>("l2dn.npc.think.pending_followup", "{followup}", "Follow-up thinks scheduled after coalescing events during execution.");
+
+    private static readonly Counter<long> SchedulerExecutionFailures =
+        Meter.CreateCounter<long>("l2dn.npc.scheduler.execution.failure", "{failure}", "NPC think executor failures isolated by scheduler workers.");
+
     private static readonly object SnapshotLock = new();
     private static StateSnapshot _snapshot = StateSnapshot.Empty;
     private static long _snapshotTimestamp;
     private static int _perceptionMode;
+    private static int _reactiveSchedulerMode;
+    private static long _criticalQueueDepth;
+    private static long _combatQueueDepth;
+    private static long _normalQueueDepth;
+    private static long _activeReactiveWorkers;
 
     static NpcAiTelemetry()
     {
@@ -129,6 +162,13 @@ public static class NpcAiTelemetry
         Meter.CreateObservableGauge("l2dn.npc.perception.mode", () => new Measurement<long>(1,
             new KeyValuePair<string, object?>("mode", ((NpcPerceptionMode)Volatile.Read(ref _perceptionMode)).ToString())),
             "{mode}", "Configured NPC perception operating mode.");
+        Meter.CreateObservableGauge("l2dn.npc.scheduler.reactive.mode", () => new Measurement<long>(1,
+            new KeyValuePair<string, object?>("mode", ((NpcReactiveSchedulerMode)Volatile.Read(ref _reactiveSchedulerMode)).ToString())),
+            "{mode}", "Configured NPC reactive scheduler operating mode.");
+        Meter.CreateObservableGauge("l2dn.npc.scheduler.queue.depth", ObserveQueueDepth,
+            "{wakeup}", "Current NPC reactive queue depth by priority.");
+        Meter.CreateObservableGauge("l2dn.npc.scheduler.active_workers", () => Volatile.Read(ref _activeReactiveWorkers),
+            "{worker}", "NPC reactive workers currently executing a think.");
     }
 
     internal static bool ThinkMeasurementsEnabled =>
@@ -167,6 +207,65 @@ public static class NpcAiTelemetry
 
     internal static void SetPerceptionMode(NpcPerceptionMode mode) =>
         Volatile.Write(ref _perceptionMode, (int)mode);
+
+    internal static void SetReactiveSchedulerMode(NpcReactiveSchedulerMode mode) =>
+        Volatile.Write(ref _reactiveSchedulerMode, (int)mode);
+
+    internal static void RecordWakeup(NpcWakeReason reasons, NpcThinkPriority priority,
+        NpcReactiveSchedulerMode mode, NpcWakeDisposition disposition)
+    {
+        TagList tags = CreateWakeTags(reasons, priority, mode);
+        tags.Add("disposition", disposition.ToString());
+        Wakeups.Add(1, tags);
+        if (disposition == NpcWakeDisposition.Coalesced)
+        {
+            WakeupsCoalesced.Add(1, tags);
+        }
+        else if (disposition is NpcWakeDisposition.DroppedNormal or NpcWakeDisposition.StaleGeneration)
+        {
+            WakeupsDropped.Add(1, tags);
+        }
+    }
+
+    internal static void RecordQueueDelay(NpcWakeContext context, TimeSpan delay) =>
+        SchedulerQueueDelay.Record(delay.TotalSeconds,
+            CreateWakeTags(context.Reasons, context.Priority,
+                (NpcReactiveSchedulerMode)Volatile.Read(ref _reactiveSchedulerMode)));
+
+    internal static void RecordLegacyEventToPeriodicDelay(NpcWakeReason reasons, TimeSpan delay) =>
+        LegacyEventToPeriodicDelay.Record(delay.TotalSeconds,
+            new KeyValuePair<string, object?>("reason", reasons.ToString()));
+
+    internal static void RecordReactionLatency(NpcWakeContext context, TimeSpan delay) =>
+        ReactionLatency.Record(delay.TotalSeconds,
+            CreateWakeTags(context.Reasons, context.Priority,
+                (NpcReactiveSchedulerMode)Volatile.Read(ref _reactiveSchedulerMode)));
+
+    internal static void RecordSingleFlightCollision() => SingleFlightCollisions.Add(1);
+
+    internal static void RecordPendingFollowup() => PendingFollowups.Add(1);
+
+    internal static void RecordSchedulerExecutionFailure() => SchedulerExecutionFailures.Add(1);
+
+    internal static void SetQueueDepth(NpcThinkPriority priority, long value)
+    {
+        switch (priority)
+        {
+            case NpcThinkPriority.Critical:
+                Volatile.Write(ref _criticalQueueDepth, value);
+                break;
+            case NpcThinkPriority.Combat:
+                Volatile.Write(ref _combatQueueDepth, value);
+                break;
+            default:
+                Volatile.Write(ref _normalQueueDepth, value);
+                break;
+        }
+    }
+
+    internal static void ReactiveWorkerStarted() => Interlocked.Increment(ref _activeReactiveWorkers);
+
+    internal static void ReactiveWorkerCompleted() => Interlocked.Decrement(ref _activeReactiveWorkers);
 
     internal static void RecordPerceptionCapture(NpcPerceptionSnapshot snapshot, NpcPerceptionDelta? delta,
         NpcPerceptionPublicationKind publication, bool semanticStateChanged, NpcPerceptionMode mode,
@@ -401,6 +500,26 @@ public static class NpcAiTelemetry
         tags.Add("ai_type", ai.GetType().Name);
         tags.Add("intention", intention.ToString());
         return tags;
+    }
+
+    private static TagList CreateWakeTags(NpcWakeReason reasons, NpcThinkPriority priority,
+        NpcReactiveSchedulerMode mode)
+    {
+        TagList tags = default;
+        tags.Add("reason", reasons.ToString());
+        tags.Add("priority", priority.ToString());
+        tags.Add("mode", mode.ToString());
+        return tags;
+    }
+
+    private static IEnumerable<Measurement<long>> ObserveQueueDepth()
+    {
+        yield return new Measurement<long>(Volatile.Read(ref _criticalQueueDepth),
+            new KeyValuePair<string, object?>("priority", NpcThinkPriority.Critical.ToString()));
+        yield return new Measurement<long>(Volatile.Read(ref _combatQueueDepth),
+            new KeyValuePair<string, object?>("priority", NpcThinkPriority.Combat.ToString()));
+        yield return new Measurement<long>(Volatile.Read(ref _normalQueueDepth),
+            new KeyValuePair<string, object?>("priority", NpcThinkPriority.Normal.ToString()));
     }
 
     private static StateSnapshot GetStateSnapshot()
