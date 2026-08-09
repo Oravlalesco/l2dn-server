@@ -210,6 +210,24 @@ public class NpcBrainTests
             NpcIntentSemanticComparer.Instance.Equals(pair.First, pair.Second));
     }
 
+    [Fact]
+    public void Replay_runner_produces_repeatable_intent_sequence_without_gameserver()
+    {
+        NpcPerceptionSnapshot[] replay =
+        [
+            CreatePerception(visible: [Hostile(Player, 80)]),
+            CreatePerception(target: Player, visible: [Hostile(Player, 30)], revision: 2)
+        ];
+        NpcBrainReplayRunner runner = new();
+
+        NpcIntent[] first = runner.Run(replay).ToArray();
+        NpcIntent[] second = runner.Run(replay).ToArray();
+
+        first.Should().HaveCount(2);
+        first.Zip(second).Should().OnlyContain(pair =>
+            NpcIntentSemanticComparer.Instance.Equals(pair.First, pair.Second));
+    }
+
     private static NpcBrainContext Context(NpcBrainStimulus stimuli = NpcBrainStimulus.PeriodicDue) => new(stimuli);
 
     private static VisibleEntity Hostile(EntityKey key, double distance, int ordinal = 0) =>
