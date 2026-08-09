@@ -128,7 +128,8 @@ The local runtime now provides:
 - `NpcIntentGateway` live revalidation of generation, lifecycle, target, instance, range, geodata, movement, skill, cooldown, mana, and policy;
 - typed rejection outcomes for expected races rather than exceptions;
 - deterministic replay directly from captured `NpcPerceptionSnapshot` sequences;
-- OTLP counters/histograms and nested `npc.brain.decide` / `npc.intent.validate` activities.
+- OTLP counters/histograms and nested `npc.brain.decide` / `npc.intent.validate` activities;
+- a collector allowlist covering every bounded `l2dn.npc.*` metric so Brain, intent, perception, and scheduler signals remain visible together.
 
 Only the exact base `AttackableAI` type uses Intent execution. Specialized/scripted AI remains on Legacy by design.
 
@@ -152,11 +153,13 @@ Automated and complete:
 - pure Brain architecture, behavior, lifecycle, tactical skill, and replay tests;
 - Gateway stale revision and races for generation, death, disappearance, disabled actor, blocked movement, and cooldown;
 - scheduler single-flight/coalescing/fairness suite retained;
-- R1-R5 in Legacy, Shadow, and Intent.
+- R1-R5 in Legacy, Shadow, and Intent;
+- development GameServer published and recreated in `Intent` / `Enabled` / `CaptureOnly` mode;
+- OTLP scrape verified the three configured modes, live Brain decisions, perception captures, and bounded queue-depth series;
+- GameServer.Model remains green at 89/89 after adding observable-instrument lifetime coverage.
 
 Environment-dependent before the completion tag:
 
-- republish/recreate the development GameServer with `NPC_BRAIN_MODE=Intent`;
 - repeat Dragon Valley Cave proximity aggro, retaliation, pursuit, target loss, death/return, and guard assistance;
 - capture the OTLP window and confirm zero drops/scheduler failures;
 - run explicit `Legacy` rollback once;

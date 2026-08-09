@@ -181,29 +181,37 @@ public static class NpcAiTelemetry
     private static long _normalQueueDepth;
     private static long _activeReactiveWorkers;
 
+    // Meter keeps observable instruments weakly referenced. Retain them for the
+    // lifetime of the process so infrequently observed mode/queue series remain
+    // available to the OTLP collection cycle.
+    private static readonly Instrument[] ObservableInstruments;
+
     static NpcAiTelemetry()
     {
-        Meter.CreateObservableGauge("l2dn.npc.loaded", () => GetStateSnapshot().Loaded, "{npc}", "NPCs registered in the world.");
-        Meter.CreateObservableGauge("l2dn.npc.thinking", () => GetStateSnapshot().Thinking, "{npc}", "Attackable NPCs registered in the legacy think scheduler.");
-        Meter.CreateObservableGauge("l2dn.npc.combat", () => GetStateSnapshot().Combat, "{npc}", "Attackable NPCs currently in combat.");
-        Meter.CreateObservableGauge("l2dn.npc.visible", () => GetStateSnapshot().Visible, "{npc}", "NPCs whose world region has active neighbours.");
-        Meter.CreateObservableGauge("l2dn.npc.sleeping", () => GetStateSnapshot().Sleeping, "{npc}", "NPCs whose world region has no active neighbours.");
-        Meter.CreateObservableGauge("l2dn.players.online", () => GetStateSnapshot().PlayersOnline, "{player}", "Players currently registered in the world.");
-        Meter.CreateObservableGauge("l2dn.npc.intention", () => GetStateSnapshot().Intentions, "{npc}", "Thinking NPCs grouped by current legacy intention.");
-        Meter.CreateObservableGauge("l2dn.npc.region.loaded", () => GetStateSnapshot().Regions, "{npc}", "Loaded NPCs grouped by instance and world region.");
-        Meter.CreateObservableGauge("l2dn.npc.perception.mode", () => new Measurement<long>(1,
-            new KeyValuePair<string, object?>("mode", ((NpcPerceptionMode)Volatile.Read(ref _perceptionMode)).ToString())),
-            "{mode}", "Configured NPC perception operating mode.");
-        Meter.CreateObservableGauge("l2dn.npc.scheduler.reactive.mode", () => new Measurement<long>(1,
-            new KeyValuePair<string, object?>("mode", ((NpcReactiveSchedulerMode)Volatile.Read(ref _reactiveSchedulerMode)).ToString())),
-            "{mode}", "Configured NPC reactive scheduler operating mode.");
-        Meter.CreateObservableGauge("l2dn.npc.brain.mode", () => new Measurement<long>(1,
-            new KeyValuePair<string, object?>("mode", ((NpcBrainMode)Volatile.Read(ref _brainMode)).ToString())),
-            "{mode}", "Configured NPC Brain operating mode.");
-        Meter.CreateObservableGauge("l2dn.npc.scheduler.queue.depth", ObserveQueueDepth,
-            "{wakeup}", "Current NPC reactive queue depth by priority.");
-        Meter.CreateObservableGauge("l2dn.npc.scheduler.active_workers", () => Volatile.Read(ref _activeReactiveWorkers),
-            "{worker}", "NPC reactive workers currently executing a think.");
+        ObservableInstruments =
+        [
+            Meter.CreateObservableGauge("l2dn.npc.loaded", () => GetStateSnapshot().Loaded, "{npc}", "NPCs registered in the world."),
+            Meter.CreateObservableGauge("l2dn.npc.thinking", () => GetStateSnapshot().Thinking, "{npc}", "Attackable NPCs registered in the legacy think scheduler."),
+            Meter.CreateObservableGauge("l2dn.npc.combat", () => GetStateSnapshot().Combat, "{npc}", "Attackable NPCs currently in combat."),
+            Meter.CreateObservableGauge("l2dn.npc.visible", () => GetStateSnapshot().Visible, "{npc}", "NPCs whose world region has active neighbours."),
+            Meter.CreateObservableGauge("l2dn.npc.sleeping", () => GetStateSnapshot().Sleeping, "{npc}", "NPCs whose world region has no active neighbours."),
+            Meter.CreateObservableGauge("l2dn.players.online", () => GetStateSnapshot().PlayersOnline, "{player}", "Players currently registered in the world."),
+            Meter.CreateObservableGauge("l2dn.npc.intention", () => GetStateSnapshot().Intentions, "{npc}", "Thinking NPCs grouped by current legacy intention."),
+            Meter.CreateObservableGauge("l2dn.npc.region.loaded", () => GetStateSnapshot().Regions, "{npc}", "Loaded NPCs grouped by instance and world region."),
+            Meter.CreateObservableGauge("l2dn.npc.perception.mode", () => new Measurement<long>(1,
+                new KeyValuePair<string, object?>("mode", ((NpcPerceptionMode)Volatile.Read(ref _perceptionMode)).ToString())),
+                "{mode}", "Configured NPC perception operating mode."),
+            Meter.CreateObservableGauge("l2dn.npc.scheduler.reactive.mode", () => new Measurement<long>(1,
+                new KeyValuePair<string, object?>("mode", ((NpcReactiveSchedulerMode)Volatile.Read(ref _reactiveSchedulerMode)).ToString())),
+                "{mode}", "Configured NPC reactive scheduler operating mode."),
+            Meter.CreateObservableGauge("l2dn.npc.brain.mode", () => new Measurement<long>(1,
+                new KeyValuePair<string, object?>("mode", ((NpcBrainMode)Volatile.Read(ref _brainMode)).ToString())),
+                "{mode}", "Configured NPC Brain operating mode."),
+            Meter.CreateObservableGauge("l2dn.npc.scheduler.queue.depth", ObserveQueueDepth,
+                "{wakeup}", "Current NPC reactive queue depth by priority."),
+            Meter.CreateObservableGauge("l2dn.npc.scheduler.active_workers", () => Volatile.Read(ref _activeReactiveWorkers),
+                "{worker}", "NPC reactive workers currently executing a think.")
+        ];
     }
 
     internal static bool ThinkMeasurementsEnabled =>

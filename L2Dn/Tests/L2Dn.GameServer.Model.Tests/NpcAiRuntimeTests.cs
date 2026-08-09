@@ -3,6 +3,7 @@ using System.Diagnostics.Metrics;
 using FluentAssertions;
 using L2Dn.GameServer.AI;
 using L2Dn.GameServer.AI.Runtime;
+using L2Dn.GameServer.AI.Scheduling;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Model.Actor.Templates;
 using L2Dn.GameServer.Model.InstanceZones;
@@ -490,6 +491,10 @@ public class NpcAiRuntimeTests
         NpcAiTelemetry.ObserveGeoQuery("test_geo", static () => true,
             static result => result ? "allowed" : "blocked");
         NpcAiTelemetry.ObserveCommand("test_command", static () => { });
+        NpcAiTelemetry.SetPerceptionMode(NpcPerceptionMode.CaptureOnly);
+        NpcAiTelemetry.SetReactiveSchedulerMode(NpcReactiveSchedulerMode.Enabled);
+        NpcAiTelemetry.SetBrainMode(NpcBrainMode.Intent);
+        listener.RecordObservableInstruments();
 
         measurements.Should().Contain(item => item.Name == "l2dn.npc.think.calls");
         measurements.Should().Contain(item => item.Name == "l2dn.npc.think.duration");
@@ -501,6 +506,12 @@ public class NpcAiRuntimeTests
             item.Tags.Any(tag => tag.Key == "outcome" && Equals(tag.Value, "allowed")));
         measurements.Should().Contain(item => item.Name == "l2dn.npc.command.calls" &&
             item.Tags.Any(tag => tag.Key == "outcome" && Equals(tag.Value, "success")));
+        measurements.Should().Contain(item => item.Name == "l2dn.npc.perception.mode" &&
+            item.Tags.Any(tag => tag.Key == "mode" && Equals(tag.Value, "CaptureOnly")));
+        measurements.Should().Contain(item => item.Name == "l2dn.npc.scheduler.reactive.mode" &&
+            item.Tags.Any(tag => tag.Key == "mode" && Equals(tag.Value, "Enabled")));
+        measurements.Should().Contain(item => item.Name == "l2dn.npc.brain.mode" &&
+            item.Tags.Any(tag => tag.Key == "mode" && Equals(tag.Value, "Intent")));
         measurements.SelectMany(item => item.Tags).Should().NotContain(tag =>
             tag.Key == "npc_id" || tag.Key == "object_id" || tag.Key == "template_id" || tag.Key == "npc_name");
     }

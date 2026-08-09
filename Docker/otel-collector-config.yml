@@ -12,7 +12,7 @@ processors:
   filter/npc-reactivity:
     error_mode: ignore
     metric_conditions:
-      - 'not IsMatch(metric.name, "^l2dn\\.(players\\.online|npc\\.(reaction|scheduler|wakeup|think|combat|loaded|thinking))")'
+      - 'not IsMatch(metric.name, "^l2dn\\.(players\\.online|npc\\..+|pathfinding\\..+)$")'
   batch:
     timeout: 2s
     send_batch_size: 1024
