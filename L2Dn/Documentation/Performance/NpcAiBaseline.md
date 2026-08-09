@@ -10,6 +10,7 @@ This runbook captures a comparable baseline for the NPC brain modernization work
 - Keep NPC spawns, client scripts and test routes identical between comparisons.
 - Record `NPC_PERCEPTION_MODE` and the full/replay interval settings for every run.
 - Record `NPC_REACTIVE_SCHEDULER_MODE`, worker count, queue capacity, minimum intervals, and event flags.
+- Record `NPC_BRAIN_MODE` (`Legacy`, `Shadow`, or `Intent`) and compare Brain/Gateway telemetry separately.
 
 ## Capture procedure
 
@@ -95,5 +96,15 @@ For the deterministic synthetic R1-R5 report:
 ```text
 dotnet run --project Tools/L2Dn.NpcReactiveScheduler.Benchmark -- --npc-count 5000 --events 100000
 ```
+
+Phase 3 reruns the same scheduler workload for every decision pipeline:
+
+```text
+dotnet run --project Tools/L2Dn.NpcReactiveScheduler.Benchmark -- --npc-count 5000 --events 100000 --pipeline Legacy
+dotnet run --project Tools/L2Dn.NpcReactiveScheduler.Benchmark -- --npc-count 5000 --events 100000 --pipeline Shadow
+dotnet run --project Tools/L2Dn.NpcReactiveScheduler.Benchmark -- --npc-count 5000 --events 100000 --pipeline Intent
+```
+
+The synthetic Shadow/Intent path measures pure Brain plus contract validation cost. Authoritative live-world races are covered by `NpcIntentGatewayTests`; client-visible latency still requires Scenario A/B/C.
 
 Do not use shared-runner elapsed time as a hard CI gate. Gate correctness, maximum concurrent Think per NPC, queue bounds, and allocations in shared CI; calibrate P50/P95/P99 gates on a dedicated runner and validate player-visible reaction in A/B/C.
