@@ -408,7 +408,7 @@
 			<skill id="4276" level="3" /> <!-- Bow Vulnerability -->
 			<skill id="4278" level="1" /> <!-- Dark Attack -->
 		</skillList>
-		<ai type="BALANCED" clanHelpRange="300" />
+		<ai type="BALANCED" aggroRange="500" clanHelpRange="300" isAggressive="true" />
 		<dropLists>
 			<drop>
 				<item id="5312" min="1" max="1" chance="0.003" /> <!-- Sealed Helm of Nightmare -->
@@ -459,6 +459,7 @@
 			<skill id="4276" level="3" /> <!-- Bow Vulnerability -->
 			<skill id="4278" level="1" /> <!-- Dark Attack -->
 		</skillList>
+		<ai aggroRange="500" clanHelpRange="300" isAggressive="true" />
 		<dropLists>
 			<drop>
 				<item id="8678" min="1" max="1" chance="0.0009" /> <!-- Sirra's Blade -->

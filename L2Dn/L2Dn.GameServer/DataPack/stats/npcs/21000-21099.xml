@@ -4208,7 +4208,7 @@
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
 		<sNpcPropHpRate>3</sNpcPropHpRate>
-		<ai aggroRange="500" clanHelpRange="400">
+		<ai aggroRange="500" clanHelpRange="400" isAggressive="true">
 			<clanList>
 				<clan>BLOODY</clan>
 			</clanList>
@@ -4273,7 +4273,7 @@
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
 		<sNpcPropHpRate>5</sNpcPropHpRate>
-		<ai type="ARCHER" aggroRange="500" clanHelpRange="400">
+		<ai type="ARCHER" aggroRange="500" clanHelpRange="400" isAggressive="true">
 			<clanList>
 				<clan>BLOODY</clan>
 			</clanList>

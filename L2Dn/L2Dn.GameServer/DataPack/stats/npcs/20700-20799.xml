@@ -1209,7 +1209,7 @@
 		</skillList>
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
-		<ai aggroRange="500" clanHelpRange="300" isAggressive="false">
+		<ai aggroRange="500" clanHelpRange="300" isAggressive="true">
 			<clanList>
 				<clan>CAVE_SERVANT</clan>
 			</clanList>
@@ -1270,7 +1270,7 @@
 		</skillList>
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
-		<ai type="ARCHER" aggroRange="500" clanHelpRange="300" isAggressive="false">
+		<ai type="ARCHER" aggroRange="500" clanHelpRange="300" isAggressive="true">
 			<clanList>
 				<clan>CAVE_SERVANT</clan>
 			</clanList>
@@ -1343,7 +1343,7 @@
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
 		<sNpcPropHpRate>3</sNpcPropHpRate>
-		<ai aggroRange="500" clanHelpRange="500">
+		<ai aggroRange="500" clanHelpRange="500" isAggressive="true">
 			<clanList>
 				<clan>MALRUK</clan>
 			</clanList>
@@ -1405,7 +1405,7 @@
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
 		<sNpcPropHpRate>2</sNpcPropHpRate>
-		<ai aggroRange="500" clanHelpRange="500" isAggressive="false">
+		<ai aggroRange="500" clanHelpRange="500" isAggressive="true">
 			<clanList>
 				<clan>MALRUK</clan>
 			</clanList>

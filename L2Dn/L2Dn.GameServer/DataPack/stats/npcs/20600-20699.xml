@@ -1348,7 +1348,7 @@
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
 		<sNpcPropHpRate>3</sNpcPropHpRate>
-		<ai aggroRange="500" clanHelpRange="500" />
+		<ai aggroRange="500" clanHelpRange="500" isAggressive="true" />
 	</npc>
 	<npc id="20621" level="84" type="Monster" name="Death Wave">
 		<parameters>
@@ -1398,7 +1398,7 @@
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
 		<sNpcPropHpRate>3</sNpcPropHpRate>
-		<ai aggroRange="500" clanHelpRange="500">
+		<ai aggroRange="500" clanHelpRange="500" isAggressive="true">
 			<clanList>
 				<clan>ALL</clan>
 			</clanList>
@@ -1451,7 +1451,7 @@
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
 		<sNpcPropHpRate>3</sNpcPropHpRate>
-		<ai aggroRange="500" clanHelpRange="500">
+		<ai aggroRange="500" clanHelpRange="500" isAggressive="true">
 			<clanList>
 				<clan>MALRUK</clan>
 			</clanList>
@@ -1512,7 +1512,7 @@
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
 		<sNpcPropHpRate>4</sNpcPropHpRate>
-		<ai aggroRange="500" clanHelpRange="500">
+		<ai aggroRange="500" clanHelpRange="500" isAggressive="true">
 			<clanList>
 				<clan>ALL</clan>
 			</clanList>
@@ -1562,7 +1562,7 @@
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
 		<sNpcPropHpRate>4</sNpcPropHpRate>
-		<ai aggroRange="500" clanHelpRange="500" />
+		<ai aggroRange="500" clanHelpRange="500" isAggressive="true" />
 	</npc>
 	<npc id="20625" level="84" type="Monster" name="Maluk Knight">
 		<parameters>
@@ -1608,7 +1608,7 @@
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
 		<sNpcPropHpRate>4</sNpcPropHpRate>
-		<ai aggroRange="500" clanHelpRange="500">
+		<ai aggroRange="500" clanHelpRange="500" isAggressive="true">
 			<clanList>
 				<clan>MALRUK</clan>
 			</clanList>
@@ -1673,7 +1673,7 @@
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
 		<sNpcPropHpRate>4</sNpcPropHpRate>
-		<ai aggroRange="500" clanHelpRange="500">
+		<ai aggroRange="500" clanHelpRange="500" isAggressive="true">
 			<clanList>
 				<clan>MALRUK</clan>
 			</clanList>
@@ -1740,7 +1740,7 @@
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
 		<sNpcPropHpRate>5</sNpcPropHpRate>
-		<ai aggroRange="500" clanHelpRange="500">
+		<ai aggroRange="500" clanHelpRange="500" isAggressive="true">
 			<clanList>
 				<clan>MALRUK</clan>
 			</clanList>
@@ -1807,7 +1807,7 @@
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
 		<sNpcPropHpRate>5</sNpcPropHpRate>
-		<ai aggroRange="500" clanHelpRange="500">
+		<ai aggroRange="500" clanHelpRange="500" isAggressive="true">
 			<clanList>
 				<clan>MALRUK</clan>
 			</clanList>
@@ -1864,7 +1864,7 @@
 		<shots shotChance="30" spiritChance="30" />
 		<exCrtEffect>false</exCrtEffect>
 		<sNpcPropHpRate>5</sNpcPropHpRate>
-		<ai aggroRange="500" clanHelpRange="500">
+		<ai aggroRange="500" clanHelpRange="500" isAggressive="true">
 			<clanList>
 				<clan>ALL</clan>
 			</clanList>
