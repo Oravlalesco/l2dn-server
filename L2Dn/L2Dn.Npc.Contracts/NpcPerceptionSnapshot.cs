@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 
-namespace L2Dn.Npc.Contracts;
+namespace L2Dn.NpcContracts;
 
 public sealed record NpcPerceptionEnvelope(
     int SchemaVersion,

@@ -324,7 +324,15 @@ public class Spawn : IIdentifiable, IHasLocation
 	private Npc? initializeNpc(Npc npc)
 	{
 		// Reset some variables
-		npc.onRespawn();
+		npc.beginRespawnLifecycle();
+		try
+		{
+			npc.onRespawn();
+		}
+		finally
+		{
+			npc.completeRespawnLifecycle();
+		}
 
 		Location3D newLocation;
 

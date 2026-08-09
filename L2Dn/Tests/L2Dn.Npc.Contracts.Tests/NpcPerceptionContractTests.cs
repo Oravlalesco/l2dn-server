@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 using FluentAssertions;
-using L2Dn.Npc.Contracts;
+using L2Dn.NpcContracts;
 
 namespace L2Dn.Npc.Contracts.Tests;
 

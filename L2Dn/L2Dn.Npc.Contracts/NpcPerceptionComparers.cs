@@ -1,4 +1,4 @@
-namespace L2Dn.Npc.Contracts;
+namespace L2Dn.NpcContracts;
 
 public sealed class NpcPerceptionStateComparer: IEqualityComparer<NpcPerceptionState>
 {

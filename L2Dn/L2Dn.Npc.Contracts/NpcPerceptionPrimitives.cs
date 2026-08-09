@@ -1,4 +1,4 @@
-namespace L2Dn.Npc.Contracts;
+namespace L2Dn.NpcContracts;
 
 public readonly record struct NpcKey(int ObjectId, int Generation);
 

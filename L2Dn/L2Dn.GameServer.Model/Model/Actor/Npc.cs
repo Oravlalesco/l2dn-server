@@ -95,6 +95,8 @@ public class Npc: Creature
 	private StatSet? _params;
 	private int _scriptValue;
 	private RaidBossStatus _raidStatus;
+	private int _spawnGeneration;
+	private int _lifecycleSequence;
 
 	/** Contains information about local tax payments. */
 	private TaxZone? _taxZone;
@@ -1050,6 +1052,49 @@ public class Npc: Creature
 		// Reset parameters
 		_params = null;
 	}
+
+	internal void beginRespawnLifecycle()
+	{
+		int sequence = Interlocked.Increment(ref _lifecycleSequence);
+		if ((sequence & 1) == 0)
+		{
+			throw new InvalidOperationException($"Concurrent lifecycle transition for NPC {ObjectId}.");
+		}
+
+		Interlocked.Increment(ref _spawnGeneration);
+	}
+
+	internal void completeRespawnLifecycle()
+	{
+		int sequence = Interlocked.Increment(ref _lifecycleSequence);
+		if ((sequence & 1) != 0)
+		{
+			throw new InvalidOperationException($"Unbalanced lifecycle transition for NPC {ObjectId}.");
+		}
+	}
+
+	internal bool tryGetStableLifecycleStamp(out NpcLifecycleStamp stamp)
+	{
+		int firstSequence = Volatile.Read(ref _lifecycleSequence);
+		if ((firstSequence & 1) != 0)
+		{
+			stamp = default;
+			return false;
+		}
+
+		int generation = Volatile.Read(ref _spawnGeneration);
+		int secondSequence = Volatile.Read(ref _lifecycleSequence);
+		if (firstSequence != secondSequence || (secondSequence & 1) != 0)
+		{
+			stamp = default;
+			return false;
+		}
+
+		stamp = new NpcLifecycleStamp(generation, secondSequence);
+		return true;
+	}
+
+	public int getSpawnGeneration() => Volatile.Read(ref _spawnGeneration);
 
 	/**
 	 * Remove the Npc from the world and update its spawn object (for a complete removal use the deleteMe method).<br>

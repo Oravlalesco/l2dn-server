@@ -9,6 +9,7 @@ using L2Dn.GameServer.Model.InstanceZones;
 using L2Dn.GameServer.Model.Items.Instances;
 using L2Dn.GameServer.Model.Skills;
 using L2Dn.Geometry;
+using L2Dn.NpcContracts;
 
 namespace L2Dn.GameServer.Model.Tests;
 
@@ -113,6 +114,103 @@ public class NpcAiRuntimeTests
     }
 
     [Fact]
+    public void Npc_lifecycle_generation_is_stable_only_outside_respawn_transition()
+    {
+        Attackable actor = CreateAttackable();
+
+        actor.tryGetStableLifecycleStamp(out NpcLifecycleStamp initial).Should().BeTrue();
+        initial.Should().Be(new NpcLifecycleStamp(0, 0));
+
+        actor.beginRespawnLifecycle();
+        actor.getSpawnGeneration().Should().Be(1);
+        actor.tryGetStableLifecycleStamp(out _).Should().BeFalse();
+
+        actor.completeRespawnLifecycle();
+        actor.tryGetStableLifecycleStamp(out NpcLifecycleStamp firstSpawn).Should().BeTrue();
+        firstSpawn.Should().Be(new NpcLifecycleStamp(1, 2));
+
+        actor.beginRespawnLifecycle();
+        actor.completeRespawnLifecycle();
+        actor.getSpawnGeneration().Should().Be(2);
+    }
+
+    [Fact]
+    public void Perception_builder_copies_state_and_remains_observationally_pure()
+    {
+        Attackable actor = CreateSpawnedAttackable();
+        Attackable attacker = CreateSpawnedAttackable();
+        actor.setXYZ(100, 100, 20);
+        attacker.setXYZ(130, 140, 25);
+        actor.setTarget(attacker);
+        actor.setCurrentHp(75, false);
+        double capturedHp = actor.getCurrentHp();
+
+        AggroInfo aggro = new(attacker);
+        aggro.addHate(17);
+        aggro.addDamage(9);
+        actor.getAggroList().put(attacker, aggro);
+        List<WorldObject> visible = [attacker];
+        TestWorldQuery world = new(visible, 42);
+        TestGeoQuery geo = new();
+        NpcPerceptionBuilder builder = new(world, geo, new FixedThreatQuery([aggro]), new FixedClock(1234));
+
+        builder.TryCapture(actor, out NpcPerceptionCapture? capture).Should().BeTrue();
+        capture.Should().NotBeNull();
+        capture!.TryCreateSnapshot(actor, 1, out NpcPerceptionSnapshot? snapshot).Should().BeTrue();
+
+        snapshot!.Envelope.Npc.Generation.Should().Be(1);
+        snapshot.Envelope.StateRevision.Should().Be(1);
+        snapshot.Envelope.WorldTick.Should().Be(42);
+        snapshot.Envelope.CaptureMonotonicMilliseconds.Should().Be(1234);
+        snapshot.State.Physical.CurrentHp.Should().Be(capturedHp);
+        snapshot.State.Physical.Position.Should().Be(new NpcPosition(100, 100, 20, actor.getHeading()));
+        snapshot.State.Combat.CurrentTarget.Should().Be(new EntityKey(attacker.ObjectId, 1, EntityKind.Npc));
+        snapshot.State.VisibleEntities.Should().ContainSingle().Which.ObservationOrdinal.Should().Be(0);
+        snapshot.State.Threats.Should().ContainSingle().Which.Should().Match<ThreatEntry>(entry =>
+            entry.Hate == 17 && entry.Damage == 9 && entry.Visible);
+        snapshot.State.SpatialObservations.Should().ContainSingle();
+        geo.VisibilityCalls.Should().Be(1);
+        geo.MovementCalls.Should().Be(1);
+
+        actor.getTarget().Should().BeSameAs(attacker);
+        actor.getAggroList().Should().ContainSingle();
+        aggro.getHate().Should().Be(17);
+
+        actor.setXYZ(999, 999, 999);
+        actor.setTarget(null);
+        aggro.addHate(100);
+        visible.Clear();
+
+        snapshot.State.Physical.CurrentHp.Should().Be(capturedHp);
+        snapshot.State.Physical.Position.Should().Be(new NpcPosition(100, 100, 20, snapshot.State.Physical.Position.Heading));
+        snapshot.State.Combat.CurrentTarget.Should().NotBeNull();
+        snapshot.State.Threats.Single().Hate.Should().Be(17);
+        snapshot.State.VisibleEntities.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Perception_builder_retries_once_when_generation_changes_during_capture()
+    {
+        Attackable actor = CreateSpawnedAttackable();
+        int worldTickReads = 0;
+        TestWorldQuery world = new([], 7, () =>
+        {
+            if (Interlocked.Increment(ref worldTickReads) == 1)
+            {
+                actor.beginRespawnLifecycle();
+                actor.completeRespawnLifecycle();
+            }
+        });
+        NpcPerceptionBuilder builder = new(world, new TestGeoQuery(), new FixedThreatQuery([]),
+            new FixedClock(1));
+
+        builder.TryCapture(actor, out NpcPerceptionCapture? capture).Should().BeTrue();
+
+        worldTickReads.Should().Be(2);
+        capture!.Npc.Generation.Should().Be(2);
+    }
+
+    [Fact]
     public void Custom_meter_emits_think_query_geo_and_command_measurements()
     {
         List<RecordedMeasurement> measurements = [];
@@ -167,6 +265,16 @@ public class NpcAiRuntimeTests
         return new Attackable(new NpcTemplate(set));
     }
 
+    private static Attackable CreateSpawnedAttackable()
+    {
+        Attackable actor = CreateAttackable();
+        actor.beginRespawnLifecycle();
+        actor.onRespawn();
+        actor.completeRespawnLifecycle();
+        actor.setSpawned(true);
+        return actor;
+    }
+
     private static int GetNextObjectId() => Interlocked.Increment(ref _nextObjectId);
 
     private sealed record RecordedMeasurement(
@@ -193,10 +301,43 @@ public class NpcAiRuntimeTests
         public int GetWorldTick() => 0;
     }
 
+    private sealed class TestWorldQuery(List<WorldObject> visible, int worldTick, Action? onWorldTick = null):
+        INpcWorldQuery
+    {
+        public List<T> GetVisibleObjects<T>(WorldObject source) where T: WorldObject =>
+            visible.OfType<T>().ToList();
+        public List<T> GetVisibleObjectsInRange<T>(WorldObject source, int range) where T: WorldObject =>
+            visible.OfType<T>().ToList();
+        public void ForEachVisibleObjectInRange<T>(WorldObject source, int range, Action<T> action)
+            where T: WorldObject => visible.OfType<T>().ToList().ForEach(action);
+        public int GetWorldTick()
+        {
+            onWorldTick?.Invoke();
+            return worldTick;
+        }
+    }
+
     private sealed class EmptyGeoQuery: INpcGeoQuery
     {
         public bool CanSeeTarget(WorldObject source, WorldObject target) => true;
         public bool CanMoveToTarget(Location3D source, Location3D target, Instance? instance) => true;
+        public Location3D GetValidLocation(Location3D source, Location3D target, Instance? instance) => target;
+    }
+
+    private sealed class TestGeoQuery: INpcGeoQuery
+    {
+        public int VisibilityCalls { get; private set; }
+        public int MovementCalls { get; private set; }
+        public bool CanSeeTarget(WorldObject source, WorldObject target)
+        {
+            VisibilityCalls++;
+            return true;
+        }
+        public bool CanMoveToTarget(Location3D source, Location3D target, Instance? instance)
+        {
+            MovementCalls++;
+            return true;
+        }
         public Location3D GetValidLocation(Location3D source, Location3D target, Instance? instance) => target;
     }
 
@@ -205,6 +346,19 @@ public class NpcAiRuntimeTests
         public long GetHating(Attackable npc, Creature target) => 0;
         public Creature? GetMostHated(Attackable npc) => null;
         public IEnumerable<AggroInfo> GetAggroEntries(Attackable npc) => [];
+    }
+
+    private sealed class FixedThreatQuery(IReadOnlyCollection<AggroInfo> entries): INpcThreatQuery
+    {
+        public long GetHating(Attackable npc, Creature target) =>
+            entries.FirstOrDefault(entry => ReferenceEquals(entry.getAttacker(), target))?.getHate() ?? 0;
+        public Creature? GetMostHated(Attackable npc) => entries.MaxBy(static entry => entry.getHate())?.getAttacker();
+        public IEnumerable<AggroInfo> GetAggroEntries(Attackable npc) => entries;
+    }
+
+    private sealed class FixedClock(long value): INpcPerceptionClock
+    {
+        public long GetMonotonicMilliseconds() => value;
     }
 
     private sealed class RecordingCommandExecutor: ILegacyNpcCommandExecutor
