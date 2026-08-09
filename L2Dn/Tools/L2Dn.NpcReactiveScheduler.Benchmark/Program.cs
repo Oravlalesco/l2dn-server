@@ -31,7 +31,7 @@ reports.Add(await RunScenarioAsync("R1_one_event_per_npc", actors, npcCount, wor
     {
         foreach (Attackable actor in actors)
         {
-            coordinator.Wake(actor, NpcWakeReason.PlayerBecameRelevant);
+            executor.RecordWake(coordinator.Wake(actor, NpcWakeReason.PlayerBecameRelevant));
         }
         return npcCount;
     }));
@@ -43,9 +43,9 @@ reports.Add(await RunScenarioAsync("R2_ten_events_per_npc", actors, npcCount * 1
         {
             for (int eventIndex = 0; eventIndex < 10; eventIndex++)
             {
-                coordinator.Wake(actor, eventIndex % 2 == 0
+                executor.RecordWake(coordinator.Wake(actor, eventIndex % 2 == 0
                     ? NpcWakeReason.Attacked
-                    : NpcWakeReason.ThreatChanged);
+                    : NpcWakeReason.ThreatChanged));
             }
         }
         return npcCount * 10;
@@ -59,7 +59,7 @@ reports.Add(await RunScenarioAsync("R3_event_storm", stormActors, stormActors.Le
         {
             for (int eventIndex = 0; eventIndex < 100; eventIndex++)
             {
-                coordinator.Wake(actor, NpcWakeReason.Attacked);
+                executor.RecordWake(coordinator.Wake(actor, NpcWakeReason.Attacked));
             }
         }
         return stormActors.Length * 100;
@@ -77,7 +77,7 @@ reports.Add(await RunScenarioAsync("R4_mixed_priority", actors, eventCount, work
                 : roll < 20
                     ? NpcWakeReason.ThreatChanged
                     : NpcWakeReason.PeriodicDue;
-            coordinator.Wake(actors[random.Next(actors.Length)], reason);
+            executor.RecordWake(coordinator.Wake(actors[random.Next(actors.Length)], reason));
         }
         return eventCount;
     }));
@@ -89,7 +89,8 @@ reports.Add(await RunScenarioAsync("R5_hotspot_concurrent", hotspotActors, event
         Parallel.For(0, eventCount, index =>
         {
             Attackable actor = hotspotActors[index % hotspotActors.Length];
-            coordinator.Wake(actor, index % 5 == 0 ? NpcWakeReason.Attacked : NpcWakeReason.ThreatChanged);
+            executor.RecordWake(coordinator.Wake(actor,
+                index % 5 == 0 ? NpcWakeReason.Attacked : NpcWakeReason.ThreatChanged));
         });
         return eventCount;
     }));
@@ -194,7 +195,8 @@ static async Task<ScenarioReport> RunScenarioAsync(string name, Attackable[] act
         submitted == 0 ? 0 : allocated / submitted,
         Percentile(pipelineDuration, 0.50),
         Percentile(pipelineDuration, 0.95),
-        Percentile(pipelineDuration, 0.99));
+        Percentile(pipelineDuration, 0.99),
+        executor.DroppedWakeups);
 }
 
 static double[] ReactionFor(IEnumerable<NpcWakeContext> contexts, NpcThinkPriority priority) =>
@@ -255,9 +257,11 @@ internal sealed class BenchmarkExecutor: INpcThinkExecutor
     private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly ConcurrentDictionary<int, int> _activeByNpc = new();
     private int _maximumConcurrentPerNpc;
+    private long _droppedWakeups;
     public ConcurrentQueue<NpcWakeContext> Contexts { get; } = new();
     public ConcurrentQueue<double> PipelineDurations { get; } = new();
     public int MaximumConcurrentPerNpc => Volatile.Read(ref _maximumConcurrentPerNpc);
+    public long DroppedWakeups => Volatile.Read(ref _droppedWakeups);
 
     public BenchmarkExecutor(bool gated, BenchmarkPipeline pipeline, IEnumerable<Attackable> actors)
     {
@@ -270,6 +274,14 @@ internal sealed class BenchmarkExecutor: INpcThinkExecutor
     {
         KeyValuePair<int, NpcPerceptionSnapshot> first = _perceptions.First();
         ExecutePipeline(first.Value.Envelope.Npc, default);
+    }
+
+    public void RecordWake(NpcWakeDisposition disposition)
+    {
+        if (disposition is NpcWakeDisposition.DroppedNormal or NpcWakeDisposition.StaleGeneration)
+        {
+            Interlocked.Increment(ref _droppedWakeups);
+        }
     }
 
     public async ValueTask ExecuteAsync(NpcKey npc, NpcWakeContext context, CancellationToken cancellationToken)
@@ -376,7 +388,8 @@ internal sealed record ScenarioReport(
     long AllocatedBytesPerEvent,
     double PipelineP50Milliseconds,
     double PipelineP95Milliseconds,
-    double PipelineP99Milliseconds);
+    double PipelineP99Milliseconds,
+    long DroppedWakeups);
 
 internal sealed record BenchmarkReport(
     DateTimeOffset CapturedAtUtc,

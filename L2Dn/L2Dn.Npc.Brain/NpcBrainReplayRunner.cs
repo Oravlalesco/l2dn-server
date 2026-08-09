@@ -20,6 +20,6 @@ public sealed class NpcBrainReplayRunner
         {
             intents.AddRange(brain.Decide(perception, new NpcBrainContext(stimuli)).Intents);
         }
-        return intents.MoveToImmutable();
+        return intents.ToImmutable();
     }
 }
