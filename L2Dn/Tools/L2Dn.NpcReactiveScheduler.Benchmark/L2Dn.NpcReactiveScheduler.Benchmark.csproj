@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\L2Dn.GameServer.Model\L2Dn.GameServer.Model.csproj" />
+    <ProjectReference Include="..\..\L2Dn.Npc.Brain\L2Dn.Npc.Brain.csproj" />
+    <ProjectReference Include="..\..\L2Dn.Npc.Contracts\L2Dn.Npc.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

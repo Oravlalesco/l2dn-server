@@ -1,15 +1,22 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using L2Dn.GameServer.AI.Scheduling;
 using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Model.Actor.Templates;
+using L2Dn.NpcBrain;
 using L2Dn.NpcContracts;
 
 int npcCount = GetArgument("--npc-count", 5_000);
 int eventCount = GetArgument("--events", 100_000);
 int workerCount = GetArgument("--workers", 0);
+string pipelineName = GetStringArgument("--pipeline", "Legacy");
+if (!Enum.TryParse(pipelineName, true, out BenchmarkPipeline pipeline))
+{
+    throw new ArgumentException("--pipeline must be Legacy, Shadow, or Intent.");
+}
 if (npcCount <= 0 || eventCount <= 0 || workerCount < 0)
 {
     throw new ArgumentOutOfRangeException(nameof(npcCount), "NPC and event counts must be positive; workers may be zero for automatic sizing.");
@@ -19,7 +26,7 @@ NpcTemplate template = CreateNpcTemplate();
 Attackable[] actors = Enumerable.Range(0, npcCount).Select(_ => CreateActor(template)).ToArray();
 List<ScenarioReport> reports = [];
 
-reports.Add(await RunScenarioAsync("R1_one_event_per_npc", actors, npcCount, workerCount, false,
+reports.Add(await RunScenarioAsync("R1_one_event_per_npc", actors, npcCount, workerCount, pipeline, false,
     (coordinator, executor) =>
     {
         foreach (Attackable actor in actors)
@@ -29,7 +36,7 @@ reports.Add(await RunScenarioAsync("R1_one_event_per_npc", actors, npcCount, wor
         return npcCount;
     }));
 
-reports.Add(await RunScenarioAsync("R2_ten_events_per_npc", actors, npcCount * 10, workerCount, true,
+reports.Add(await RunScenarioAsync("R2_ten_events_per_npc", actors, npcCount * 10, workerCount, pipeline, true,
     (coordinator, executor) =>
     {
         foreach (Attackable actor in actors)
@@ -45,7 +52,7 @@ reports.Add(await RunScenarioAsync("R2_ten_events_per_npc", actors, npcCount * 1
     }));
 
 Attackable[] stormActors = actors.Take(Math.Min(1_000, actors.Length)).ToArray();
-reports.Add(await RunScenarioAsync("R3_event_storm", stormActors, stormActors.Length * 100, workerCount, true,
+reports.Add(await RunScenarioAsync("R3_event_storm", stormActors, stormActors.Length * 100, workerCount, pipeline, true,
     (coordinator, executor) =>
     {
         foreach (Attackable actor in stormActors)
@@ -58,7 +65,7 @@ reports.Add(await RunScenarioAsync("R3_event_storm", stormActors, stormActors.Le
         return stormActors.Length * 100;
     }));
 
-reports.Add(await RunScenarioAsync("R4_mixed_priority", actors, eventCount, workerCount, true,
+reports.Add(await RunScenarioAsync("R4_mixed_priority", actors, eventCount, workerCount, pipeline, true,
     (coordinator, executor) =>
     {
         Random random = new(0x25A1);
@@ -76,7 +83,7 @@ reports.Add(await RunScenarioAsync("R4_mixed_priority", actors, eventCount, work
     }));
 
 Attackable[] hotspotActors = actors.Take(Math.Min(500, actors.Length)).ToArray();
-reports.Add(await RunScenarioAsync("R5_hotspot_concurrent", hotspotActors, eventCount, workerCount, true,
+reports.Add(await RunScenarioAsync("R5_hotspot_concurrent", hotspotActors, eventCount, workerCount, pipeline, true,
     (coordinator, executor) =>
     {
         Parallel.For(0, eventCount, index =>
@@ -92,11 +99,16 @@ BenchmarkReport report = new(
     npcCount,
     eventCount,
     workerCount == 0 ? Math.Clamp(Environment.ProcessorCount, 1, 16) : workerCount,
+    pipeline,
     reports,
     GC.CollectionCount(0),
     GC.CollectionCount(1),
     GC.CollectionCount(2));
-Console.WriteLine(JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
+Console.WriteLine(JsonSerializer.Serialize(report, new JsonSerializerOptions
+{
+    WriteIndented = true,
+    Converters = { new JsonStringEnumConverter() }
+}));
 
 return;
 
@@ -108,14 +120,22 @@ int GetArgument(string name, int fallback)
         : fallback;
 }
 
-static async Task<ScenarioReport> RunScenarioAsync(string name, Attackable[] actors, int expectedEvents,
-    int workerCount, bool gateExecution, Func<NpcThinkCoordinator, BenchmarkExecutor, int> submit)
+string GetStringArgument(string name, string fallback)
 {
-    BenchmarkExecutor executor = new(gateExecution);
+    int index = Array.IndexOf(args, name);
+    return index >= 0 && index + 1 < args.Length ? args[index + 1] : fallback;
+}
+
+static async Task<ScenarioReport> RunScenarioAsync(string name, Attackable[] actors, int expectedEvents,
+    int workerCount, BenchmarkPipeline pipeline, bool gateExecution,
+    Func<NpcThinkCoordinator, BenchmarkExecutor, int> submit)
+{
+    BenchmarkExecutor executor = new(gateExecution, pipeline, actors);
     NpcReactiveSchedulerOptions options = new(NpcReactiveSchedulerMode.Enabled, workerCount, 20_000,
         TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero, false, true, true, true, true);
     await using NpcThinkCoordinator coordinator = new(options, executor, AlwaysCurrentValidator.Instance);
 
+    executor.WarmUp();
     GC.Collect();
     GC.WaitForPendingFinalizers();
     GC.Collect();
@@ -145,6 +165,7 @@ static async Task<ScenarioReport> RunScenarioAsync(string name, Attackable[] act
     double[] combatReaction = ReactionFor(executor.Contexts, NpcThinkPriority.Combat);
     double[] normalReaction = ReactionFor(executor.Contexts, NpcThinkPriority.Normal);
     int executions = executor.Contexts.Count;
+    double[] pipelineDuration = executor.PipelineDurations.ToArray();
     return new ScenarioReport(
         name,
         actors.Length,
@@ -170,7 +191,10 @@ static async Task<ScenarioReport> RunScenarioAsync(string name, Attackable[] act
         queueAtPeak.Normal,
         queueAtPeak.CriticalOverflow + queueAtPeak.CombatOverflow,
         allocated,
-        submitted == 0 ? 0 : allocated / submitted);
+        submitted == 0 ? 0 : allocated / submitted,
+        Percentile(pipelineDuration, 0.50),
+        Percentile(pipelineDuration, 0.95),
+        Percentile(pipelineDuration, 0.99));
 }
 
 static double[] ReactionFor(IEnumerable<NpcWakeContext> contexts, NpcThinkPriority priority) =>
@@ -215,13 +239,38 @@ internal sealed class AlwaysCurrentValidator: INpcGenerationValidator
     public bool IsCurrent(NpcKey npc) => true;
 }
 
-internal sealed class BenchmarkExecutor(bool gated): INpcThinkExecutor
+internal enum BenchmarkPipeline
 {
+    Legacy,
+    Shadow,
+    Intent
+}
+
+internal sealed class BenchmarkExecutor: INpcThinkExecutor
+{
+    private readonly bool _gated;
+    private readonly BenchmarkPipeline _pipeline;
+    private readonly Dictionary<int, NpcPerceptionSnapshot> _perceptions;
+    private readonly NpcBrainCoordinator _brain = new();
     private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly ConcurrentDictionary<int, int> _activeByNpc = new();
     private int _maximumConcurrentPerNpc;
     public ConcurrentQueue<NpcWakeContext> Contexts { get; } = new();
+    public ConcurrentQueue<double> PipelineDurations { get; } = new();
     public int MaximumConcurrentPerNpc => Volatile.Read(ref _maximumConcurrentPerNpc);
+
+    public BenchmarkExecutor(bool gated, BenchmarkPipeline pipeline, IEnumerable<Attackable> actors)
+    {
+        _gated = gated;
+        _pipeline = pipeline;
+        _perceptions = actors.ToDictionary(static actor => actor.ObjectId, CreatePerception);
+    }
+
+    public void WarmUp()
+    {
+        KeyValuePair<int, NpcPerceptionSnapshot> first = _perceptions.First();
+        ExecutePipeline(first.Value.Envelope.Npc, default);
+    }
 
     public async ValueTask ExecuteAsync(NpcKey npc, NpcWakeContext context, CancellationToken cancellationToken)
     {
@@ -230,15 +279,61 @@ internal sealed class BenchmarkExecutor(bool gated): INpcThinkExecutor
         Contexts.Enqueue(context);
         try
         {
-            if (gated)
+            if (_gated)
             {
                 await _gate.Task.WaitAsync(cancellationToken);
             }
+            long startedAt = Stopwatch.GetTimestamp();
+            ExecutePipeline(npc, context);
+            PipelineDurations.Enqueue(Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
         }
         finally
         {
             _activeByNpc.AddOrUpdate(npc.ObjectId, 0, static (_, current) => current - 1);
         }
+    }
+
+    private void ExecutePipeline(NpcKey npc, NpcWakeContext context)
+    {
+        if (_pipeline == BenchmarkPipeline.Legacy)
+        {
+            return;
+        }
+
+        NpcBrainDecision decision = _brain.Decide(_perceptions[npc.ObjectId],
+            new NpcBrainContext((NpcBrainStimulus)(int)context.Reasons));
+        if (_pipeline == BenchmarkPipeline.Shadow)
+        {
+            _ = decision.Intents.FirstOrDefault(); // semantic comparison input, with no world mutation.
+            return;
+        }
+
+        foreach (NpcIntent intent in decision.Intents)
+        {
+            if (intent.Envelope.Actor != npc || intent.Envelope.BasedOnStateRevision <= 0 ||
+                intent.Envelope.SchemaVersion != NpcIntent.CurrentSchemaVersion)
+            {
+                throw new InvalidOperationException("Synthetic intent validation failed.");
+            }
+        }
+    }
+
+    private static NpcPerceptionSnapshot CreatePerception(Attackable actor)
+    {
+        NpcKey npc = new(actor.ObjectId, actor.getSpawnGeneration());
+        EntityKey player = new(actor.ObjectId ^ int.MinValue, 0, EntityKind.Player);
+        VisibleEntity visible = new(0, player, new NpcPosition(30, 0, 0, 0), 20, 5, 10, 30,
+            EntityStateFlags.Alive | EntityStateFlags.Spawned,
+            EntityRelationFlags.Player | EntityRelationFlags.Playable | EntityRelationFlags.SameInstance);
+        NpcPerceptionState state = new(
+            new NpcIdentity(actor.getId(), NpcKind.Monster, LegacyNpcAiType.Fighter, 20, 0, [],
+                NpcCapabilities.CanMove | NpcCapabilities.CanAttack | NpcCapabilities.Aggressive),
+            new NpcPhysicalState(default, 100, 100, 100, 100, 5, 10,
+                NpcPhysicalFlags.Alive | NpcPhysicalFlags.Spawned),
+            new NpcCombatFacts(null, 40, 500, NpcCombatFlags.None),
+            new NpcEnvironment(default, default, true, true, false, false, true),
+            [visible], [], [], []);
+        return new NpcPerceptionSnapshot(new NpcPerceptionEnvelope(1, npc, 1, 1, 1), state);
     }
 
     public void Release() => _gate.TrySetResult();
@@ -278,13 +373,17 @@ internal sealed record ScenarioReport(
     long PeakNormalQueueDepth,
     int PeakOverflowStates,
     long AllocatedBytes,
-    long AllocatedBytesPerEvent);
+    long AllocatedBytesPerEvent,
+    double PipelineP50Milliseconds,
+    double PipelineP95Milliseconds,
+    double PipelineP99Milliseconds);
 
 internal sealed record BenchmarkReport(
     DateTimeOffset CapturedAtUtc,
     int ConfiguredNpcCount,
     int ConfiguredMixedEventCount,
     int EffectiveWorkerCount,
+    BenchmarkPipeline Pipeline,
     IReadOnlyCollection<ScenarioReport> Scenarios,
     int Gen0Collections,
     int Gen1Collections,
