@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using L2Dn.GameServer.AI;
 using L2Dn.GameServer.AI.Runtime;
+using L2Dn.GameServer.AI.Scheduling;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Utilities;
 using ThreadPool = L2Dn.GameServer.Utilities.ThreadPool;
@@ -42,62 +43,43 @@ public class AttackableThinkTaskManager
 				return;
 			}
 			
-			CreatureAI ai;
 			List<NpcPerceptionCycle> perceptionPublications = [];
 			foreach (Attackable attackable in _attackables)
 			{
-				if (attackable.hasAI())
-				{
-					ai = attackable.getAI();
-					if (ai != null)
-					{
-						CtrlIntention intention = ai.getIntention();
-						bool measure = NpcAiTelemetry.ThinkMeasurementsEnabled;
-						long startedAt = measure ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
-						long allocatedBytesBefore = measure ? GC.GetAllocatedBytesForCurrentThread() : 0;
-						using System.Diagnostics.Activity? thinkActivity = NpcAiTelemetry.StartThinkActivity(ai, intention);
-						try
-						{
-							NpcPerceptionCoordinator coordinator = NpcPerceptionCoordinator.Instance;
-							NpcPerceptionCycle? perception = coordinator.Capture(attackable);
-							if (perception is { Publication: not NpcPerceptionPublicationKind.None })
-							{
-								perceptionPublications.Add(perception);
-							}
-							using (NpcAiTelemetry.StartDecisionActivity(ai))
-							{
-								if (coordinator.Mode == NpcPerceptionMode.SnapshotRead && perception != null &&
-								    ai is AttackableAI attackableAi)
-								{
-									attackableAi.onEvtThink(perception.Snapshot);
-								}
-								else
-								{
-									ai.onEvtThink();
-								}
-							}
-						}
-						catch
-						{
-							NpcAiTelemetry.RecordThinkError(ai, intention);
-							throw;
-						}
-						finally
-						{
-							if (measure)
-							{
-								NpcAiTelemetry.RecordThink(ai, intention, startedAt, allocatedBytesBefore);
-							}
-						}
-					}
-					else
-					{
-						_attackables.remove(attackable);
-					}
-				}
-				else
+				if (!attackable.hasAI() || attackable.getAI() == null)
 				{
 					_attackables.remove(attackable);
+					NpcReactivity.Remove(attackable);
+					continue;
+				}
+
+				NpcReactiveSchedulerMode mode = NpcReactivity.Mode;
+				if (mode == NpcReactiveSchedulerMode.Enabled)
+				{
+					NpcReactivity.Wake(attackable, NpcWakeReason.PeriodicDue, sourcePoolId: _sourcePoolId);
+					continue;
+				}
+
+				if (mode == NpcReactiveSchedulerMode.Observe)
+				{
+					NpcThinkCoordinator.Instance.ObservePeriodic(attackable);
+				}
+				else if (mode == NpcReactiveSchedulerMode.Shadow)
+				{
+					NpcReactivity.Wake(attackable, NpcWakeReason.PeriodicDue, sourcePoolId: _sourcePoolId);
+				}
+
+				try
+				{
+					NpcPerceptionCycle? perception = LegacyNpcThinkExecutor.Instance.ExecuteDirect(attackable);
+					if (perception is { Publication: not NpcPerceptionPublicationKind.None })
+					{
+						perceptionPublications.Add(perception);
+					}
+				}
+				catch
+				{
+					// A single actor must not abort the remaining pool iteration.
 				}
 			}
 
@@ -128,6 +110,7 @@ public class AttackableThinkTaskManager
 			if (pool.Count < POOL_SIZE)
 			{
 				pool.add(attackable);
+				NpcReactivity.Wake(attackable, NpcWakeReason.Respawned);
 				return;
 			}
 		}
@@ -137,6 +120,7 @@ public class AttackableThinkTaskManager
 		int sourcePoolId = Interlocked.Increment(ref _nextPoolId);
 		ThreadPool.scheduleAtFixedRate(new AttackableThink(pool1, sourcePoolId), TASK_DELAY, TASK_DELAY); // TODO: high priority task
 		POOLS.add(pool1);
+		NpcReactivity.Wake(attackable, NpcWakeReason.Respawned);
 	}
 	
 	public void remove(Attackable attackable)
@@ -146,6 +130,7 @@ public class AttackableThinkTaskManager
 			if (pool.remove(attackable))
 			{
 				NpcPerceptionCoordinator.Instance.Remove(attackable.ObjectId);
+				NpcReactivity.Remove(attackable);
 				return;
 			}
 		}

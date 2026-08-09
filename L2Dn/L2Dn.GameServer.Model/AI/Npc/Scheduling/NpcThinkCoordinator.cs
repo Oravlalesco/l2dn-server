@@ -28,6 +28,10 @@ internal sealed class NpcThinkCoordinator: IAsyncDisposable
     private long _dequeueSequence;
     private int _disposed;
 
+    public static NpcThinkCoordinator Instance { get; } = new(
+        NpcReactiveSchedulerOptions.FromEnvironment(), LegacyNpcThinkExecutor.Instance,
+        LegacyNpcThinkExecutor.Instance);
+
     internal NpcThinkCoordinator(NpcReactiveSchedulerOptions options, INpcThinkExecutor executor,
         INpcGenerationValidator generationValidator, INpcThinkClock? clock = null)
     {
