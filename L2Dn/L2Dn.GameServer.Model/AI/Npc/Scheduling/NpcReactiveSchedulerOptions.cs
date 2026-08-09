@@ -41,7 +41,8 @@ internal sealed record NpcReactiveSchedulerOptions(
         NpcWakeReason.Attacked => WakeOnAttacked,
         NpcWakeReason.TargetLost or NpcWakeReason.TargetDied => WakeOnTargetLost,
         NpcWakeReason.PlayerBecameRelevant => WakeOnPlayerRelevant,
-        NpcWakeReason.ThreatChanged or NpcWakeReason.AllyAttacked or NpcWakeReason.CombatStarted =>
+        NpcWakeReason.ThreatChanged or NpcWakeReason.AllyAttacked or NpcWakeReason.CombatStarted or
+            NpcWakeReason.ActionReady =>
             WakeOnThreatChanged,
         _ => true
     };
@@ -70,4 +71,3 @@ internal sealed record NpcReactiveSchedulerOptions(
     private static bool ParseBoolean(string? value, bool fallback) =>
         bool.TryParse(value, out bool parsed) ? parsed : fallback;
 }
-

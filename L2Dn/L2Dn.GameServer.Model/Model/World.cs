@@ -1,6 +1,7 @@
 ﻿using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using L2Dn.GameServer.AI;
+using L2Dn.GameServer.AI.Scheduling;
 using L2Dn.GameServer.Configuration;
 using L2Dn.GameServer.Data.Sql;
 using L2Dn.GameServer.Model.Actor;
@@ -318,6 +319,10 @@ public sealed class World
 						}
 					}
 				}
+				if (wo is Attackable relevantNpc)
+				{
+					NpcReactivity.Wake(relevantNpc, NpcWakeReason.PlayerBecameRelevant);
+				}
 			}
 
 			if (wo.isPlayer() && @object.isVisibleFor((Player) wo))
@@ -334,6 +339,10 @@ public sealed class World
 							ai.setIntention(CtrlIntention.AI_INTENTION_ACTIVE);
 						}
 					}
+				}
+				if (@object is Attackable relevantNpc)
+				{
+					NpcReactivity.Wake(relevantNpc, NpcWakeReason.PlayerBecameRelevant);
 				}
 			}
 		});
@@ -543,6 +552,10 @@ public sealed class World
 							}
 						}
 					}
+					if (wo is Attackable relevantNpc)
+					{
+						NpcReactivity.Wake(relevantNpc, NpcWakeReason.PlayerBecameRelevant);
+					}
 				}
 
 				if (wo.isPlayer() && obj.isVisibleFor((Player) wo))
@@ -559,6 +572,10 @@ public sealed class World
 								ai.setIntention(CtrlIntention.AI_INTENTION_ACTIVE);
 							}
 						}
+					}
+					if (obj is Attackable relevantNpc)
+					{
+						NpcReactivity.Wake(relevantNpc, NpcWakeReason.PlayerBecameRelevant);
 					}
 				}
 			}

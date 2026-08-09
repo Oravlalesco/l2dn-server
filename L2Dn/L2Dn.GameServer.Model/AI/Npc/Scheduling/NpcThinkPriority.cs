@@ -18,7 +18,7 @@ internal static class NpcWakePriorities
         }
 
         if ((reasons & (NpcWakeReason.ThreatChanged | NpcWakeReason.AllyAttacked |
-                       NpcWakeReason.CombatStarted)) != 0)
+                       NpcWakeReason.CombatStarted | NpcWakeReason.ActionReady)) != 0)
         {
             return NpcThinkPriority.Combat;
         }
@@ -26,4 +26,3 @@ internal static class NpcWakePriorities
         return NpcThinkPriority.Normal;
     }
 }
-

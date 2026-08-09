@@ -4,6 +4,7 @@ using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Model.Items.Instances;
 using L2Dn.GameServer.Model.Skills;
+using L2Dn.GameServer.AI.Scheduling;
 using L2Dn.GameServer.Network.OutgoingPackets;
 using L2Dn.GameServer.TaskManagers;
 using L2Dn.Geometry;
@@ -205,11 +206,40 @@ public abstract class AbstractAI : Ctrl
 			return;
 		}
 
+		Attackable? reactiveActor = this is AttackableAI && _actor is Attackable attackable ? attackable : null;
+		NpcWakeReason wakeReason = NpcWakeReason.None;
+		long eventTimestamp = 0;
+		if (reactiveActor != null)
+		{
+			wakeReason = evt switch
+			{
+				CtrlEvent.EVT_ATTACKED => NpcWakeReason.Attacked,
+				CtrlEvent.EVT_AGGRESSION => NpcWakeReason.ThreatChanged,
+				CtrlEvent.EVT_THINK => NpcWakeReason.ActionReady,
+				CtrlEvent.EVT_FORGET_OBJECT when ReferenceEquals(_actor.getTarget(), arg0) =>
+					arg0 is Creature forgotten && forgotten.isDead()
+						? NpcWakeReason.TargetDied
+						: NpcWakeReason.TargetLost,
+				_ => NpcWakeReason.None
+			};
+			if (wakeReason != NpcWakeReason.None)
+			{
+				eventTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
+			}
+		}
+
 		switch (evt)
 		{
 			case CtrlEvent.EVT_THINK:
 			{
-				onEvtThink();
+				if (reactiveActor != null && NpcReactivity.Mode == NpcReactiveSchedulerMode.Enabled)
+				{
+					NpcReactivity.Wake(reactiveActor, wakeReason, eventTimestamp);
+				}
+				else
+				{
+					onEvtThink();
+				}
 				break;
 			}
 			case CtrlEvent.EVT_ATTACKED:
@@ -340,6 +370,11 @@ public abstract class AbstractAI : Ctrl
 		if (_nextAction is not null && _nextAction.Events.Contains(evt))
 		{
 			_nextAction.DoAction();
+		}
+
+		if (reactiveActor != null && wakeReason != NpcWakeReason.None && evt != CtrlEvent.EVT_THINK)
+		{
+			NpcReactivity.Wake(reactiveActor, wakeReason, eventTimestamp);
 		}
 	}
 

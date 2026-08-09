@@ -8,8 +8,9 @@ internal static class NpcReactivity
 
     public static NpcWakeDisposition Wake(Attackable actor, NpcWakeReason reason,
         long eventTimestamp = 0, int sourcePoolId = 0) =>
-        NpcThinkCoordinator.Instance.Wake(actor, reason, eventTimestamp, sourcePoolId);
+        !actor.hasAI()
+            ? NpcWakeDisposition.Ignored
+            : NpcThinkCoordinator.Instance.Wake(actor, reason, eventTimestamp, sourcePoolId);
 
     public static void Remove(Attackable actor) => NpcThinkCoordinator.Instance.Remove(actor.ObjectId);
 }
-

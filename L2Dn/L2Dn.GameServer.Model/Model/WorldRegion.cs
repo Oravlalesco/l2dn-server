@@ -1,5 +1,6 @@
 ﻿using System.Collections.Immutable;
 using L2Dn.GameServer.AI;
+using L2Dn.GameServer.AI.Scheduling;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Model.Actor.Instances;
 using L2Dn.GameServer.TaskManagers;
@@ -301,6 +302,7 @@ public sealed class WorldRegion
                     // Start HP/MP/CP regeneration task.
                     ((Attackable)wo).getStatus().startHpMpRegeneration();
                     RandomAnimationTaskManager.getInstance().add((Npc)wo);
+                    NpcReactivity.Wake((Attackable)wo, NpcWakeReason.RegionActivated);
                 }
                 else if (wo.isNpc())
                 {

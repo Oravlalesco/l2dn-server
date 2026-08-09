@@ -12,6 +12,7 @@ This matrix is the implementation checklist for Phase 2.5. A wake-up means only 
 | Player became relevant on region crossing | Reuses newly surrounding regions from `World.switchRegion` | Lower than movement packets | `NpcKey`, reason flag | Feature flagged after combat |
 | Region activated | Exact region transition | Low burst | `NpcKey`, reason flag | Normal priority |
 | Respawned | Exact lifecycle event but AI registration ordering matters | Low | `NpcKey`, reason flag | Wake from scheduler registration |
+| Action ready / explicit think event | Exact legacy `EVT_THINK` source | Moderate | `NpcKey`, reason flag | Routed through coordinator only in Enabled mode |
 | Ally attacked | Currently propagated as aggression/minion assist | Raid burst | `NpcKey`, reason flag | Classified as threat change |
 | Combat ended | No single reliable source | Low | N/A | Deferred |
 
@@ -21,4 +22,3 @@ Explicit non-sources:
 - A second visibility/spatial scan: prohibited because `World` already computes relevant region transitions.
 - Polling all NPCs from an event handler: prohibited.
 - `Task.Run` per wake-up: prohibited.
-

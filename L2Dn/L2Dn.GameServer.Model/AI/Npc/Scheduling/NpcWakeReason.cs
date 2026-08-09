@@ -14,6 +14,6 @@ public enum NpcWakeReason
     CombatStarted = 1 << 7,
     CombatEnded = 1 << 8,
     RegionActivated = 1 << 9,
-    Respawned = 1 << 10
+    Respawned = 1 << 10,
+    ActionReady = 1 << 11
 }
-
