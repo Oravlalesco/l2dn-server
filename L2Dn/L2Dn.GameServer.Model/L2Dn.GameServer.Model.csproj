@@ -9,6 +9,7 @@
 
     <ItemGroup>
       <InternalsVisibleTo Include="L2Dn.GameServer.Model.Tests" />
+      <InternalsVisibleTo Include="L2Dn.NpcReactiveScheduler.Benchmark" />
     </ItemGroup>
 
     <ItemGroup>

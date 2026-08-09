@@ -214,6 +214,10 @@ public static class NpcAiTelemetry
     internal static void RecordWakeup(NpcWakeReason reasons, NpcThinkPriority priority,
         NpcReactiveSchedulerMode mode, NpcWakeDisposition disposition)
     {
+        if (!Wakeups.Enabled && !WakeupsCoalesced.Enabled && !WakeupsDropped.Enabled)
+        {
+            return;
+        }
         TagList tags = CreateWakeTags(reasons, priority, mode);
         tags.Add("disposition", disposition.ToString());
         Wakeups.Add(1, tags);
@@ -227,19 +231,37 @@ public static class NpcAiTelemetry
         }
     }
 
-    internal static void RecordQueueDelay(NpcWakeContext context, TimeSpan delay) =>
+    internal static void RecordQueueDelay(NpcWakeContext context, TimeSpan delay)
+    {
+        if (!SchedulerQueueDelay.Enabled)
+        {
+            return;
+        }
         SchedulerQueueDelay.Record(delay.TotalSeconds,
             CreateWakeTags(context.Reasons, context.Priority,
                 (NpcReactiveSchedulerMode)Volatile.Read(ref _reactiveSchedulerMode)));
+    }
 
-    internal static void RecordLegacyEventToPeriodicDelay(NpcWakeReason reasons, TimeSpan delay) =>
+    internal static void RecordLegacyEventToPeriodicDelay(NpcWakeReason reasons, TimeSpan delay)
+    {
+        if (!LegacyEventToPeriodicDelay.Enabled)
+        {
+            return;
+        }
         LegacyEventToPeriodicDelay.Record(delay.TotalSeconds,
             new KeyValuePair<string, object?>("reason", reasons.ToString()));
+    }
 
-    internal static void RecordReactionLatency(NpcWakeContext context, TimeSpan delay) =>
+    internal static void RecordReactionLatency(NpcWakeContext context, TimeSpan delay)
+    {
+        if (!ReactionLatency.Enabled)
+        {
+            return;
+        }
         ReactionLatency.Record(delay.TotalSeconds,
             CreateWakeTags(context.Reasons, context.Priority,
                 (NpcReactiveSchedulerMode)Volatile.Read(ref _reactiveSchedulerMode)));
+    }
 
     internal static void RecordSingleFlightCollision() => SingleFlightCollisions.Add(1);
 

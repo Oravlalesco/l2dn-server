@@ -220,7 +220,8 @@ internal sealed class NpcThinkCoordinator: IAsyncDisposable
     {
         while (true)
         {
-            NpcThinkRuntimeState state = _states.GetOrAdd(key.ObjectId, _ => new NpcThinkRuntimeState(key));
+            NpcThinkRuntimeState state = _states.GetOrAdd(key.ObjectId,
+                static (_, npc) => new NpcThinkRuntimeState(npc), key);
             if (state.Npc == key)
             {
                 return state;
