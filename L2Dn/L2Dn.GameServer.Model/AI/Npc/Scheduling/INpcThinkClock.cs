@@ -4,6 +4,7 @@ internal interface INpcThinkClock
 {
     long GetTimestamp();
     TimeSpan GetElapsedTime(long startTimestamp, long endTimestamp);
+    long Add(long timestamp, TimeSpan duration);
 }
 
 internal sealed class StopwatchNpcThinkClock: INpcThinkClock
@@ -18,5 +19,7 @@ internal sealed class StopwatchNpcThinkClock: INpcThinkClock
 
     public TimeSpan GetElapsedTime(long startTimestamp, long endTimestamp) =>
         System.Diagnostics.Stopwatch.GetElapsedTime(startTimestamp, endTimestamp);
-}
 
+    public long Add(long timestamp, TimeSpan duration) => checked(timestamp +
+        (long)(duration.TotalSeconds * System.Diagnostics.Stopwatch.Frequency));
+}

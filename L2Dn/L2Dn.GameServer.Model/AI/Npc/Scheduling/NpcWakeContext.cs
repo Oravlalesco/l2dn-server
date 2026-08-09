@@ -17,8 +17,7 @@ public enum NpcWakeDisposition
     Observed = 1,
     Queued = 2,
     Coalesced = 3,
-    DeferredCritical = 4,
+    Deferred = 4,
     DroppedNormal = 5,
     StaleGeneration = 6
 }
-

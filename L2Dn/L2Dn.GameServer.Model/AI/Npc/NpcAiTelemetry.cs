@@ -465,6 +465,7 @@ public static class NpcAiTelemetry
 
     internal static void ObserveCommand(string command, Action action)
     {
+        NpcReactionTracker.CommandStarted();
         using Activity? activity = Activities.StartActivity("npc.command.execute", ActivityKind.Internal);
         activity?.SetTag("command", command);
         if (!CommandCalls.Enabled)
