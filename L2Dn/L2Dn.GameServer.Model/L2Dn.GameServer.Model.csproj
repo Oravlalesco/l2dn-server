@@ -15,6 +15,7 @@
     <ItemGroup>
       <ProjectReference Include="..\L2Dn.GameServer.Db\L2Dn.GameServer.Db.csproj" />
       <ProjectReference Include="..\L2Dn.GameServer.StaticData\L2Dn.GameServer.StaticData.csproj" />
+      <ProjectReference Include="..\L2Dn.Npc.Brain\L2Dn.Npc.Brain.csproj" />
       <ProjectReference Include="..\L2Dn.Npc.Contracts\L2Dn.Npc.Contracts.csproj" />
       <ProjectReference Include="..\L2Dn.Model\L2Dn.Model.csproj" />
       <ProjectReference Include="..\L2Dn.Protocol\L2Dn.Protocol.csproj" />

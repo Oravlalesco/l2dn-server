@@ -39,9 +39,27 @@ internal sealed class NpcPerceptionCoordinator
 
     public void Remove(int objectId) => _published.TryRemove(objectId, out _);
 
-    public NpcPerceptionCycle? Capture(Attackable actor)
+    public bool TryGetPublishedRevision(NpcKey npc, out long revision)
     {
-        if (_options.Mode == NpcPerceptionMode.Disabled)
+        if (_published.TryGetValue(npc.ObjectId, out PublishedState? published))
+        {
+            lock (published)
+            {
+                if (published.Npc == npc && published.Revision > 0)
+                {
+                    revision = published.Revision;
+                    return true;
+                }
+            }
+        }
+
+        revision = 0;
+        return false;
+    }
+
+    public NpcPerceptionCycle? Capture(Attackable actor, bool requiredForBrain = false)
+    {
+        if (_options.Mode == NpcPerceptionMode.Disabled && !requiredForBrain)
         {
             return null;
         }

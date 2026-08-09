@@ -12,3 +12,7 @@ internal interface INpcGenerationValidator
     bool IsCurrent(NpcKey npc);
 }
 
+internal interface INpcThinkLifecycle
+{
+    void Remove(NpcKey npc);
+}

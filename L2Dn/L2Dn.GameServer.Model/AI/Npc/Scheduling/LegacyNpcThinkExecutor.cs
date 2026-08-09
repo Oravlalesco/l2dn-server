@@ -26,25 +26,34 @@ internal sealed class LegacyNpcThinkExecutor: INpcThinkExecutor, INpcGenerationV
             return ValueTask.CompletedTask;
         }
 
-        NpcPerceptionCycle? perception = ExecuteDirect(actor);
-        if (perception is { Publication: not NpcPerceptionPublicationKind.None })
-        {
-            long sequence = Interlocked.Increment(ref _batchSequence);
-            foreach (NpcPerceptionRegionBatch batch in NpcPerceptionBatchBuilder.Build(
-                         context.SourcePoolId, sequence, [perception]))
-            {
-                NpcPerceptionBatchHub.Publish(batch);
-            }
-        }
+        NpcPerceptionCycle? perception = ExecuteCaptureAndLegacy(actor);
+        Publish(context, perception);
 
         return ValueTask.CompletedTask;
     }
 
-    internal NpcPerceptionCycle? ExecuteDirect(Attackable actor)
+    internal NpcPerceptionCycle? Capture(Attackable actor, bool requiredForBrain = false) =>
+        NpcPerceptionCoordinator.Instance.Capture(actor, requiredForBrain);
+
+    internal NpcPerceptionCycle? ExecuteCaptureAndLegacy(Attackable actor, bool requiredForBrain = false)
+    {
+        NpcPerceptionCycle? perception = null;
+        ExecuteMeasured(actor, ai =>
+        {
+            perception = Capture(actor, requiredForBrain);
+            ExecuteDecision(ai, perception);
+        });
+        return perception;
+    }
+
+    internal void ExecuteDirect(Attackable actor, NpcPerceptionCycle? perception) =>
+        ExecuteMeasured(actor, ai => ExecuteDecision(ai, perception));
+
+    internal void ExecuteMeasured(Attackable actor, Action<CreatureAI> operation)
     {
         if (!actor.hasAI() || actor.getAI() is not CreatureAI ai)
         {
-            return null;
+            return;
         }
 
         CtrlIntention intention = ai.getIntention();
@@ -54,21 +63,7 @@ internal sealed class LegacyNpcThinkExecutor: INpcThinkExecutor, INpcGenerationV
         using System.Diagnostics.Activity? thinkActivity = NpcAiTelemetry.StartThinkActivity(ai, intention);
         try
         {
-            NpcPerceptionCoordinator perceptionCoordinator = NpcPerceptionCoordinator.Instance;
-            NpcPerceptionCycle? perception = perceptionCoordinator.Capture(actor);
-            using (NpcAiTelemetry.StartDecisionActivity(ai))
-            {
-                if (perceptionCoordinator.Mode == NpcPerceptionMode.SnapshotRead && perception != null &&
-                    ai is AttackableAI attackableAi)
-                {
-                    attackableAi.onEvtThink(perception.Snapshot);
-                }
-                else
-                {
-                    ai.onEvtThink();
-                }
-            }
-            return perception;
+            operation(ai);
         }
         catch
         {
@@ -84,7 +79,38 @@ internal sealed class LegacyNpcThinkExecutor: INpcThinkExecutor, INpcGenerationV
         }
     }
 
-    private static Attackable? Resolve(NpcKey npc)
+    private static void ExecuteDecision(CreatureAI ai, NpcPerceptionCycle? perception)
+    {
+        using (NpcAiTelemetry.StartDecisionActivity(ai))
+        {
+            if (NpcPerceptionCoordinator.Instance.Mode == NpcPerceptionMode.SnapshotRead && perception != null &&
+                ai is AttackableAI attackableAi)
+            {
+                attackableAi.onEvtThink(perception.Snapshot);
+            }
+            else
+            {
+                ai.onEvtThink();
+            }
+        }
+    }
+
+    internal void Publish(NpcWakeContext context, NpcPerceptionCycle? perception)
+    {
+        if (perception is not { Publication: not NpcPerceptionPublicationKind.None })
+        {
+            return;
+        }
+
+        long sequence = Interlocked.Increment(ref _batchSequence);
+        foreach (NpcPerceptionRegionBatch batch in NpcPerceptionBatchBuilder.Build(
+                     context.SourcePoolId, sequence, [perception]))
+        {
+            NpcPerceptionBatchHub.Publish(batch);
+        }
+    }
+
+    internal static Attackable? Resolve(NpcKey npc)
     {
         if (World.getInstance().findObject(npc.ObjectId) is not Attackable actor ||
             actor.getSpawnGeneration() != npc.Generation || !actor.isSpawned() || !actor.hasAI())

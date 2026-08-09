@@ -4,6 +4,7 @@ using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.TaskManagers;
 using L2Dn.GameServer.AI.Scheduling;
+using L2Dn.NpcBrain;
 using L2Dn.NpcContracts;
 
 namespace L2Dn.GameServer.AI.Runtime;
@@ -139,11 +140,42 @@ public static class NpcAiTelemetry
     private static readonly Counter<long> SchedulerExecutionFailures =
         Meter.CreateCounter<long>("l2dn.npc.scheduler.execution.failure", "{failure}", "NPC think executor failures isolated by scheduler workers.");
 
+    private static readonly Counter<long> BrainDecisions =
+        Meter.CreateCounter<long>("l2dn.npc.brain.decision.count", "{decision}", "Local NPC Brain decisions completed.");
+
+    private static readonly Histogram<double> BrainDecisionDuration =
+        Meter.CreateHistogram<double>("l2dn.npc.brain.decision.duration", "s", "Local NPC Brain decision duration.");
+
+    private static readonly Histogram<double> BrainReflexDuration =
+        Meter.CreateHistogram<double>("l2dn.npc.brain.reflex.duration", "s", "Reflex Brain decision duration.");
+
+    private static readonly Histogram<double> BrainTacticalDuration =
+        Meter.CreateHistogram<double>("l2dn.npc.brain.tactical.duration", "s", "Tactical Brain decision duration.");
+
+    private static readonly Counter<long> IntentsCreated =
+        Meter.CreateCounter<long>("l2dn.npc.intent.created", "{intent}", "NPC intents created by a Brain.");
+
+    private static readonly Counter<long> IntentsExecuted =
+        Meter.CreateCounter<long>("l2dn.npc.intent.executed", "{intent}", "NPC intents authorized and executed.");
+
+    private static readonly Counter<long> IntentsRejected =
+        Meter.CreateCounter<long>("l2dn.npc.intent.rejected", "{intent}", "NPC intents rejected by the authoritative gateway.");
+
+    private static readonly Histogram<double> IntentValidationDuration =
+        Meter.CreateHistogram<double>("l2dn.npc.intent.validation.duration", "s", "NPC intent validation and execution duration.");
+
+    private static readonly Counter<long> BrainShadowMatches =
+        Meter.CreateCounter<long>("l2dn.npc.brain.shadow.match", "{comparison}", "Shadow Brain decisions matching legacy commands.");
+
+    private static readonly Counter<long> BrainShadowDiffs =
+        Meter.CreateCounter<long>("l2dn.npc.brain.shadow.diff", "{comparison}", "Shadow Brain decisions differing from legacy commands.");
+
     private static readonly object SnapshotLock = new();
     private static StateSnapshot _snapshot = StateSnapshot.Empty;
     private static long _snapshotTimestamp;
     private static int _perceptionMode;
     private static int _reactiveSchedulerMode;
+    private static int _brainMode;
     private static long _criticalQueueDepth;
     private static long _combatQueueDepth;
     private static long _normalQueueDepth;
@@ -165,6 +197,9 @@ public static class NpcAiTelemetry
         Meter.CreateObservableGauge("l2dn.npc.scheduler.reactive.mode", () => new Measurement<long>(1,
             new KeyValuePair<string, object?>("mode", ((NpcReactiveSchedulerMode)Volatile.Read(ref _reactiveSchedulerMode)).ToString())),
             "{mode}", "Configured NPC reactive scheduler operating mode.");
+        Meter.CreateObservableGauge("l2dn.npc.brain.mode", () => new Measurement<long>(1,
+            new KeyValuePair<string, object?>("mode", ((NpcBrainMode)Volatile.Read(ref _brainMode)).ToString())),
+            "{mode}", "Configured NPC Brain operating mode.");
         Meter.CreateObservableGauge("l2dn.npc.scheduler.queue.depth", ObserveQueueDepth,
             "{wakeup}", "Current NPC reactive queue depth by priority.");
         Meter.CreateObservableGauge("l2dn.npc.scheduler.active_workers", () => Volatile.Read(ref _activeReactiveWorkers),
@@ -210,6 +245,96 @@ public static class NpcAiTelemetry
 
     internal static void SetReactiveSchedulerMode(NpcReactiveSchedulerMode mode) =>
         Volatile.Write(ref _reactiveSchedulerMode, (int)mode);
+
+    internal static void SetBrainMode(NpcBrainMode mode) => Volatile.Write(ref _brainMode, (int)mode);
+
+    internal static NpcBrainDecision ObserveBrainDecision(Func<NpcBrainDecision> decide)
+    {
+        using Activity? activity = Activities.StartActivity("npc.brain.decide", ActivityKind.Internal);
+        long startedAt = Stopwatch.GetTimestamp();
+        NpcBrainDecision decision = decide();
+        double elapsed = Stopwatch.GetElapsedTime(startedAt).TotalSeconds;
+        TagList tags = default;
+        tags.Add("layer", decision.Layer.ToString());
+        tags.Add("outcome", decision.Intents.IsEmpty ? "no_intent" : "intent");
+        BrainDecisions.Add(1, tags);
+        BrainDecisionDuration.Record(elapsed, tags);
+        if (decision.Layer == NpcBrainLayer.Reflex)
+        {
+            BrainReflexDuration.Record(elapsed, tags);
+        }
+        else if (decision.Layer == NpcBrainLayer.Tactical)
+        {
+            BrainTacticalDuration.Record(elapsed, tags);
+        }
+        foreach (NpcIntent intent in decision.Intents)
+        {
+            IntentsCreated.Add(1, new KeyValuePair<string, object?>("intent_type", intent.Envelope.IntentType.ToString()));
+        }
+        activity?.SetTag("brain.layer", decision.Layer.ToString());
+        activity?.SetTag("intent.count", decision.Intents.Length);
+        return decision;
+    }
+
+    internal static NpcIntentExecutionResult ObserveIntentExecution(NpcIntent intent,
+        Func<NpcIntentExecutionResult> execute)
+    {
+        using Activity? activity = Activities.StartActivity("npc.intent.validate", ActivityKind.Internal);
+        activity?.SetTag("intent.type", intent.Envelope.IntentType.ToString());
+        long startedAt = Stopwatch.GetTimestamp();
+        NpcIntentExecutionResult result;
+        try
+        {
+            result = execute();
+        }
+        catch
+        {
+            result = NpcIntentExecutionResult.Failed();
+        }
+
+        TagList tags = default;
+        tags.Add("intent_type", intent.Envelope.IntentType.ToString());
+        tags.Add("status", result.Status.ToString());
+        tags.Add("reason", ToRejectionTag(result.RejectionReason));
+        IntentValidationDuration.Record(Stopwatch.GetElapsedTime(startedAt).TotalSeconds, tags);
+        if (result.IsExecuted)
+        {
+            IntentsExecuted.Add(1, tags);
+        }
+        else
+        {
+            IntentsRejected.Add(1, tags);
+        }
+        activity?.SetTag("intent.status", result.Status.ToString());
+        activity?.SetTag("intent.rejection_reason", ToRejectionTag(result.RejectionReason));
+        return result;
+    }
+
+    internal static void RecordShadowComparison(NpcIntentComparisonKind comparison)
+    {
+        KeyValuePair<string, object?> tag = new("comparison", comparison.ToString());
+        if (comparison is NpcIntentComparisonKind.ExactMatch or NpcIntentComparisonKind.SemanticMatch)
+        {
+            BrainShadowMatches.Add(1, tag);
+        }
+        else
+        {
+            BrainShadowDiffs.Add(1, tag);
+        }
+    }
+
+    private static string ToRejectionTag(NpcIntentRejectionReason reason) => reason switch
+    {
+        NpcIntentRejectionReason.None => "none",
+        NpcIntentRejectionReason.GenerationMismatch => "generation_mismatch",
+        NpcIntentRejectionReason.ActorDead => "dead_actor",
+        NpcIntentRejectionReason.TargetDead => "dead_target",
+        NpcIntentRejectionReason.TargetInvalid => "invalid_target",
+        NpcIntentRejectionReason.OutOfRange => "out_of_range",
+        NpcIntentRejectionReason.Cooldown => "cooldown",
+        NpcIntentRejectionReason.InsufficientMana => "insufficient_mana",
+        _ => reason.ToString().ToLowerInvariant()
+    };
 
     internal static void RecordWakeup(NpcWakeReason reasons, NpcThinkPriority priority,
         NpcReactiveSchedulerMode mode, NpcWakeDisposition disposition)
@@ -375,12 +500,14 @@ public static class NpcAiTelemetry
         const int ThreatEntryEstimate = 56;
         const int AffordanceEstimate = 24;
         const int SpatialEstimate = 24;
+        const int SkillEstimate = 32;
         const int ClanIdEstimate = sizeof(int);
         return EnvelopeAndScalarEstimate +
                snapshot.State.VisibleEntities.Length * VisibleEntityEstimate +
                snapshot.State.Threats.Length * ThreatEntryEstimate +
                snapshot.State.Affordances.Length * AffordanceEstimate +
                snapshot.State.SpatialObservations.Length * SpatialEstimate +
+               snapshot.State.Skills.Length * SkillEstimate +
                snapshot.State.Identity.ClanIds.Length * ClanIdEstimate;
     }
 
@@ -400,6 +527,7 @@ public static class NpcAiTelemetry
         bytes += delta.Threats.Length * 56L;
         bytes += delta.Affordances.Length * 24L;
         bytes += delta.SpatialObservations.Length * 24L;
+        bytes += delta.Skills.Length * 32L;
         return bytes;
     }
 

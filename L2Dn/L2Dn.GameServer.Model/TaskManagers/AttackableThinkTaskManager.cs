@@ -73,7 +73,8 @@ public class AttackableThinkTaskManager
 
 				try
 				{
-					NpcPerceptionCycle? perception = LegacyNpcThinkExecutor.Instance.ExecuteDirect(attackable);
+					NpcPerceptionCycle? perception =
+						LegacyNpcThinkExecutor.Instance.ExecuteCaptureAndLegacy(attackable);
 					if (perception is { Publication: not NpcPerceptionPublicationKind.None })
 					{
 						perceptionPublications.Add(perception);
