@@ -177,6 +177,10 @@ A third gameplay pass confirmed respawn target cleanup, guard retaliation/assist
 
 Movement updates now reuse World visibility as the broad phase and track exact aggro-radius membership per player/NPC generation. A wake is emitted only on entry, re-entry, or a new NPC generation; continuous movement inside the radius is coalesced at the source. The hot path reuses its per-player delegate and collections, does not scan the world, and still leaves the authoritative attack decision to perception/Brain/Gateway validation.
 
+A fourth gameplay pass verified karma acquisition, large-group proximity aggro, leash disengage, target loss, and guard assistance. It also exposed that the Intent Brain kept a valid current target even after another player accumulated more hate. Legacy `thinkAttack()` continuously follows `getMostHated()`. The Brain now performs the same deterministic threat preference, and damage publishes a coalescible `ThreatChanged` wake after the full damage-derived hate mutation.
+
+The pass also clarified return semantics. Legacy `MOVE_TO` return ignores passive spectators until arrival, but a new attack/aggression may interrupt it; after arrival, `ACTIVE` may reacquire any eligible hostile still inside aggro range. Those behaviors are now explicit tests rather than accidental side effects. The detailed migration inventory is maintained in `NpcLegacyBehaviorCoverage.md` so remaining legacy branches are migrated profile-by-profile instead of copied wholesale.
+
 ## Verification status
 
 Automated and complete:
@@ -188,7 +192,7 @@ Automated and complete:
 - R1-R5 in Legacy, Shadow, and Intent;
 - development GameServer published and recreated in `Intent` / `Enabled` / `CaptureOnly` mode;
 - OTLP scrape verified the three configured modes, live Brain decisions, perception captures, and bounded queue-depth series;
-- Contracts remain green at 15/15, Brain at 24/24, and GameServer.Model at 95/95 after the gameplay regression fixes.
+- Contracts remain green at 15/15, Brain at 29/29, and GameServer.Model at 97/97 after the gameplay regression fixes.
 
 Environment-dependent before the completion tag:
 
