@@ -1535,6 +1535,13 @@ public class Attackable: Npc
 
 		// Reset the rest of NPC related states
 		base.onRespawn();
+
+		// A respawn is a new combat incarnation. Creature.doDie() normally clears
+		// these values, but the reset is repeated here so direct/scripted respawns
+		// can never publish a target or threat from the previous generation.
+		getAttackByList().clear();
+		clearAggroList();
+		base.setTarget(null);
 	}
 
 	/**
@@ -1805,8 +1812,15 @@ public class Attackable: Npc
 
 	public override void setTarget(WorldObject? @object)
 	{
+		// Creature.doDie() marks the actor dead before clearing its target. Reject
+		// new targets while dead, but perform the authoritative null reset without
+		// starting ACTIVE intention or another AI task during the death sequence.
 		if (isDead())
 		{
+			if (@object == null)
+			{
+				base.setTarget(null);
+			}
 			return;
 		}
 

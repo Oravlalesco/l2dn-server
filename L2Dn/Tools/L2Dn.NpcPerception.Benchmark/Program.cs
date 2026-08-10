@@ -127,7 +127,8 @@ static NpcPerceptionSnapshot CreateSnapshot(int index, long revision, int visibl
             new EntityKey(1_000_000 + index * Math.Max(visibleCount, 1) + ordinal, 0, EntityKind.Player),
             new NpcPosition(x, ordinal * 10, 0, 0), 85, 8, 16, double.Hypot(x, ordinal * 10),
             EntityStateFlags.Alive | EntityStateFlags.Spawned,
-            EntityRelationFlags.Player | EntityRelationFlags.SameInstance));
+            EntityRelationFlags.Player | EntityRelationFlags.SameInstance |
+            EntityRelationFlags.AutoAttackable));
     }
 
     NpcPerceptionState state = new(

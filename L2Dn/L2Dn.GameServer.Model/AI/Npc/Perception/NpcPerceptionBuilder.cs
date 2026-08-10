@@ -157,6 +157,8 @@ internal sealed class NpcPerceptionBuilder
         if (actor.isFlying()) capabilities |= NpcCapabilities.Flying;
         if (actor.isFakePlayer()) capabilities |= NpcCapabilities.FakePlayer;
         if (actor.canSeeThroughSilentMove()) capabilities |= NpcCapabilities.CanSeeSilentMovement;
+        if (actor is Guard || Config.Npc.ALT_MOB_AGRO_IN_PEACEZONE)
+            capabilities |= NpcCapabilities.CanAcquireInPeaceZone;
 
         return new NpcIdentity(
             actor.getId(),
@@ -358,6 +360,8 @@ internal sealed class NpcPerceptionBuilder
         if (observed.isFakePlayer()) result |= EntityRelationFlags.FakePlayer;
         if (observed.getInstanceId() == observer.getInstanceId()) result |= EntityRelationFlags.SameInstance;
         if (observed is Npc npc && HaveSameClan(observer, npc)) result |= EntityRelationFlags.SameClan;
+        if (observed.isSpawned() && observed.isTargetable() && observed.isAutoAttackable(observer))
+            result |= EntityRelationFlags.AutoAttackable;
         return result;
     }
 

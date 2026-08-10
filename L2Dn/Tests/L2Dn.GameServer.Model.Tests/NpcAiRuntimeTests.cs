@@ -133,6 +133,38 @@ public class NpcAiRuntimeTests
     }
 
     [Fact]
+    public void Dead_attackable_allows_authoritative_target_clear()
+    {
+        Attackable actor = CreateSpawnedAttackable();
+        Attackable target = CreateSpawnedAttackable();
+        actor.setTarget(target);
+        actor.setDead(true);
+
+        actor.setTarget(null);
+
+        actor.getTarget().Should().BeNull();
+    }
+
+    [Fact]
+    public void Respawn_starts_a_new_generation_without_previous_combat_state()
+    {
+        Attackable actor = CreateSpawnedAttackable();
+        Attackable target = CreateSpawnedAttackable();
+        actor.setTarget(target);
+        actor.addDamageHate(target, 5, 10);
+        actor.getAttackByList().add(new WeakReference<Creature>(target));
+        actor.setDead(true);
+
+        actor.beginRespawnLifecycle();
+        actor.onRespawn();
+        actor.completeRespawnLifecycle();
+
+        actor.getTarget().Should().BeNull();
+        actor.getAggroList().Should().BeEmpty();
+        actor.getAttackByList().Should().BeEmpty();
+    }
+
+    [Fact]
     public void Npc_lifecycle_generation_is_stable_only_outside_respawn_transition()
     {
         Attackable actor = CreateAttackable();

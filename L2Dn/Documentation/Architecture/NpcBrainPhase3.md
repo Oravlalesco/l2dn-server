@@ -160,6 +160,13 @@ The first broad gameplay pass was intentionally treated as a failed certificatio
 
 The regression suite now covers visible-threat acquisition, combat leash with an active target, return-home reacquisition suppression, guard-style retaliation, cooldown fallback range, and legacy movement target synchronization. The corrected runtime must pass a new gameplay run before Phase 3 can be tagged complete.
 
+A second gameplay pass exposed two additional authority-boundary defects:
+
+- `Creature.doDie()` marked an `Attackable` dead before invoking `setTarget(null)`, while the override rejected every target update on dead actors. The actor target therefore survived death and was published again after respawn. Null clearing is now explicitly allowed without restarting AI, and respawn defensively clears target, hate, and attack-by state.
+- acquisition treated every visible player as a hostile candidate and treated peace zones as universal protection. Visible perception now carries the GameServer's `AutoAttackable` affordance. New acquisition requires that authority (existing positive hate remains a valid retaliation path), ordinary monsters still respect protected peace zones, and guards preserve the legacy rule that permits acquiring negative-reputation players inside a city.
+
+The new regression coverage verifies death-time target clearing, clean combat state for each respawn generation, rejection of visible but non-attackable entities, monster peace-zone behavior, and guard acquisition of authorized targets inside protected zones.
+
 ## Verification status
 
 Automated and complete:
@@ -171,7 +178,7 @@ Automated and complete:
 - R1-R5 in Legacy, Shadow, and Intent;
 - development GameServer published and recreated in `Intent` / `Enabled` / `CaptureOnly` mode;
 - OTLP scrape verified the three configured modes, live Brain decisions, perception captures, and bounded queue-depth series;
-- Contracts remain green at 15/15, Brain at 21/21, and GameServer.Model at 92/92 after the gameplay regression fixes.
+- Contracts remain green at 15/15, Brain at 24/24, and GameServer.Model at 94/94 after the gameplay regression fixes.
 
 Environment-dependent before the completion tag:
 

@@ -336,7 +336,8 @@ internal sealed class BenchmarkExecutor: INpcThinkExecutor
         EntityKey player = new(actor.ObjectId ^ int.MinValue, 0, EntityKind.Player);
         VisibleEntity visible = new(0, player, new NpcPosition(30, 0, 0, 0), 20, 5, 10, 30,
             EntityStateFlags.Alive | EntityStateFlags.Spawned,
-            EntityRelationFlags.Player | EntityRelationFlags.Playable | EntityRelationFlags.SameInstance);
+            EntityRelationFlags.Player | EntityRelationFlags.Playable | EntityRelationFlags.SameInstance |
+            EntityRelationFlags.AutoAttackable);
         NpcPerceptionState state = new(
             new NpcIdentity(actor.getId(), NpcKind.Monster, LegacyNpcAiType.Fighter, 20, 0, [],
                 NpcCapabilities.CanMove | NpcCapabilities.CanAttack | NpcCapabilities.Aggressive),

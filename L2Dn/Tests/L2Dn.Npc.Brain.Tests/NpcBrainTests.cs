@@ -47,6 +47,57 @@ public class NpcBrainTests
     }
 
     [Fact]
+    public void Aggressive_actor_does_not_acquire_visible_entity_without_attack_authority()
+    {
+        VisibleEntity neutral = Hostile(Player, 90) with
+        {
+            Relations = EntityRelationFlags.Player | EntityRelationFlags.Playable |
+                EntityRelationFlags.SameInstance
+        };
+        NpcPerceptionSnapshot perception = CreatePerception(visible: [neutral]);
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception,
+            Context(NpcBrainStimulus.PlayerBecameRelevant));
+
+        decision.Intents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Aggressive_monster_does_not_acquire_new_target_in_protected_peace_zone()
+    {
+        VisibleEntity protectedPlayer = Hostile(Player, 90) with
+        {
+            State = EntityStateFlags.Alive | EntityStateFlags.Spawned |
+                EntityStateFlags.PeaceZone | EntityStateFlags.NoPvpZone
+        };
+        NpcPerceptionSnapshot perception = CreatePerception(visible: [protectedPlayer]);
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception,
+            Context(NpcBrainStimulus.PlayerBecameRelevant));
+
+        decision.Intents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Guard_acquires_authorized_target_inside_protected_peace_zone()
+    {
+        VisibleEntity criminal = Hostile(Player, 90) with
+        {
+            State = EntityStateFlags.Alive | EntityStateFlags.Spawned |
+                EntityStateFlags.PeaceZone | EntityStateFlags.NoPvpZone
+        };
+        NpcCapabilities capabilities = NpcCapabilities.CanMove | NpcCapabilities.CanAttack |
+            NpcCapabilities.Guard | NpcCapabilities.CanAcquireInPeaceZone;
+        NpcPerceptionSnapshot perception = CreatePerception(visible: [criminal], capabilities: capabilities);
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception,
+            Context(NpcBrainStimulus.PlayerBecameRelevant));
+
+        decision.Intents.Should().ContainSingle().Which.Should().BeOfType<AcquireTargetIntent>()
+            .Which.Target.Should().Be(Player);
+    }
+
+    [Fact]
     public void Passive_actor_does_not_acquire_visible_player_without_threat()
     {
         NpcPerceptionSnapshot perception = CreatePerception(visible: [Hostile(Player, 90)],
@@ -286,7 +337,8 @@ public class NpcBrainTests
     private static VisibleEntity Hostile(EntityKey key, double distance, int ordinal = 0) =>
         new(ordinal, key, new NpcPosition((int)distance, 0, 0, 0), 20, 5, 10, distance,
             EntityStateFlags.Alive | EntityStateFlags.Spawned,
-            EntityRelationFlags.Player | EntityRelationFlags.Playable | EntityRelationFlags.SameInstance);
+            EntityRelationFlags.Player | EntityRelationFlags.Playable | EntityRelationFlags.SameInstance |
+            EntityRelationFlags.AutoAttackable);
 
     private static NpcPerceptionSnapshot CreatePerception(
         NpcKey? actor = null,

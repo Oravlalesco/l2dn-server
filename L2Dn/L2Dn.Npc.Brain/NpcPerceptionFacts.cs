@@ -25,12 +25,14 @@ internal static class NpcPerceptionFacts
 
             visible = candidate;
             distance = candidate.Distance2D;
-            return IsValidVisibleTarget(candidate);
+            return IsValidVisibleTarget(candidate) &&
+                (candidate.Relations.HasFlag(EntityRelationFlags.AutoAttackable) ||
+                    HasPositiveVisibleThreat(perception, key));
         }
 
         foreach (ThreatEntry threat in perception.State.Threats)
         {
-            if (threat.Target == key && threat.Visible && threat.ValidTarget)
+            if (threat.Target == key && threat.Hate > 0 && threat.Visible && threat.ValidTarget)
             {
                 visible = default;
                 distance = threat.Distance2D;
@@ -83,14 +85,22 @@ internal static class NpcPerceptionFacts
         EntityStateFlags state = candidate.State;
         return state.HasFlag(EntityStateFlags.Alive) && !state.HasFlag(EntityStateFlags.AlikeDead) &&
             state.HasFlag(EntityStateFlags.Spawned) && !state.HasFlag(EntityStateFlags.Invulnerable) &&
-            !state.HasFlag(EntityStateFlags.PeaceZone) &&
+            !state.HasFlag(EntityStateFlags.RecentFakeDeath) &&
             candidate.Relations.HasFlag(EntityRelationFlags.SameInstance);
     }
 
     private static bool IsVisibleHostileCandidate(VisibleEntity candidate, NpcCapabilities capabilities)
     {
         if (!IsValidVisibleTarget(candidate) ||
-            !candidate.Relations.HasFlag(EntityRelationFlags.Playable))
+            !candidate.Relations.HasFlag(EntityRelationFlags.Playable) ||
+            !candidate.Relations.HasFlag(EntityRelationFlags.AutoAttackable))
+        {
+            return false;
+        }
+
+        bool protectedPeaceZone = candidate.State.HasFlag(EntityStateFlags.PeaceZone) &&
+            candidate.State.HasFlag(EntityStateFlags.NoPvpZone);
+        if (protectedPeaceZone && !capabilities.HasFlag(NpcCapabilities.CanAcquireInPeaceZone))
         {
             return false;
         }
@@ -98,4 +108,8 @@ internal static class NpcPerceptionFacts
         return !candidate.State.HasFlag(EntityStateFlags.SilentMoving) ||
             capabilities.HasFlag(NpcCapabilities.CanSeeSilentMovement);
     }
+
+    private static bool HasPositiveVisibleThreat(NpcPerceptionSnapshot perception, EntityKey key) =>
+        perception.State.Threats.Any(threat => threat.Target == key && threat.Hate > 0 && threat.Visible &&
+            threat.ValidTarget);
 }

@@ -48,7 +48,8 @@ public enum NpcCapabilities
     RaidMinion = 1 << 6,
     Flying = 1 << 7,
     FakePlayer = 1 << 8,
-    CanSeeSilentMovement = 1 << 9
+    CanSeeSilentMovement = 1 << 9,
+    CanAcquireInPeaceZone = 1 << 10
 }
 
 [Flags]
@@ -106,7 +107,8 @@ public enum EntityRelationFlags
     SameClan = 1 << 8,
     CurrentTarget = 1 << 9,
     PrimaryThreat = 1 << 10,
-    SameInstance = 1 << 11
+    SameInstance = 1 << 11,
+    AutoAttackable = 1 << 12
 }
 
 [Flags]
