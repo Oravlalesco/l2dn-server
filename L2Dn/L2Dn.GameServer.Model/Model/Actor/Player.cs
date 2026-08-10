@@ -4972,7 +4972,7 @@ public class Player: Playable
 					}
 				}
 
-				if (fpcKill && Config.FakePlayers.FAKE_PLAYER_KILL_KARMA && _pvpFlag != PvpFlagStatus.None && getReputation() >= 0)
+				if (fpcKill && Config.FakePlayers.FAKE_PLAYER_KILL_KARMA && _pvpFlag.IsUnflagged() && getReputation() >= 0)
 				{
 					killer.setReputation(killer.getReputation() - 150);
 				}
@@ -5393,7 +5393,7 @@ public class Player: Playable
 		}
 
 		setPvpFlagLasts(DateTime.UtcNow + Config.Pvp.PVP_NORMAL_TIME);
-		if (_pvpFlag != PvpFlagStatus.None)
+		if (_pvpFlag.IsUnflagged())
 		{
 			startPvPFlag();
 		}
@@ -5432,7 +5432,7 @@ public class Player: Playable
 			{
 				setPvpFlagLasts(DateTime.UtcNow + Config.Pvp.PVP_NORMAL_TIME);
 			}
-			if (_pvpFlag != PvpFlagStatus.None)
+			if (_pvpFlag.IsUnflagged())
 			{
 				startPvPFlag();
 			}
@@ -13416,7 +13416,7 @@ public class Player: Playable
             }
             else if (clan == null || targetClan == null)
             {
-                if (target.getPvpFlag() != PvpFlagStatus.None && target.getReputation() >= 0)
+                if (target.getPvpFlag().IsUnflagged() && target.getReputation() >= 0)
                 {
                     return false;
                 }
