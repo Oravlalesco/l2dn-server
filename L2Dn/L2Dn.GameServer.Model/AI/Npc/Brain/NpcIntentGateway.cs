@@ -1,5 +1,6 @@
 using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
+using L2Dn.GameServer.Model.Actor.Instances;
 using L2Dn.GameServer.Model.Skills;
 using L2Dn.Geometry;
 using L2Dn.NpcContracts;
@@ -102,12 +103,29 @@ internal sealed class NpcIntentGateway
             return Reject(NpcIntentRejectionReason.Policy);
         }
 
-        _commands.AddThreat(actor, target!, 0, 1);
+        Creature liveTarget = target!;
+        // Fresh proximity acquisition must cross the same authoritative boundary
+        // as legacy thinkActive(). Existing hate is retaliation and may legitimately
+        // select an attacker outside the passive aggro radius.
+        if (actor.getHating(liveTarget) <= 0)
+        {
+            int aggroRange = actor is Guard ? 500 : actor.getAggroRange();
+            if (aggroRange <= 0 || !actor.IsInsideRadius3D(liveTarget, aggroRange))
+            {
+                return Reject(NpcIntentRejectionReason.OutOfRange);
+            }
+            if (!_geo.CanSeeTarget(actor, liveTarget))
+            {
+                return Reject(NpcIntentRejectionReason.Blocked);
+            }
+        }
+
+        _commands.AddThreat(actor, liveTarget, 0, 1);
         if (!actor.isRunning())
         {
             _commands.SetRunning(actor);
         }
-        _commands.SetIntention(ai, CtrlIntention.AI_INTENTION_ATTACK, target);
+        _commands.SetIntention(ai, CtrlIntention.AI_INTENTION_ATTACK, liveTarget);
         return NpcIntentExecutionResult.Executed();
     }
 

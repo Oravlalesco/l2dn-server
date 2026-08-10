@@ -47,6 +47,21 @@ public class NpcBrainTests
     }
 
     [Fact]
+    public void Aggressive_actor_does_not_acquire_target_outside_vertical_aggro_range()
+    {
+        VisibleEntity verticallyDistant = Hostile(Player, 0) with
+        {
+            Position = new NpcPosition(0, 0, 600, 0)
+        };
+        NpcPerceptionSnapshot perception = CreatePerception(visible: [verticallyDistant]);
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception,
+            Context(NpcBrainStimulus.PlayerBecameRelevant));
+
+        decision.Intents.Should().BeEmpty();
+    }
+
+    [Fact]
     public void Aggressive_actor_does_not_acquire_visible_entity_without_attack_authority()
     {
         VisibleEntity neutral = Hostile(Player, 90) with
@@ -121,6 +136,43 @@ public class NpcBrainTests
 
         decision.Intents.Should().ContainSingle().Which.Should().BeOfType<AcquireTargetIntent>()
             .Which.Target.Should().Be(Player);
+    }
+
+    [Fact]
+    public void Higher_hate_visible_threat_replaces_current_target()
+    {
+        EntityKey challenger = new(9277, 0, EntityKind.Player);
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 30), Hostile(challenger, 40, 1)],
+            threats:
+            [
+                new ThreatEntry(Player, 10, 100, 30, true, true),
+                new ThreatEntry(challenger, 200, 200, 40, true, true)
+            ]);
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception,
+            Context(NpcBrainStimulus.ThreatChanged));
+
+        decision.Intents.Should().ContainSingle().Which.Should().BeOfType<AcquireTargetIntent>()
+            .Which.Target.Should().Be(challenger);
+    }
+
+    [Fact]
+    public void Lower_hate_visible_threat_does_not_replace_current_target()
+    {
+        EntityKey challenger = new(9277, 0, EntityKind.Player);
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 30), Hostile(challenger, 40, 1)],
+            threats:
+            [
+                new ThreatEntry(Player, 200, 200, 30, true, true),
+                new ThreatEntry(challenger, 10, 10, 40, true, true)
+            ]);
+
+        NpcIntent intent = new NpcBrainCoordinator().Decide(perception,
+            Context(NpcBrainStimulus.ThreatChanged)).Intents.Single();
+
+        intent.Should().BeOfType<BasicAttackIntent>().Which.Target.Should().Be(Player);
     }
 
     [Fact]
@@ -264,6 +316,34 @@ public class NpcBrainTests
             Context(NpcBrainStimulus.PlayerBecameRelevant));
 
         decision.Intents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Returning_actor_interrupts_return_when_attacked_again()
+    {
+        NpcPerceptionSnapshot perception = CreatePerception(visible: [Hostile(Player, 30)],
+            threats: [new ThreatEntry(Player, 100, 50, 30, true, true)],
+            position: new NpcPosition(500, 0, 0, 0), spawn: new NpcPosition(0, 0, 0, 0),
+            returningToSpawn: true);
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception,
+            Context(NpcBrainStimulus.Attacked));
+
+        decision.Intents.Should().ContainSingle().Which.Should().BeOfType<AcquireTargetIntent>()
+            .Which.Target.Should().Be(Player);
+    }
+
+    [Fact]
+    public void Actor_at_home_reacquires_hostile_still_inside_aggro_range()
+    {
+        NpcPerceptionSnapshot perception = CreatePerception(visible: [Hostile(Player, 30)],
+            position: new NpcPosition(0, 0, 0, 0), spawn: new NpcPosition(0, 0, 0, 0));
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception,
+            Context(NpcBrainStimulus.PeriodicDue));
+
+        decision.Intents.Should().ContainSingle().Which.Should().BeOfType<AcquireTargetIntent>()
+            .Which.Target.Should().Be(Player);
     }
 
     [Fact]

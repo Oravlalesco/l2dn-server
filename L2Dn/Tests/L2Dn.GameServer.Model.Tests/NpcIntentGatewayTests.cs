@@ -64,6 +64,30 @@ public class NpcIntentGatewayTests
     }
 
     [Fact]
+    public void Fresh_acquisition_outside_authoritative_aggro_range_is_rejected()
+    {
+        Attackable actor = CreateActor();
+        Attackable target = CreateAutoAttackableTarget();
+        target.setXYZ(actor.getX() + 501, actor.getY(), actor.getZ());
+        AcquireTargetIntent intent = new(Envelope(actor, NpcIntentType.AcquireTarget), Key(target));
+        NpcIntentGateway gateway = CreateGateway(new RecordingCommands(), actor, target);
+
+        gateway.Execute(intent).RejectionReason.Should().Be(NpcIntentRejectionReason.OutOfRange);
+    }
+
+    [Fact]
+    public void Fresh_acquisition_without_line_of_sight_is_rejected()
+    {
+        Attackable actor = CreateActor();
+        Attackable target = CreateAutoAttackableTarget();
+        target.setXYZ(actor.getX() + 100, actor.getY(), actor.getZ());
+        AcquireTargetIntent intent = new(Envelope(actor, NpcIntentType.AcquireTarget), Key(target));
+        NpcIntentGateway gateway = CreateGateway(new RecordingCommands(), false, actor, target);
+
+        gateway.Execute(intent).RejectionReason.Should().Be(NpcIntentRejectionReason.Blocked);
+    }
+
+    [Fact]
     public void Target_dying_between_decision_and_gateway_is_rejected_without_exception()
     {
         Attackable actor = CreateActor();
@@ -185,6 +209,11 @@ public class NpcIntentGatewayTests
         return InitializeActor(new NonAutoAttackableAttackable(CreateNpcTemplate()));
     }
 
+    private static Attackable CreateAutoAttackableTarget()
+    {
+        return InitializeActor(new AutoAttackableAttackable(CreateNpcTemplate()));
+    }
+
     private static T InitializeActor<T>(T actor) where T: Attackable
     {
         actor.beginRespawnLifecycle();
@@ -203,6 +232,7 @@ public class NpcIntentGatewayTests
         set.set("name", "Intent Test NPC");
         set.set("baseHpMax", 100d);
         set.set("baseMpMax", 100d);
+        set.set("aggroRange", 500);
         return new NpcTemplate(set);
     }
 
@@ -227,6 +257,11 @@ public class NpcIntentGatewayTests
     private sealed class NonAutoAttackableAttackable(NpcTemplate template): Attackable(template)
     {
         public override bool isAutoAttackable(Creature attacker) => false;
+    }
+
+    private sealed class AutoAttackableAttackable(NpcTemplate template): Attackable(template)
+    {
+        public override bool isAutoAttackable(Creature attacker) => true;
     }
 
     private sealed class RecordingCommands: ILegacyNpcCommandExecutor

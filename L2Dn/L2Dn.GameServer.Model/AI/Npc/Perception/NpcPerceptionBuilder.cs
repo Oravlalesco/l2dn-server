@@ -204,7 +204,7 @@ internal sealed class NpcPerceptionBuilder
         return new NpcCombatFacts(
             currentTarget == null ? null : ToEntityKey(currentTarget),
             actor.getPhysicalAttackRange(),
-            actor.getAggroRange(),
+            actor is Guard ? 500 : actor.getAggroRange(),
             flags);
     }
 

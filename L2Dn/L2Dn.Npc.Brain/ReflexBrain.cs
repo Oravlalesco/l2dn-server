@@ -14,6 +14,7 @@ public sealed class ReflexBrain
 
         NpcPerceptionEnvelope snapshot = perception.Envelope;
         EntityKey? currentTarget = perception.State.Combat.CurrentTarget;
+        EntityKey? highestThreat = NpcPerceptionFacts.SelectHighestVisibleThreat(perception);
         NpcEnvironment environment = perception.State.Environment;
         if (environment.SpawnPosition is { } spawn)
         {
@@ -33,11 +34,19 @@ public sealed class ReflexBrain
                 return new ReturnHomeIntent(Envelope(snapshot, decisionSequence, NpcIntentType.ReturnHome));
             }
 
-            // Returning is an authoritative movement state. Do not reacquire a nearby
-            // player until the NPC has completed the trip back into its home radius.
+            // Match legacy MOVE_TO behavior: a mere spectator cannot interrupt the
+            // return, but a new attack/aggression event with authoritative hate can.
             if (environment.ReturningToSpawn && returnHomeDistance > 0 &&
                 distanceFromSpawn > returnHomeDistance)
             {
+                NpcBrainStimulus interruptingStimuli = NpcBrainStimulus.Attacked |
+                    NpcBrainStimulus.ThreatChanged | NpcBrainStimulus.AllyAttacked;
+                if ((context.Stimuli & interruptingStimuli) != 0 && highestThreat.HasValue)
+                {
+                    return new AcquireTargetIntent(
+                        Envelope(snapshot, decisionSequence, NpcIntentType.AcquireTarget),
+                        highestThreat.Value);
+                }
                 return null;
             }
         }
@@ -46,8 +55,23 @@ public sealed class ReflexBrain
         {
             if (!NpcPerceptionFacts.TryGetValidTarget(perception, currentTarget.Value, out _, out _))
             {
+                if (highestThreat.HasValue && highestThreat.Value != currentTarget.Value)
+                {
+                    return new AcquireTargetIntent(
+                        Envelope(snapshot, decisionSequence, NpcIntentType.AcquireTarget),
+                        highestThreat.Value);
+                }
                 return new ClearTargetIntent(Envelope(snapshot, decisionSequence, NpcIntentType.ClearTarget),
                     currentTarget);
+            }
+
+            // Legacy thinkAttack() continuously follows getMostHated(). The current
+            // target is therefore not sticky when another visible attacker has won hate.
+            if (highestThreat.HasValue && highestThreat.Value != currentTarget.Value)
+            {
+                return new AcquireTargetIntent(
+                    Envelope(snapshot, decisionSequence, NpcIntentType.AcquireTarget),
+                    highestThreat.Value);
             }
 
             if (profile.FleeAllowed &&

@@ -47,15 +47,10 @@ internal static class NpcPerceptionFacts
 
     public static EntityKey? SelectTarget(NpcPerceptionSnapshot perception, NpcIntelligenceProfile profile)
     {
-        ThreatEntry? threat = perception.State.Threats
-            .Where(static entry => entry.Visible && entry.ValidTarget && entry.Hate > 0)
-            .OrderByDescending(static entry => entry.Hate)
-            .ThenBy(static entry => entry.Distance2D)
-            .Cast<ThreatEntry?>()
-            .FirstOrDefault();
+        EntityKey? threat = SelectHighestVisibleThreat(perception);
         if (threat.HasValue)
         {
-            return threat.Value.Target;
+            return threat;
         }
 
         if (!profile.AcquireVisibleHostiles)
@@ -65,13 +60,31 @@ internal static class NpcPerceptionFacts
 
         NpcCapabilities capabilities = perception.State.Identity.Capabilities;
         int aggroRange = perception.State.Combat.AggroRange;
+        NpcPosition actorPosition = perception.State.Physical.Position;
         return perception.State.VisibleEntities
-            .Where(candidate => candidate.Distance2D <= aggroRange && IsVisibleHostileCandidate(candidate,
-                capabilities))
+            .Where(candidate => Distance3D(actorPosition, candidate.Position) <= aggroRange &&
+                IsVisibleHostileCandidate(candidate, capabilities))
             .OrderBy(static candidate => candidate.Distance2D)
             .ThenBy(static candidate => candidate.ObservationOrdinal)
             .Select(static candidate => (EntityKey?)candidate.Entity)
             .FirstOrDefault();
+    }
+
+    public static EntityKey? SelectHighestVisibleThreat(NpcPerceptionSnapshot perception)
+    {
+        EntityKey? target = null;
+        long highestHate = 0;
+        foreach (ThreatEntry entry in perception.State.Threats)
+        {
+            // Strictly greater preserves the first observed entry on ties, matching
+            // legacy getMostHated() while remaining deterministic for replay.
+            if (entry.Visible && entry.ValidTarget && entry.Hate > highestHate)
+            {
+                target = entry.Target;
+                highestHate = entry.Hate;
+            }
+        }
+        return target;
     }
 
     public static double HpPercent(NpcPhysicalState physical) =>
@@ -79,6 +92,12 @@ internal static class NpcPerceptionFacts
 
     public static double Distance2D(NpcPosition left, NpcPosition right) =>
         double.Hypot((double)left.X - right.X, (double)left.Y - right.Y);
+
+    public static double Distance3D(NpcPosition left, NpcPosition right)
+    {
+        double xy = Distance2D(left, right);
+        return double.Hypot(xy, (double)left.Z - right.Z);
+    }
 
     private static bool IsValidVisibleTarget(VisibleEntity candidate)
     {

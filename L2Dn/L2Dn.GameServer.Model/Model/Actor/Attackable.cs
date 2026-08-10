@@ -1,5 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 using L2Dn.GameServer.AI;
+using L2Dn.GameServer.AI.Scheduling;
 using L2Dn.GameServer.Data.Xml;
 using L2Dn.GameServer.Dto;
 using L2Dn.GameServer.Enums;
@@ -801,6 +802,10 @@ public class Attackable: Npc
 				}
 
 				addDamageHate(attacker, damage, (int) hateValue);
+				// EVT_ATTACKED is raised before the full damage-derived hate is applied.
+				// Publish a second, coalescible stimulus after the authoritative threat
+				// mutation so the Brain can immediately reconsider the most hated target.
+				NpcReactivity.Wake(this, NpcWakeReason.ThreatChanged);
 
 				Player? player = attacker.getActingPlayer();
 				if (player != null && Events.HasSubscribers<OnAttackableAttack>())
