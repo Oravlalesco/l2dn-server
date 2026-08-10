@@ -145,6 +145,21 @@ The benchmark used 5,000 NPCs, 100,000 mixed/storm events, 16 workers, bounded c
 
 All pipelines stayed within bounded queues and preserved exactly one concurrent Think per NPC. R1 is an artificial simultaneous 5,000-NPC critical burst: Shadow/Intent add decision allocations and queue work, explaining the relative increase while remaining far below the Phase 2.5 live Critical P95 of 92.39 ms. R4 mixed-priority Critical P95 was 37.32 ms Legacy, 29.09 ms Shadow, and 29.02 ms Intent. No network, disk, or database I/O occurs in the Brain/Gateway hot path.
 
+## First Intent-mode gameplay regression pass
+
+The first broad gameplay pass was intentionally treated as a failed certification run. OTLP showed repeated approach decisions, rejected guard attacks, and stale combat retention. The following defects were corrected before repeating Scenario A:
+
+- retaliation is authorized by authoritative positive hate as well as `isAutoAttackable`, preserving guard and ally-assist behavior;
+- threat fallback requires a currently visible, valid target, preventing invisible stale threats from being reacquired;
+- the authoritative combat leash is captured from the legacy GameServer rules and evaluated before target handling;
+- return-home clears attack, hate, attack-by, and target state before movement, and reacquisition is suppressed while returning;
+- approach follows at the requested stopping range and is not restarted while the same target is already moving;
+- basic attack always cancels the legacy follow task before execution;
+- ranged/caster profiles with no ready offensive skill approach physical attack range instead of stalling at preferred casting range;
+- only the exact base `AttackableAI` uses the new Intent event semantics; derived and scripted AIs retain Legacy behavior.
+
+The regression suite now covers visible-threat acquisition, combat leash with an active target, return-home reacquisition suppression, guard-style retaliation, cooldown fallback range, and legacy movement target synchronization. The corrected runtime must pass a new gameplay run before Phase 3 can be tagged complete.
+
 ## Verification status
 
 Automated and complete:
@@ -156,11 +171,11 @@ Automated and complete:
 - R1-R5 in Legacy, Shadow, and Intent;
 - development GameServer published and recreated in `Intent` / `Enabled` / `CaptureOnly` mode;
 - OTLP scrape verified the three configured modes, live Brain decisions, perception captures, and bounded queue-depth series;
-- GameServer.Model remains green at 89/89 after adding observable-instrument lifetime coverage.
+- Contracts remain green at 15/15, Brain at 21/21, and GameServer.Model at 92/92 after the gameplay regression fixes.
 
 Environment-dependent before the completion tag:
 
-- repeat Dragon Valley Cave proximity aggro, retaliation, pursuit, target loss, death/return, and guard assistance;
+- repeat Dragon Valley Cave proximity aggro, guard melee/ranged retaliation, pursuit, leash disengage, target loss, death/return, and guard assistance on the corrected runtime;
 - capture the OTLP window and confirm zero drops/scheduler failures;
 - run explicit `Legacy` rollback once;
 - Scenario B/C remain certification gates before Intent can become a production default.

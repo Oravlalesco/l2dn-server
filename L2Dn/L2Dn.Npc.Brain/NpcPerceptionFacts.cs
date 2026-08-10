@@ -30,7 +30,7 @@ internal static class NpcPerceptionFacts
 
         foreach (ThreatEntry threat in perception.State.Threats)
         {
-            if (threat.Target == key && threat.ValidTarget)
+            if (threat.Target == key && threat.Visible && threat.ValidTarget)
             {
                 visible = default;
                 distance = threat.Distance2D;
@@ -46,7 +46,7 @@ internal static class NpcPerceptionFacts
     public static EntityKey? SelectTarget(NpcPerceptionSnapshot perception, NpcIntelligenceProfile profile)
     {
         ThreatEntry? threat = perception.State.Threats
-            .Where(static entry => entry.ValidTarget && entry.Hate > 0)
+            .Where(static entry => entry.Visible && entry.ValidTarget && entry.Hate > 0)
             .OrderByDescending(static entry => entry.Hate)
             .ThenBy(static entry => entry.Distance2D)
             .Cast<ThreatEntry?>()

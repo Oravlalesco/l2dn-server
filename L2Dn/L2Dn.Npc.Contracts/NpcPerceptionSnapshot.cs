@@ -55,7 +55,9 @@ public sealed record NpcEnvironment(
     bool NeighborsActive,
     bool RandomWalkingEnabled,
     bool ReturningToSpawn,
-    bool CanReturnToSpawn);
+    bool CanReturnToSpawn,
+    int ReturnHomeDistance,
+    int CombatLeashDistance);
 
 public sealed record NpcPerceptionState
 {

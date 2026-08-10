@@ -137,7 +137,8 @@ static NpcPerceptionSnapshot CreateSnapshot(int index, long revision, int visibl
             NpcPhysicalFlags.Alive | NpcPhysicalFlags.Spawned),
         new NpcCombatFacts(visibleCount == 0 ? null : visible[0].Entity, 40, 500,
             visibleCount == 0 ? NpcCombatFlags.None : NpcCombatFlags.InCombat),
-        new NpcEnvironment(new RegionKey(0, index % 32, index / 32 % 32), null, true, true, false, false, true),
+        new NpcEnvironment(new RegionKey(0, index % 32, index / 32 % 32), null, true, true, false, false, true,
+            300, 1500),
         visible.MoveToImmutable(), [], [], []);
     return new NpcPerceptionSnapshot(new NpcPerceptionEnvelope(1, npc, revision, revision, revision), state);
 }

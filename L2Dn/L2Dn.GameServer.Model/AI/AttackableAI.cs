@@ -56,6 +56,11 @@ public class AttackableAI: CreatureAI
 
 	private int chaostime;
 
+	// Only the exact base AI is migrated in Phase 3. Derived/scripted AIs must retain
+	// every legacy event side effect until they receive an explicit Brain profile.
+	internal bool UsesIntentBrain => NpcBrainRuntime.Mode == NpcBrainMode.Intent &&
+		GetType() == typeof(AttackableAI);
+
 	public AttackableAI(Attackable attackable): this(attackable, NpcAiDependencies.Legacy)
 	{
 	}
@@ -1263,7 +1268,7 @@ public class AttackableAI: CreatureAI
 	 */
 	public override void onEvtThink()
 	{
-		if (NpcBrainRuntime.Mode == NpcBrainMode.Intent &&
+		if (UsesIntentBrain &&
 		    NpcReactivity.Mode == NpcReactiveSchedulerMode.Enabled)
 		{
 			NpcReactivity.Wake(getActiveChar(), NpcWakeReason.ActionReady);
@@ -1367,7 +1372,7 @@ public class AttackableAI: CreatureAI
 		// Add the attacker to the _aggroList of the actor
 		_commands.AddThreat(me, attacker, 0, 1);
 
-		if (NpcBrainRuntime.Mode != NpcBrainMode.Intent)
+		if (!UsesIntentBrain)
 		{
 			// Set the Creature movement type to run and send Server->Client packet ChangeMoveType to all others Player
 			if (!me.isRunning())
@@ -1431,7 +1436,7 @@ public class AttackableAI: CreatureAI
 			_commands.AddThreat(me, target, 0, aggro);
 
 			// In Intent mode, threat is authoritative world input; target/running/intention are Brain decisions.
-			if (NpcBrainRuntime.Mode != NpcBrainMode.Intent &&
+			if (!UsesIntentBrain &&
 			    getIntention() != CtrlIntention.AI_INTENTION_ATTACK)
 			{
 				// Set the Creature movement type to run and send Server->Client packet ChangeMoveType to all others Player
@@ -1462,7 +1467,7 @@ public class AttackableAI: CreatureAI
 
 	protected override void onEvtForgetObject(WorldObject @object)
 	{
-		if (NpcBrainRuntime.Mode == NpcBrainMode.Intent && ReferenceEquals(_actor.getTarget(), @object))
+		if (UsesIntentBrain && ReferenceEquals(_actor.getTarget(), @object))
 		{
 			return;
 		}
@@ -1484,7 +1489,10 @@ public class AttackableAI: CreatureAI
 
 	public override void setTarget(WorldObject? target)
 	{
-		// NPCs share their regular target with AI target.
+		// Keep AbstractAI's private target synchronized as follow coordination and
+		// isFollowing() still use it internally. The actor target remains the
+		// authoritative legacy target exposed to the rest of the GameServer.
+		base.setTarget(target);
 		_commands.SetTarget(_actor, target);
 	}
 

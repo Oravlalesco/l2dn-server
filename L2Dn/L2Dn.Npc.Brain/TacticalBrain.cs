@@ -27,7 +27,7 @@ public sealed class TacticalBrain
                 Envelope(snapshot, decisionSequence, NpcIntentType.BasicAttack), target),
             NpcTacticalAction.Approach => new ApproachTargetIntent(
                 Envelope(snapshot, decisionSequence, NpcIntentType.ApproachTarget), target,
-                profile.PreferredRange > 0 ? profile.PreferredRange : perception.State.Combat.PhysicalAttackRange),
+                score.DesiredRange > 0 ? score.DesiredRange : perception.State.Combat.PhysicalAttackRange),
             NpcTacticalAction.Flee => new FleeIntent(
                 Envelope(snapshot, decisionSequence, NpcIntentType.Flee), target),
             NpcTacticalAction.CastSkill when score.Skill is { } skill => new CastSkillIntent(

@@ -26,7 +26,7 @@ public class NpcPerceptionContractTests
         NpcPerceptionState state = new(identity,
             new NpcPhysicalState(default, 1, 1, 1, 1, 5, 10, NpcPhysicalFlags.Alive),
             new NpcCombatFacts(null, 40, 500, NpcCombatFlags.None),
-            new NpcEnvironment(default, null, true, true, false, false, true),
+            new NpcEnvironment(default, null, true, true, false, false, true, 300, 1500),
             default, default, default, default);
 
         identity.ClanIds.IsDefault.Should().BeFalse();
@@ -205,7 +205,7 @@ public class NpcPerceptionContractTests
         NpcPhysicalState physical = new(new NpcPosition(10, 20, 30, 40), 80, 100, 20, 30, 8, 16,
             NpcPhysicalFlags.Alive | NpcPhysicalFlags.Spawned);
         NpcCombatFacts combat = new(null, 40, 500, NpcCombatFlags.None);
-        NpcEnvironment environment = new(new RegionKey(0, 10, 11), null, true, true, false, false, true);
+        NpcEnvironment environment = new(new RegionKey(0, 10, 11), null, true, true, false, false, true, 300, 1500);
         ImmutableArray<VisibleEntity> visible =
         [
             new VisibleEntity(0, new EntityKey(2, 0, EntityKind.Player), new NpcPosition(15, 20, 30, 0),
@@ -238,7 +238,7 @@ public class NpcPerceptionContractTests
             NpcPhysicalFlags.Alive | NpcPhysicalFlags.Spawned);
         NpcCombatFacts combat = new(visible[0].Entity, 40, 500, NpcCombatFlags.InCombat);
         NpcEnvironment environment = new(new RegionKey(0, seed % 10, seed % 7), null, true, true, false, false,
-            true);
+            true, 300, 1500);
         return new NpcPerceptionState(identity, physical, combat, environment, visible.MoveToImmutable(), [], [], []);
     }
 }

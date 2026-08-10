@@ -73,6 +73,19 @@ public class NpcBrainTests
     }
 
     [Fact]
+    public void Threat_that_left_world_visibility_is_not_reacquired()
+    {
+        NpcPerceptionSnapshot perception = CreatePerception(threats:
+            [new ThreatEntry(Player, 10, 2, 2_000, false, true)],
+            capabilities: NpcCapabilities.CanMove | NpcCapabilities.CanAttack);
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception,
+            Context(NpcBrainStimulus.TargetLost));
+
+        decision.Intents.Should().BeEmpty();
+    }
+
+    [Fact]
     public void Dead_current_target_is_cleared()
     {
         VisibleEntity dead = Hostile(Player, 30) with { State = EntityStateFlags.Spawned | EntityStateFlags.AlikeDead };
@@ -106,6 +119,22 @@ public class NpcBrainTests
 
         decision.Intents.Should().ContainSingle().Which.Should().BeOfType<BasicAttackIntent>()
             .Which.Target.Should().Be(Player);
+    }
+
+    [Fact]
+    public void Caster_without_ready_skill_approaches_physical_attack_range()
+    {
+        NpcIntelligenceProfile profile = new(NpcIntelligenceArchetype.BasicCasterMob,
+            true, true, true, false, 0, 400, 1500);
+        NpcSkillObservation cooldownSkill = new(107, 2, 600, 20, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Cooldown);
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 300)], skills: [cooldownSkill]);
+
+        ApproachTargetIntent intent = (ApproachTargetIntent)new NpcBrainCoordinator().Decide(perception,
+            new NpcBrainContext(NpcBrainStimulus.PeriodicDue, profile)).Intents.Single();
+
+        intent.PreferredRange.Should().Be(40);
     }
 
     [Fact]
@@ -160,6 +189,30 @@ public class NpcBrainTests
         NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception, Context());
 
         decision.Intents.Should().ContainSingle().Which.Should().BeOfType<ReturnHomeIntent>();
+    }
+
+    [Fact]
+    public void Actor_outside_combat_leash_returns_home_even_with_valid_target()
+    {
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player, visible: [Hostile(Player, 30)],
+            position: new NpcPosition(1_501, 0, 0, 0), spawn: new NpcPosition(0, 0, 0, 0));
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception, Context());
+
+        decision.Intents.Should().ContainSingle().Which.Should().BeOfType<ReturnHomeIntent>();
+    }
+
+    [Fact]
+    public void Returning_actor_does_not_reacquire_visible_hostile()
+    {
+        NpcPerceptionSnapshot perception = CreatePerception(visible: [Hostile(Player, 30)],
+            position: new NpcPosition(500, 0, 0, 0), spawn: new NpcPosition(0, 0, 0, 0),
+            returningToSpawn: true);
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception,
+            Context(NpcBrainStimulus.PlayerBecameRelevant));
+
+        decision.Intents.Should().BeEmpty();
     }
 
     [Fact]
@@ -245,6 +298,7 @@ public class NpcBrainTests
         NpcPhysicalFlags physicalFlags = NpcPhysicalFlags.Alive | NpcPhysicalFlags.Spawned,
         NpcPosition? position = null,
         NpcPosition? spawn = null,
+        bool returningToSpawn = false,
         double hp = 100,
         long revision = 1)
     {
@@ -253,7 +307,8 @@ public class NpcBrainTests
         NpcPhysicalState physical = new(position ?? new NpcPosition(0, 0, 0, 0), hp, 100, 50, 50, 8, 16,
             physicalFlags);
         NpcCombatFacts combat = new(target, 40, 500, NpcCombatFlags.None);
-        NpcEnvironment environment = new(new RegionKey(0, 1, 1), spawn, true, true, false, false, true);
+        NpcEnvironment environment = new(new RegionKey(0, 1, 1), spawn, true, true, false,
+            returningToSpawn, true, 300, 1500);
         NpcPerceptionState state = new(identity, physical, combat, environment, visible, threats, [], [], skills);
         return new NpcPerceptionSnapshot(new NpcPerceptionEnvelope(1, npc, revision, revision, revision), state);
     }

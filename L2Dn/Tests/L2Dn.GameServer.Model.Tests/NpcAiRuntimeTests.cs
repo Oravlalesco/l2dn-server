@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Collections.Concurrent;
 using FluentAssertions;
 using L2Dn.GameServer.AI;
 using L2Dn.GameServer.AI.Runtime;
@@ -113,6 +114,22 @@ public class NpcAiRuntimeTests
 
         commands.TargetActor.Should().BeSameAs(actor);
         commands.Target.Should().BeSameAs(target);
+    }
+
+    [Fact]
+    public void Attackable_ai_keeps_abstract_target_synchronized_for_legacy_movement()
+    {
+        Attackable actor = CreateSpawnedAttackable();
+        Attackable target = CreateSpawnedAttackable();
+        NpcAiDependencies dependencies = new(new EmptyWorldQuery(), new EmptyGeoQuery(),
+            new EmptyThreatQuery(), LegacyNpcCommandExecutor.Instance, new DeterministicRandomSource(),
+            new NullEntityResolver());
+        TargetReadingAttackableAI ai = new(actor, dependencies);
+
+        ai.setTarget(target);
+
+        actor.getTarget().Should().BeSameAs(target);
+        ai.LegacyMovementTarget.Should().BeSameAs(target);
     }
 
     [Fact]
@@ -463,9 +480,33 @@ public class NpcAiRuntimeTests
     }
 
     [Fact]
+    public void Intent_mode_applies_only_to_exact_base_attackable_ai()
+    {
+        NpcBrainMode previous = NpcBrainRuntime.Mode;
+        Attackable actor = CreateAttackable();
+        NpcAiDependencies dependencies = new(new EmptyWorldQuery(), new EmptyGeoQuery(),
+            new EmptyThreatQuery(), new RecordingCommandExecutor(), new DeterministicRandomSource(),
+            new NullEntityResolver());
+        AttackableAI exact = new(actor, dependencies);
+        TargetReadingAttackableAI derived = new(actor, dependencies);
+
+        try
+        {
+            NpcBrainRuntime.Configure(NpcBrainMode.Intent);
+
+            exact.UsesIntentBrain.Should().BeTrue();
+            derived.UsesIntentBrain.Should().BeFalse();
+        }
+        finally
+        {
+            NpcBrainRuntime.Configure(previous);
+        }
+    }
+
+    [Fact]
     public void Custom_meter_emits_think_query_geo_and_command_measurements()
     {
-        List<RecordedMeasurement> measurements = [];
+        ConcurrentQueue<RecordedMeasurement> measurements = [];
         using MeterListener listener = new();
         listener.InstrumentPublished = (instrument, meterListener) =>
         {
@@ -475,9 +516,9 @@ public class NpcAiRuntimeTests
             }
         };
         listener.SetMeasurementEventCallback<long>((instrument, measurement, tags, _) =>
-            measurements.Add(new RecordedMeasurement(instrument.Name, measurement, tags.ToArray())));
+            measurements.Enqueue(new RecordedMeasurement(instrument.Name, measurement, tags.ToArray())));
         listener.SetMeasurementEventCallback<double>((instrument, measurement, tags, _) =>
-            measurements.Add(new RecordedMeasurement(instrument.Name, measurement, tags.ToArray())));
+            measurements.Enqueue(new RecordedMeasurement(instrument.Name, measurement, tags.ToArray())));
         listener.Start();
 
         Attackable actor = CreateAttackable();
@@ -653,6 +694,7 @@ public class NpcAiRuntimeTests
         AttackableAI(actor, dependencies)
     {
         public WorldObject? ObservedTarget { get; private set; }
+        public WorldObject? LegacyMovementTarget => base.getTarget();
         public override void onEvtThink() => ObservedTarget = getTarget();
     }
 
@@ -676,7 +718,8 @@ public class NpcAiRuntimeTests
 
         public void SetIntention(AbstractAI ai, CtrlIntention intention, object? argument = null) => throw Unexpected();
         public void MoveTo(AbstractAI ai, Location3D destination) => throw Unexpected();
-        public void StartFollow(AbstractAI ai, Creature target) => throw Unexpected();
+        public void StartFollow(AbstractAI ai, Creature target, int range = -1) => throw Unexpected();
+        public void StopFollow(AbstractAI ai) => throw Unexpected();
         public void SetRunning(Creature actor) => throw Unexpected();
         public void SetWalking(Creature actor) => throw Unexpected();
         public void ReturnHome(Attackable npc) => throw Unexpected();

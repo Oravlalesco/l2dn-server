@@ -48,6 +48,22 @@ public class NpcIntentGatewayTests
     }
 
     [Fact]
+    public void Existing_hate_authorizes_guard_style_retaliation_against_non_auto_attackable_target()
+    {
+        Attackable actor = CreateActor();
+        Attackable target = CreateNonAutoAttackableTarget();
+        actor.addDamageHate(target, 0, 10);
+        actor.setTarget(target);
+        RecordingCommands commands = new();
+        NpcIntentGateway gateway = CreateGateway(commands, actor, target);
+
+        NpcIntentExecutionResult result = gateway.Execute(AttackIntent(actor, Key(target)));
+
+        result.IsExecuted.Should().BeTrue();
+        commands.AutoAttackTarget.Should().BeSameAs(target);
+    }
+
+    [Fact]
     public void Target_dying_between_decision_and_gateway_is_rejected_without_exception()
     {
         Attackable actor = CreateActor();
@@ -93,6 +109,7 @@ public class NpcIntentGatewayTests
     {
         Attackable actor = CreateActor();
         Attackable target = CreateActor();
+        target.setXYZ(500, 0, 0);
         NpcIntentEnvelope envelope = Envelope(actor, NpcIntentType.ApproachTarget);
         ApproachTargetIntent intent = new(envelope, Key(target), 40);
         NpcIntentGateway gateway = CreateGateway(new RecordingCommands(), false, actor, target);
@@ -160,7 +177,16 @@ public class NpcIntentGatewayTests
 
     private static Attackable CreateActor()
     {
-        Attackable actor = new(CreateNpcTemplate());
+        return InitializeActor(new Attackable(CreateNpcTemplate()));
+    }
+
+    private static Attackable CreateNonAutoAttackableTarget()
+    {
+        return InitializeActor(new NonAutoAttackableAttackable(CreateNpcTemplate()));
+    }
+
+    private static T InitializeActor<T>(T actor) where T: Attackable
+    {
         actor.beginRespawnLifecycle();
         actor.onRespawn();
         actor.completeRespawnLifecycle();
@@ -198,13 +224,19 @@ public class NpcIntentGatewayTests
             allowed ? target : source;
     }
 
+    private sealed class NonAutoAttackableAttackable(NpcTemplate template): Attackable(template)
+    {
+        public override bool isAutoAttackable(Creature attacker) => false;
+    }
+
     private sealed class RecordingCommands: ILegacyNpcCommandExecutor
     {
         public Creature? AutoAttackTarget { get; private set; }
         public void AutoAttack(Creature actor, Creature target) => AutoAttackTarget = target;
         public void SetIntention(AbstractAI ai, CtrlIntention intention, object? argument = null) { }
         public void MoveTo(AbstractAI ai, Location3D destination) { }
-        public void StartFollow(AbstractAI ai, Creature target) { }
+        public void StartFollow(AbstractAI ai, Creature target, int range = -1) { }
+        public void StopFollow(AbstractAI ai) { }
         public void SetTarget(Creature actor, WorldObject? target) => actor.setTarget(target);
         public void SetRunning(Creature actor) => actor.setRunning();
         public void SetWalking(Creature actor) => actor.setWalking();

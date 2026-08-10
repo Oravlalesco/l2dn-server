@@ -78,7 +78,7 @@ internal sealed class NpcIntentGateway
         {
             AcquireTargetIntent acquire => ExecuteAcquire(actor, ai, acquire),
             ClearTargetIntent clear => ExecuteClear(actor, ai, clear),
-            BasicAttackIntent attack => ExecuteAttack(actor, attack),
+            BasicAttackIntent attack => ExecuteAttack(actor, ai, attack),
             ApproachTargetIntent approach => ExecuteApproach(actor, ai, approach),
             ReturnHomeIntent => ExecuteReturnHome(actor),
             FleeIntent flee => ExecuteFlee(actor, ai, flee),
@@ -128,7 +128,7 @@ internal sealed class NpcIntentGateway
         return NpcIntentExecutionResult.Executed();
     }
 
-    private NpcIntentExecutionResult ExecuteAttack(Attackable actor, BasicAttackIntent intent)
+    private NpcIntentExecutionResult ExecuteAttack(Attackable actor, AttackableAI ai, BasicAttackIntent intent)
     {
         NpcIntentExecutionResult validation = ResolveLiveTarget(actor, intent.Target, true, out Creature? target);
         if (!validation.IsExecuted)
@@ -155,6 +155,13 @@ internal sealed class NpcIntentGateway
             return Reject(NpcIntentRejectionReason.Blocked);
         }
 
+        // Removal is idempotent. Always stop the legacy follow task before starting
+        // an attack so it cannot overwrite the attack movement on its next tick.
+        _commands.StopFollow(ai);
+        if (!actor.isRunning())
+        {
+            _commands.SetRunning(actor);
+        }
         _commands.AutoAttack(actor, target);
         return NpcIntentExecutionResult.Executed();
     }
@@ -172,12 +179,30 @@ internal sealed class NpcIntentGateway
             return Reject(NpcIntentRejectionReason.Policy);
         }
 
-        Location3D destination = target!.Location.Location3D;
+        Creature liveTarget = target!;
+        int stoppingRange = Math.Max(1, intent.PreferredRange);
+        int collisionAdjustedRange = stoppingRange + (int)actor.getCollisionRadius() +
+            (int)liveTarget.getCollisionRadius();
+        if (actor.IsInsideRadius2D(liveTarget, collisionAdjustedRange))
+        {
+            return NpcIntentExecutionResult.Executed();
+        }
+
+        Location3D destination = liveTarget.Location.Location3D;
         if (!_geo.CanMoveToTarget(actor.Location.Location3D, destination, actor.getInstanceWorld()))
         {
             return Reject(NpcIntentRejectionReason.Blocked);
         }
-        _commands.MoveTo(ai, destination);
+        if (!actor.isRunning())
+        {
+            _commands.SetRunning(actor);
+        }
+        // The actor state is authoritative here. Avoid restarting the follow task on
+        // every Brain evaluation while the same target is already being approached.
+        if (!ReferenceEquals(actor.getTarget(), liveTarget) || !actor.isMoving())
+        {
+            _commands.StartFollow(ai, liveTarget, stoppingRange);
+        }
         return NpcIntentExecutionResult.Executed();
     }
 
@@ -187,6 +212,9 @@ internal sealed class NpcIntentGateway
         {
             return Reject(NpcIntentRejectionReason.Policy);
         }
+        _commands.AbortAttack(actor);
+        _commands.ClearCombatMemory(actor);
+        _commands.SetTarget(actor, null);
         _commands.SetWalking(actor);
         _commands.ReturnHome(actor);
         return NpcIntentExecutionResult.Executed();
@@ -317,7 +345,10 @@ internal sealed class NpcIntentGateway
             target = null;
             return Reject(NpcIntentRejectionReason.InstanceMismatch);
         }
-        if (requireAttackable && !creature.isAutoAttackable(actor))
+        // Retaliation and faction assistance are authoritative hostility too. Guards, in
+        // particular, may legally attack a player who damaged a guard even before that
+        // player becomes generically auto-attackable to every NPC.
+        if (requireAttackable && !creature.isAutoAttackable(actor) && actor.getHating(creature) <= 0)
         {
             target = null;
             return Reject(NpcIntentRejectionReason.TargetInvalid);

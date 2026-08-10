@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using L2Dn.GameServer.Configuration;
 using L2Dn.GameServer.Enums;
 using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
@@ -7,6 +8,7 @@ using L2Dn.GameServer.Model.Actor.Templates;
 using L2Dn.GameServer.Model.Skills;
 using L2Dn.GameServer.Model.Zones;
 using L2Dn.GameServer.Utilities;
+using L2Dn.Geometry;
 using L2Dn.NpcContracts;
 
 namespace L2Dn.GameServer.AI.Runtime;
@@ -211,6 +213,10 @@ internal sealed class NpcPerceptionBuilder
         NpcPosition? spawnPosition = spawn == null
             ? null
             : new NpcPosition(spawn.Location.X, spawn.Location.Y, spawn.Location.Z, spawn.Location.Heading);
+        int returnHomeDistance = Math.Max(1, Config.Npc.MAX_DRIFT_RANGE);
+        bool returningToSpawn = spawn != null && actor.getTarget() == null && actor.hasAI() &&
+            actor.getAI().getIntention() == CtrlIntention.AI_INTENTION_MOVE_TO &&
+            actor.Distance2D(spawn.Location.Location2D) > returnHomeDistance;
 
         return new NpcEnvironment(
             new RegionKey(actor.getInstanceId(), region.RegionX, region.RegionY),
@@ -218,8 +224,34 @@ internal sealed class NpcPerceptionBuilder
             region.Active,
             region.AreNeighborsActive,
             actor.isRandomWalkingEnabled(),
-            false,
-            actor.canReturnToSpawnPoint());
+            returningToSpawn,
+            actor.canReturnToSpawnPoint(),
+            returnHomeDistance,
+            GetCombatLeashDistance(actor, spawn));
+    }
+
+    private static int GetCombatLeashDistance(Attackable actor, Spawn? spawn)
+    {
+        if (spawn == null)
+        {
+            return 0;
+        }
+
+        if (!Config.Npc.AGGRO_DISTANCE_CHECK_ENABLED || actor is not Monster || actor.isWalker() ||
+            actor is GrandBoss || (actor.isRaid() && !Config.Npc.AGGRO_DISTANCE_CHECK_RAIDS) ||
+            (actor.isInInstance() && !Config.Npc.AGGRO_DISTANCE_CHECK_INSTANCES))
+        {
+            return 0;
+        }
+
+        if (spawn.getChaseRange() > 0)
+        {
+            return Math.Max(Config.Npc.MAX_DRIFT_RANGE, spawn.getChaseRange());
+        }
+
+        return actor.isRaid()
+            ? Config.Npc.AGGRO_DISTANCE_CHECK_RAID_RANGE
+            : Config.Npc.AGGRO_DISTANCE_CHECK_RANGE;
     }
 
     private static ImmutableArray<NpcSkillObservation> MapSkills(Attackable actor)

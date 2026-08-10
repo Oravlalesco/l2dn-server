@@ -14,7 +14,8 @@ public enum NpcTacticalAction
 public readonly record struct NpcTacticalScore(
     NpcTacticalAction Action,
     int Score,
-    NpcSkillObservation? Skill = null);
+    NpcSkillObservation? Skill = null,
+    int DesiredRange = 0);
 
 public sealed class TacticalActionEvaluator
 {
@@ -40,22 +41,29 @@ public sealed class TacticalActionEvaluator
 
         NpcSkillObservation? offensive = perception.State.Skills
             .Where(skill => (skill.Category is NpcSkillCategory.Offensive or NpcSkillCategory.Debuff or
-                    NpcSkillCategory.Control) && skill.Flags.HasFlag(NpcSkillObservationFlags.Ready) &&
-                (skill.Range <= 0 || targetDistance <= skill.Range + perception.State.Physical.CollisionRadius))
+                    NpcSkillCategory.Control) && skill.Flags.HasFlag(NpcSkillObservationFlags.Ready))
             .OrderByDescending(static skill => skill.Level)
             .ThenBy(static skill => skill.SkillId)
             .Cast<NpcSkillObservation?>()
             .FirstOrDefault();
         if (offensive.HasValue)
         {
-            return new NpcTacticalScore(NpcTacticalAction.CastSkill, 90, offensive);
+            int skillRange = Math.Max(0, offensive.Value.Range);
+            if (skillRange <= 0 || targetDistance <= skillRange + perception.State.Physical.CollisionRadius)
+            {
+                return new NpcTacticalScore(NpcTacticalAction.CastSkill, 90, offensive);
+            }
+
+            int desiredRange = profile.PreferredRange > 0
+                ? Math.Min(profile.PreferredRange, skillRange)
+                : skillRange;
+            return new NpcTacticalScore(NpcTacticalAction.Approach, 80, offensive,
+                Math.Max(1, desiredRange));
         }
 
-        int preferredRange = profile.PreferredRange > 0
-            ? profile.PreferredRange
-            : Math.Max(1, perception.State.Combat.PhysicalAttackRange);
-        return targetDistance > preferredRange
-            ? new NpcTacticalScore(NpcTacticalAction.Approach, 80)
+        int physicalAttackRange = Math.Max(1, perception.State.Combat.PhysicalAttackRange);
+        return targetDistance > physicalAttackRange
+            ? new NpcTacticalScore(NpcTacticalAction.Approach, 80, null, physicalAttackRange)
             : new NpcTacticalScore(NpcTacticalAction.BasicAttack, 60);
     }
 }

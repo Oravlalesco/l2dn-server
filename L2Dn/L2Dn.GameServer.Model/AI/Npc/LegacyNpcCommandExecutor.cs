@@ -29,8 +29,10 @@ internal sealed class LegacyNpcCommandExecutor: ILegacyNpcCommandExecutor
         Execute("move_to", () => ai.moveTo(destination));
     }
 
-    public void StartFollow(AbstractAI ai, Creature target) =>
-        Execute("start_follow", () => ai.startFollow(target));
+    public void StartFollow(AbstractAI ai, Creature target, int range = -1) =>
+        Execute("start_follow", () => ai.startFollow(target, range));
+
+    public void StopFollow(AbstractAI ai) => Execute("stop_follow", ai.stopFollow);
 
     public void SetTarget(Creature actor, WorldObject? target)
     {

@@ -343,7 +343,7 @@ internal sealed class BenchmarkExecutor: INpcThinkExecutor
             new NpcPhysicalState(default, 100, 100, 100, 100, 5, 10,
                 NpcPhysicalFlags.Alive | NpcPhysicalFlags.Spawned),
             new NpcCombatFacts(null, 40, 500, NpcCombatFlags.None),
-            new NpcEnvironment(default, default, true, true, false, false, true),
+            new NpcEnvironment(default, default, true, true, false, false, true, 300, 1500),
             [visible], [], [], []);
         return new NpcPerceptionSnapshot(new NpcPerceptionEnvelope(1, npc, 1, 1, 1), state);
     }
