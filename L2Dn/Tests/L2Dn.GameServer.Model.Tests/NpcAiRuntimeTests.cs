@@ -165,6 +165,20 @@ public class NpcAiRuntimeTests
     }
 
     [Fact]
+    public void Spatial_relevance_emits_only_range_entry_reentry_and_new_generation()
+    {
+        NpcSpatialRelevanceState state = new();
+        NpcKey firstGeneration = new(8172, 10);
+        NpcKey nextGeneration = new(8172, 11);
+
+        state.Update([firstGeneration]).Should().Equal(firstGeneration);
+        state.Update([firstGeneration]).Should().BeEmpty();
+        state.Update([]).Should().BeEmpty();
+        state.Update([firstGeneration]).Should().Equal(firstGeneration);
+        state.Update([nextGeneration]).Should().Equal(nextGeneration);
+    }
+
+    [Fact]
     public void Npc_lifecycle_generation_is_stable_only_outside_respawn_transition()
     {
         Attackable actor = CreateAttackable();

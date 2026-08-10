@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using L2Dn.GameServer.AI;
+using L2Dn.GameServer.AI.Scheduling;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Utilities;
 using NLog;
@@ -43,7 +44,12 @@ public class MovementTaskManager
 			{
 				try
 				{
-					if (creature.updatePosition())
+					bool arrived = creature.updatePosition();
+					if (creature is Player player)
+					{
+						NpcSpatialRelevanceTracker.Instance.ObserveMovement(player);
+					}
+					if (arrived)
 					{
 						_creatures.Remove(creature);
 						creature.getAI().notifyEvent(CtrlEvent.EVT_ARRIVED);

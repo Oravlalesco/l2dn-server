@@ -25,6 +25,12 @@ The architectural rule is: the Brain may request an action; only GameServer may 
 
 `NpcPerception` remains an immutable read model of world facts. `NpcBrainState` remains private to the Brain and represents short-lived logical state such as the last target, last decision, decision sequence, return-home state, and flee state. A generation change replaces the previous brain state.
 
+## Migration ownership
+
+Phase 3 deliberately runs legacy and Intent paths side by side, but they do not both own the same NPC execution. The exact base `AttackableAI` profile may be assigned to the Intent path; specialized and scripted profiles remain entirely on Legacy until their own vertical is migrated. Shadow observes both decisions while only Legacy executes.
+
+The migration must not copy authoritative GameServer mechanics into the Brain. Reputation, attack permission, zones, lifecycle, range, geodata, cooldowns, movement, damage, and skill execution remain GameServer rules exposed as perception facts/affordances and revalidated by the Intent Gateway. The Brain owns policy: target selection, approach, attack choice, flee, and return-home decisions. Legacy decision policy is retired incrementally by profile after deterministic replay, decision comparison, gameplay certification, and rollback validation; it is not rewritten wholesale in one step.
+
 ## Scope
 
 Phase 3 includes:
@@ -167,6 +173,10 @@ A second gameplay pass exposed two additional authority-boundary defects:
 
 The new regression coverage verifies death-time target clearing, clean combat state for each respawn generation, rejection of visible but non-attackable entities, monster peace-zone behavior, and guard acquisition of authorized targets inside protected zones.
 
+A third gameplay pass confirmed respawn target cleanup, guard retaliation/assistance, and city combat, but exposed intermittent negative-reputation acquisition. The broad `PlayerBecameRelevant` wake was emitted when a player entered World visibility, not when that already-visible player crossed an individual guard's smaller aggro radius. A fast pass through the radius could therefore be missed until the periodic tick, while leaving and re-entering broad visibility appeared to fix it.
+
+Movement updates now reuse World visibility as the broad phase and track exact aggro-radius membership per player/NPC generation. A wake is emitted only on entry, re-entry, or a new NPC generation; continuous movement inside the radius is coalesced at the source. The hot path reuses its per-player delegate and collections, does not scan the world, and still leaves the authoritative attack decision to perception/Brain/Gateway validation.
+
 ## Verification status
 
 Automated and complete:
@@ -178,7 +188,7 @@ Automated and complete:
 - R1-R5 in Legacy, Shadow, and Intent;
 - development GameServer published and recreated in `Intent` / `Enabled` / `CaptureOnly` mode;
 - OTLP scrape verified the three configured modes, live Brain decisions, perception captures, and bounded queue-depth series;
-- Contracts remain green at 15/15, Brain at 24/24, and GameServer.Model at 94/94 after the gameplay regression fixes.
+- Contracts remain green at 15/15, Brain at 24/24, and GameServer.Model at 95/95 after the gameplay regression fixes.
 
 Environment-dependent before the completion tag:
 
