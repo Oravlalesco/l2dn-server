@@ -50,18 +50,17 @@ public sealed class NpcBrainCoordinator: INpcBrain
     {
         long sequence = ++state.DecisionSequence;
         NpcIntelligenceProfile profile = context.Profile ?? _profiles.Resolve(perception.State.Identity);
-        NpcIntent? intent = _reflex.Decide(perception, context, profile, sequence);
+        NpcIntent? intent = _reflex.Decide(perception, context, profile, state, sequence);
         NpcBrainLayer layer = intent == null ? NpcBrainLayer.None : NpcBrainLayer.Reflex;
         if (intent == null)
         {
-            intent = _tactical.Decide(perception, profile, sequence);
+            intent = _tactical.Decide(perception, profile, state, sequence);
             layer = intent == null ? NpcBrainLayer.None : NpcBrainLayer.Tactical;
         }
 
         state.LastTarget = perception.State.Combat.CurrentTarget;
         state.LastDecision = intent?.Envelope.IntentType;
         state.LastDecisionWorldTick = perception.Envelope.WorldTick;
-        state.ReturnHomeRequested = intent is ReturnHomeIntent;
         state.FleeMode = intent is FleeIntent;
 
         ImmutableArray<NpcIntent> intents = intent == null ? [] : [intent];

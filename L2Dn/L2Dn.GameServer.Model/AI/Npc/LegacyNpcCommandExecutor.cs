@@ -34,6 +34,8 @@ internal sealed class LegacyNpcCommandExecutor: ILegacyNpcCommandExecutor
 
     public void StopFollow(AbstractAI ai) => Execute("stop_follow", ai.stopFollow);
 
+    public void StopMovement(AbstractAI ai) => Execute("stop_movement", () => ai.clientStopMoving(null));
+
     public void SetTarget(Creature actor, WorldObject? target)
     {
         LegacyNpcCommandObserver.RecordTarget(actor, target);

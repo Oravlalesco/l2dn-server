@@ -40,11 +40,14 @@ public class NpcIntentContractTests
     {
         NpcIntent[] intents =
         [
-            new AcquireTargetIntent(Envelope(NpcIntentType.AcquireTarget), Target),
+            new AcquireTargetIntent(Envelope(NpcIntentType.AcquireTarget), Target,
+                NpcTargetAcquisitionMode.PreserveMovement),
             new ClearTargetIntent(Envelope(NpcIntentType.ClearTarget), Target),
             new BasicAttackIntent(Envelope(NpcIntentType.BasicAttack), Target),
-            new ApproachTargetIntent(Envelope(NpcIntentType.ApproachTarget), Target, 40),
-            new ReturnHomeIntent(Envelope(NpcIntentType.ReturnHome)),
+            new ApproachTargetIntent(Envelope(NpcIntentType.ApproachTarget), Target, 40,
+                NpcApproachConstraint.TowardSpawnOnly),
+            new ReturnHomeIntent(Envelope(NpcIntentType.ReturnHome), NpcReturnHomeMode.PreserveThreat),
+            new ReturnHomeIntent(Envelope(NpcIntentType.ReturnHome), NpcReturnHomeMode.TeleportReset),
             new FleeIntent(Envelope(NpcIntentType.Flee), Target),
             new CastSkillIntent(Envelope(NpcIntentType.CastSkill), 107, 2, Target),
             new StopCombatIntent(Envelope(NpcIntentType.StopCombat))
@@ -69,6 +72,42 @@ public class NpcIntentContractTests
 
         NpcIntentSemanticComparer.Instance.Equals(first, second).Should().BeTrue();
         first.Should().NotBe(second);
+    }
+
+    [Fact]
+    public void Semantic_comparison_includes_movement_and_return_policy()
+    {
+        ApproachTargetIntent unrestricted = new(
+            Envelope(NpcIntentType.ApproachTarget), Target, 40);
+        ApproachTargetIntent homeward = new(
+            Envelope(NpcIntentType.ApproachTarget), Target, 40, NpcApproachConstraint.TowardSpawnOnly);
+        ReturnHomeIntent reset = new(Envelope(NpcIntentType.ReturnHome));
+        ReturnHomeIntent preserve = new(Envelope(NpcIntentType.ReturnHome), NpcReturnHomeMode.PreserveThreat);
+        AcquireTargetIntent engage = new(Envelope(NpcIntentType.AcquireTarget), Target);
+        AcquireTargetIntent preserveMovement = new(Envelope(NpcIntentType.AcquireTarget), Target,
+            NpcTargetAcquisitionMode.PreserveMovement);
+
+        NpcIntentSemanticComparer.Instance.Equals(unrestricted, homeward).Should().BeFalse();
+        NpcIntentSemanticComparer.Instance.Equals(reset, preserve).Should().BeFalse();
+        NpcIntentSemanticComparer.Instance.Equals(engage, preserveMovement).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Older_json_without_new_policy_fields_uses_safe_defaults()
+    {
+        const string approachJson =
+            """{"$intent":"approachTarget","envelope":{"schemaVersion":1,"actor":{"objectId":8172,"generation":4},"basedOnStateRevision":812,"decisionSequence":3,"intentType":4},"target":{"objectId":9182,"generation":0,"kind":1},"preferredRange":40}""";
+        const string returnJson =
+            """{"$intent":"returnHome","envelope":{"schemaVersion":1,"actor":{"objectId":8172,"generation":4},"basedOnStateRevision":812,"decisionSequence":3,"intentType":5}}""";
+        const string acquireJson =
+            """{"$intent":"acquireTarget","envelope":{"schemaVersion":1,"actor":{"objectId":8172,"generation":4},"basedOnStateRevision":812,"decisionSequence":3,"intentType":1},"target":{"objectId":9182,"generation":0,"kind":1}}""";
+
+        ((ApproachTargetIntent)NpcIntentJsonCodec.Deserialize(System.Text.Encoding.UTF8.GetBytes(approachJson))!)
+            .Constraint.Should().Be(NpcApproachConstraint.None);
+        ((ReturnHomeIntent)NpcIntentJsonCodec.Deserialize(System.Text.Encoding.UTF8.GetBytes(returnJson))!)
+            .Mode.Should().Be(NpcReturnHomeMode.ResetCombat);
+        ((AcquireTargetIntent)NpcIntentJsonCodec.Deserialize(System.Text.Encoding.UTF8.GetBytes(acquireJson))!)
+            .Mode.Should().Be(NpcTargetAcquisitionMode.Engage);
     }
 
     [Fact]

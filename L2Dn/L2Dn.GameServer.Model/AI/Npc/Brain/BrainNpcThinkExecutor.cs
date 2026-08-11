@@ -10,12 +10,15 @@ internal sealed class BrainNpcThinkExecutor: INpcThinkExecutor, INpcThinkLifecyc
     private readonly LegacyNpcThinkExecutor _legacy;
     private readonly INpcBrain _brain;
     private readonly NpcIntentGateway _gateway;
+    private readonly NpcReturnDefensePolicy _returnDefense;
 
-    public BrainNpcThinkExecutor(LegacyNpcThinkExecutor legacy, INpcBrain brain, NpcIntentGateway gateway)
+    public BrainNpcThinkExecutor(LegacyNpcThinkExecutor legacy, INpcBrain brain, NpcIntentGateway gateway,
+        NpcReturnDefensePolicy returnDefense)
     {
         _legacy = legacy;
         _brain = brain;
         _gateway = gateway;
+        _returnDefense = returnDefense;
     }
 
     public ValueTask ExecuteAsync(NpcKey npc, NpcWakeContext context, CancellationToken cancellationToken)
@@ -27,8 +30,10 @@ internal sealed class BrainNpcThinkExecutor: INpcThinkExecutor, INpcThinkLifecyc
             return ValueTask.CompletedTask;
         }
 
-        // Scripted/specialized AI remains on its authoritative legacy path until it has an explicit profile.
-        if (actor.getAI() is not AttackableAI ai || ai.GetType() != typeof(AttackableAI))
+        // Sharing the base AttackableAI is not sufficient: guards, raids, minions,
+        // and scripted actor subclasses still own legacy behavior not represented
+        // by the Phase 3 Brain contract.
+        if (!NpcBrainEligibility.TryGetIntentAi(actor, out AttackableAI ai))
         {
             return _legacy.ExecuteAsync(npc, context, cancellationToken);
         }
@@ -45,7 +50,8 @@ internal sealed class BrainNpcThinkExecutor: INpcThinkExecutor, INpcThinkLifecyc
 
             NpcBrainDecision decision = NpcAiTelemetry.ObserveBrainDecision(() => _brain.Decide(
                 perception.Snapshot,
-                new NpcBrainContext(NpcBrainStimulusMapper.Map(context.Reasons))));
+                new NpcBrainContext(NpcBrainStimulusMapper.Map(context.Reasons),
+                    ReturnDefense: _returnDefense)));
             foreach (NpcIntent intent in decision.Intents)
             {
                 cancellationToken.ThrowIfCancellationRequested();

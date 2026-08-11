@@ -1,5 +1,7 @@
 ﻿using System.Globalization;
 using L2Dn.GameServer.AI;
+using L2Dn.GameServer.AI.Runtime;
+using L2Dn.GameServer.AI.Scheduling;
 using L2Dn.GameServer.Enums;
 using L2Dn.GameServer.Model.Actor.Templates;
 using L2Dn.GameServer.Model.Events.Impl.Npcs;
@@ -53,13 +55,29 @@ public class Guard: Attackable
 	public override void addDamage(Creature attacker, int damage, Skill? skill)
 	{
 		base.addDamage(attacker, damage, skill);
-		getAI().startFollow(attacker);
-		addDamageHate(attacker, 0, 10);
+		AssistAttacker(this, attacker);
 		World.getInstance().forEachVisibleObjectInRange<Guard>(this, 500, guard =>
 		{
-			guard.getAI().startFollow(attacker);
-			guard.addDamageHate(attacker, 0, 10);
+			AssistAttacker(guard, attacker);
 		});
+	}
+
+	private static void AssistAttacker(Guard guard, Creature attacker)
+	{
+		CreatureAI ai = guard.getAI();
+		bool brainOwnsDecision = NpcReactivity.Mode == NpcReactiveSchedulerMode.Enabled &&
+			ai is AttackableAI attackableAi && attackableAi.UsesIntentBrain;
+		if (!brainOwnsDecision)
+		{
+			// Preserve the legacy immediate-follow side effect outside the Intent pipeline.
+			ai.startFollow(attacker);
+		}
+
+		// Publish only after the authoritative hate mutation. In Intent mode the Brain
+		// owns target acquisition and movement; in Legacy this wake only removes the
+		// former dependency on the next one-second periodic tick.
+		guard.addDamageHate(attacker, 0, 10);
+		NpcReactivity.Wake(guard, NpcWakeReason.AllyAttacked);
 	}
 
 	/**

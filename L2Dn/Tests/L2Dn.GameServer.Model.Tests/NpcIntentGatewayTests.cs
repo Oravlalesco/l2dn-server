@@ -3,6 +3,7 @@ using L2Dn.GameServer.AI;
 using L2Dn.GameServer.AI.Runtime;
 using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
+using L2Dn.GameServer.Model.Actor.Instances;
 using L2Dn.GameServer.Model.Actor.Templates;
 using L2Dn.GameServer.Model.InstanceZones;
 using L2Dn.GameServer.Model.Items.Instances;
@@ -61,6 +62,25 @@ public class NpcIntentGatewayTests
 
         result.IsExecuted.Should().BeTrue();
         commands.AutoAttackTarget.Should().BeSameAs(target);
+    }
+
+    [Fact]
+    public void Acquiring_attacker_cancels_previous_return_home_movement()
+    {
+        Attackable actor = CreateActor();
+        Attackable attacker = CreateNonAutoAttackableTarget();
+        actor.addDamageHate(attacker, 10, 100);
+        RecordingCommands commands = new();
+        NpcIntentGateway gateway = CreateGateway(commands, actor, attacker);
+        AcquireTargetIntent intent = new(Envelope(actor, NpcIntentType.AcquireTarget), Key(attacker));
+
+        NpcIntentExecutionResult result = gateway.Execute(intent);
+
+        result.IsExecuted.Should().BeTrue();
+        commands.StopFollowCalls.Should().Be(1);
+        commands.StopMovementCalls.Should().Be(1);
+        commands.Intention.Should().Be(CtrlIntention.AI_INTENTION_ATTACK);
+        commands.IntentionTarget.Should().BeSameAs(attacker);
     }
 
     [Fact]
@@ -142,6 +162,155 @@ public class NpcIntentGatewayTests
     }
 
     [Fact]
+    public void Homeward_only_approach_uses_static_movement_toward_spawn()
+    {
+        Attackable actor = CreateActorWithSpawn(0, 0, 0);
+        Attackable target = CreateActor();
+        actor.setXYZ(1_600, 0, 0);
+        target.setXYZ(1_500, 0, 0);
+        RecordingCommands commands = new();
+        NpcIntentGateway gateway = CreateGateway(commands, actor, target);
+        ApproachTargetIntent intent = new(Envelope(actor, NpcIntentType.ApproachTarget), Key(target), 40,
+            NpcApproachConstraint.TowardSpawnOnly);
+
+        NpcIntentExecutionResult result = gateway.Execute(intent);
+
+        result.IsExecuted.Should().BeTrue();
+        commands.StartFollowCalls.Should().Be(0);
+        commands.StopFollowCalls.Should().Be(1);
+        commands.MoveDestination.Should().NotBeNull();
+        commands.MoveDestination!.Value.X.Should().BeLessThan(actor.getX());
+    }
+
+    [Fact]
+    public void Homeward_only_approach_falls_back_to_return_when_target_moved_outward()
+    {
+        Attackable actor = CreateActorWithSpawn(0, 0, 0);
+        Attackable target = CreateActor();
+        actor.setXYZ(1_600, 0, 0);
+        target.setXYZ(1_700, 0, 0);
+        actor.addDamageHate(target, 100, 100);
+        actor.setTarget(target);
+        RecordingCommands commands = new();
+        NpcIntentGateway gateway = CreateGateway(commands, actor, target);
+        ApproachTargetIntent intent = new(Envelope(actor, NpcIntentType.ApproachTarget), Key(target), 40,
+            NpcApproachConstraint.TowardSpawnOnly);
+
+        gateway.Execute(intent).IsExecuted.Should().BeTrue();
+        commands.MoveDestination.Should().BeNull();
+        commands.StartFollowCalls.Should().Be(0);
+        commands.Intention.Should().Be(CtrlIntention.AI_INTENTION_MOVE_TO);
+        actor.getTarget().Should().BeSameAs(target);
+        actor.getHating(target).Should().BePositive();
+    }
+
+    [Fact]
+    public void Homeward_only_approach_falls_back_to_return_when_geo_redirects_outward()
+    {
+        Attackable actor = CreateActorWithSpawn(0, 0, 0);
+        Attackable target = CreateActor();
+        actor.setXYZ(1_600, 0, 0);
+        target.setXYZ(1_500, 0, 0);
+        RecordingCommands commands = new();
+        NpcIntentGateway gateway = new(
+            id => new[] { actor, target }.FirstOrDefault(item => item.ObjectId == id), _ => 1,
+            new RedirectingGeo(new Location3D(1_700, 0, 0)), commands);
+        ApproachTargetIntent intent = new(Envelope(actor, NpcIntentType.ApproachTarget), Key(target), 40,
+            NpcApproachConstraint.TowardSpawnOnly);
+
+        gateway.Execute(intent).IsExecuted.Should().BeTrue();
+        commands.MoveDestination.Should().BeNull();
+        commands.Intention.Should().Be(CtrlIntention.AI_INTENTION_MOVE_TO);
+    }
+
+    [Fact]
+    public void Defensive_retarget_preserves_the_current_return_movement()
+    {
+        Attackable actor = CreateActorWithSpawn(0, 0, 0);
+        Attackable attacker = CreateActor();
+        actor.setXYZ(1_600, 0, 0);
+        attacker.setXYZ(1_580, 0, 0);
+        actor.addDamageHate(attacker, 100, 100);
+        RecordingCommands commands = new();
+        NpcIntentGateway gateway = CreateGateway(commands, actor, attacker);
+
+        NpcIntentExecutionResult result = gateway.Execute(new AcquireTargetIntent(
+            Envelope(actor, NpcIntentType.AcquireTarget), Key(attacker),
+            NpcTargetAcquisitionMode.PreserveMovement));
+
+        result.IsExecuted.Should().BeTrue();
+        actor.getTarget().Should().BeSameAs(attacker);
+        commands.StopMovementCalls.Should().Be(0);
+        commands.Intention.Should().BeNull();
+    }
+
+    [Fact]
+    public void Defensive_return_preserves_target_and_threat_while_moving_home()
+    {
+        Attackable actor = CreateActorWithSpawn(0, 0, 0);
+        Attackable attacker = CreateActor();
+        actor.setXYZ(1_600, 0, 0);
+        attacker.setXYZ(1_700, 0, 0);
+        actor.addDamageHate(attacker, 100, 100);
+        actor.setTarget(attacker);
+        RecordingCommands commands = new();
+        NpcIntentGateway gateway = CreateGateway(commands, actor, attacker);
+        ReturnHomeIntent intent = new(Envelope(actor, NpcIntentType.ReturnHome),
+            NpcReturnHomeMode.PreserveThreat);
+
+        NpcIntentExecutionResult result = gateway.Execute(intent);
+
+        result.IsExecuted.Should().BeTrue();
+        actor.getTarget().Should().BeSameAs(attacker);
+        actor.getHating(attacker).Should().BePositive();
+        commands.ClearCombatMemoryCalls.Should().Be(0);
+        commands.ReturnHomeCalls.Should().Be(0);
+        commands.Intention.Should().Be(CtrlIntention.AI_INTENTION_MOVE_TO);
+    }
+
+    [Fact]
+    public void Reset_return_clears_target_and_combat_memory()
+    {
+        Attackable actor = CreateActorWithSpawn(0, 0, 0);
+        Attackable attacker = CreateActor();
+        actor.addDamageHate(attacker, 100, 100);
+        actor.setTarget(attacker);
+        RecordingCommands commands = new();
+        NpcIntentGateway gateway = CreateGateway(commands, actor, attacker);
+
+        gateway.Execute(new ReturnHomeIntent(Envelope(actor, NpcIntentType.ReturnHome)))
+            .IsExecuted.Should().BeTrue();
+
+        actor.getTarget().Should().BeNull();
+        commands.ClearCombatMemoryCalls.Should().Be(1);
+        commands.ReturnHomeCalls.Should().Be(1);
+    }
+
+    [Fact]
+    public void Emergency_return_teleports_home_and_forgets_combat()
+    {
+        Attackable actor = CreateActorWithSpawn(100, 200, 300);
+        Attackable attacker = CreateActor();
+        actor.setXYZ(2_000, 0, 0);
+        actor.addDamageHate(attacker, 100, 100);
+        actor.setTarget(attacker);
+        RecordingCommands commands = new();
+        NpcIntentGateway gateway = CreateGateway(commands, actor, attacker);
+
+        NpcIntentExecutionResult result = gateway.Execute(new ReturnHomeIntent(
+            Envelope(actor, NpcIntentType.ReturnHome), NpcReturnHomeMode.TeleportReset));
+
+        result.IsExecuted.Should().BeTrue();
+        commands.TeleportCalls.Should().Be(1);
+        commands.TeleportDestination.Should().Be(new Location(100, 200, 300, 0));
+        commands.StopMovementCalls.Should().Be(1);
+        commands.ClearCombatMemoryCalls.Should().Be(1);
+        commands.Intention.Should().Be(CtrlIntention.AI_INTENTION_ACTIVE);
+        actor.getTarget().Should().BeNull();
+        actor.getHating(attacker).Should().Be(0);
+    }
+
+    [Fact]
     public void Skill_entering_cooldown_after_decision_is_rejected()
     {
         Attackable actor = CreateActor();
@@ -157,11 +326,33 @@ public class NpcIntentGatewayTests
     [Fact]
     public void Brain_mode_parses_independently_from_reactive_scheduler_mode()
     {
-        NpcBrainOptions.FromEnvironment(name => name == "NPC_BRAIN_MODE" ? "shadow" : null).Mode
-            .Should().Be(NpcBrainMode.Shadow);
+        NpcBrainOptions defaults = NpcBrainOptions.FromEnvironment(
+            name => name == "NPC_BRAIN_MODE" ? "shadow" : null);
+        defaults.Mode.Should().Be(NpcBrainMode.Shadow);
+        defaults.ReturnDefense.Enabled.Should().BeTrue();
+        defaults.ReturnDefense.TimeoutWorldTicks.Should().Be(1200);
+        defaults.ReturnDefense.LeashGraceWorldTicks.Should().Be(200);
+        defaults.ReturnDefense.MaxLeashExcursions.Should().Be(3);
+        defaults.ReturnDefense.HardLeashExtension.Should().Be(500);
         NpcBrainOptions.FromEnvironment(name => name == "NPC_BRAIN_MODE" ? "INTENT" : null).Mode
             .Should().Be(NpcBrainMode.Intent);
         NpcBrainOptions.FromEnvironment(_ => "invalid").Mode.Should().Be(NpcBrainMode.Legacy);
+
+        NpcBrainOptions configured = NpcBrainOptions.FromEnvironment(name => name switch
+        {
+            "NPC_BRAIN_MODE" => "intent",
+            "NPC_RETURN_DEFENSE_ENABLED" => "false",
+            "NPC_RETURN_DEFENSE_TIMEOUT_MS" => "2500",
+            "NPC_LEASH_GRACE_MS" => "3500",
+            "NPC_LEASH_MAX_EXCURSIONS" => "2",
+            "NPC_LEASH_HARD_EXTENSION" => "750",
+            _ => null
+        });
+        configured.ReturnDefense.Enabled.Should().BeFalse();
+        configured.ReturnDefense.TimeoutWorldTicks.Should().Be(25);
+        configured.ReturnDefense.LeashGraceWorldTicks.Should().Be(35);
+        configured.ReturnDefense.MaxLeashExcursions.Should().Be(2);
+        configured.ReturnDefense.HardLeashExtension.Should().Be(750);
     }
 
     [Fact]
@@ -201,7 +392,14 @@ public class NpcIntentGatewayTests
 
     private static Attackable CreateActor()
     {
-        return InitializeActor(new Attackable(CreateNpcTemplate()));
+        return InitializeActor(new Monster(CreateNpcTemplate()));
+    }
+
+    private static Attackable CreateActorWithSpawn(int x, int y, int z)
+    {
+        Attackable actor = CreateActor();
+        actor.setSpawn(new Spawn(actor.getTemplate()) { Location = new Location(x, y, z, 0) });
+        return actor;
     }
 
     private static Attackable CreateNonAutoAttackableTarget()
@@ -254,6 +452,13 @@ public class NpcIntentGatewayTests
             allowed ? target : source;
     }
 
+    private sealed class RedirectingGeo(Location3D destination): INpcGeoQuery
+    {
+        public bool CanSeeTarget(WorldObject source, WorldObject target) => true;
+        public bool CanMoveToTarget(Location3D source, Location3D target, Instance? instance) => true;
+        public Location3D GetValidLocation(Location3D source, Location3D target, Instance? instance) => destination;
+    }
+
     private sealed class NonAutoAttackableAttackable(NpcTemplate template): Attackable(template)
     {
         public override bool isAutoAttackable(Creature attacker) => false;
@@ -267,23 +472,46 @@ public class NpcIntentGatewayTests
     private sealed class RecordingCommands: ILegacyNpcCommandExecutor
     {
         public Creature? AutoAttackTarget { get; private set; }
+        public int StopFollowCalls { get; private set; }
+        public int StartFollowCalls { get; private set; }
+        public int StopMovementCalls { get; private set; }
+        public int ClearCombatMemoryCalls { get; private set; }
+        public int ReturnHomeCalls { get; private set; }
+        public int TeleportCalls { get; private set; }
+        public Location? TeleportDestination { get; private set; }
+        public Location3D? MoveDestination { get; private set; }
+        public CtrlIntention? Intention { get; private set; }
+        public object? IntentionTarget { get; private set; }
         public void AutoAttack(Creature actor, Creature target) => AutoAttackTarget = target;
-        public void SetIntention(AbstractAI ai, CtrlIntention intention, object? argument = null) { }
-        public void MoveTo(AbstractAI ai, Location3D destination) { }
-        public void StartFollow(AbstractAI ai, Creature target, int range = -1) { }
-        public void StopFollow(AbstractAI ai) { }
+        public void SetIntention(AbstractAI ai, CtrlIntention intention, object? argument = null)
+        {
+            Intention = intention;
+            IntentionTarget = argument;
+        }
+        public void MoveTo(AbstractAI ai, Location3D destination) => MoveDestination = destination;
+        public void StartFollow(AbstractAI ai, Creature target, int range = -1) => StartFollowCalls++;
+        public void StopFollow(AbstractAI ai) => StopFollowCalls++;
+        public void StopMovement(AbstractAI ai) => StopMovementCalls++;
         public void SetTarget(Creature actor, WorldObject? target) => actor.setTarget(target);
         public void SetRunning(Creature actor) => actor.setRunning();
         public void SetWalking(Creature actor) => actor.setWalking();
-        public void ReturnHome(Attackable npc) { }
+        public void ReturnHome(Attackable npc) => ReturnHomeCalls++;
         public void RestoreFullHealth(Creature actor) { }
-        public void Teleport(Creature actor, Location destination, bool randomOffset) { }
+        public void Teleport(Creature actor, Location destination, bool randomOffset)
+        {
+            TeleportCalls++;
+            TeleportDestination = destination;
+        }
         public void AbortAttack(Creature actor) { }
         public void Cast(Creature actor, Skill skill, Item? item = null, bool forceUse = false, bool dontMove = false) { }
         public void AddThreat(Attackable npc, Creature target, long damage, long hate) =>
             npc.addDamageHate(target, damage, hate);
         public void StopHating(Attackable npc, Creature? target) => npc.stopHating(target);
-        public void ClearCombatMemory(Attackable npc) => npc.clearAggroList();
+        public void ClearCombatMemory(Attackable npc)
+        {
+            ClearCombatMemoryCalls++;
+            npc.clearAggroList();
+        }
         public void PickUpDroppedItem(Attackable npc, Item item) { }
     }
 }

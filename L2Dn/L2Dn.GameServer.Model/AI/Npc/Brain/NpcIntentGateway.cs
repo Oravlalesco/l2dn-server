@@ -66,7 +66,7 @@ internal sealed class NpcIntentGateway
         {
             return Reject(NpcIntentRejectionReason.ActorDead);
         }
-        if (!actor.hasAI() || actor.getAI() is not AttackableAI ai || ai.GetType() != typeof(AttackableAI))
+        if (!actor.hasAI() || !NpcBrainEligibility.TryGetIntentAi(actor, out AttackableAI ai))
         {
             return Reject(NpcIntentRejectionReason.ActorUnsupported);
         }
@@ -81,7 +81,7 @@ internal sealed class NpcIntentGateway
             ClearTargetIntent clear => ExecuteClear(actor, ai, clear),
             BasicAttackIntent attack => ExecuteAttack(actor, ai, attack),
             ApproachTargetIntent approach => ExecuteApproach(actor, ai, approach),
-            ReturnHomeIntent => ExecuteReturnHome(actor),
+            ReturnHomeIntent returnHome => ExecuteReturnHome(actor, ai, returnHome),
             FleeIntent flee => ExecuteFlee(actor, ai, flee),
             CastSkillIntent cast => ExecuteCast(actor, cast),
             StopCombatIntent => ExecuteStopCombat(actor, ai),
@@ -92,6 +92,12 @@ internal sealed class NpcIntentGateway
     private NpcIntentExecutionResult ExecuteAcquire(Attackable actor, AttackableAI ai,
         AcquireTargetIntent intent)
     {
+        if (intent.Mode is not (NpcTargetAcquisitionMode.Engage or
+            NpcTargetAcquisitionMode.PreserveMovement))
+        {
+            return Reject(NpcIntentRejectionReason.InvalidIntent);
+        }
+
         NpcIntentExecutionResult validation = ResolveLiveTarget(actor, intent.Target, true, out Creature? target);
         if (!validation.IsExecuted)
         {
@@ -121,10 +127,28 @@ internal sealed class NpcIntentGateway
         }
 
         _commands.AddThreat(actor, liveTarget, 0, 1);
+        if (intent.Mode == NpcTargetAcquisitionMode.PreserveMovement)
+        {
+            // Retargeting during a defensive return must not cancel the route
+            // home. Tactical evaluation will attack, approach homeward, or keep
+            // returning on the next single-flight Think.
+            _commands.AbortAttack(actor);
+            _commands.StopFollow(ai);
+            _commands.SetTarget(actor, liveTarget);
+            return NpcIntentExecutionResult.Executed();
+        }
+
         if (!actor.isRunning())
         {
             _commands.SetRunning(actor);
         }
+
+        // Acquiring a target must cancel any physical trajectory left by a
+        // ReturnHomeIntent. Changing the AI intention alone does not stop a
+        // MOVE_TO already in progress, so without this the NPC keeps walking
+        // home until a later tactical evaluation starts following the attacker.
+        _commands.StopFollow(ai);
+        _commands.StopMovement(ai);
         _commands.SetIntention(ai, CtrlIntention.AI_INTENTION_ATTACK, liveTarget);
         return NpcIntentExecutionResult.Executed();
     }
@@ -206,37 +230,147 @@ internal sealed class NpcIntentGateway
             return NpcIntentExecutionResult.Executed();
         }
 
-        Location3D destination = liveTarget.Location.Location3D;
+        Location3D destination;
+        if (intent.Constraint == NpcApproachConstraint.TowardSpawnOnly)
+        {
+            if (actor.getSpawn() is not { } spawn)
+            {
+                return Reject(NpcIntentRejectionReason.Policy);
+            }
+
+            double actorSpawnDistance = Distance2D(actor.getX(), actor.getY(),
+                spawn.Location.X, spawn.Location.Y);
+            double targetSpawnDistance = Distance2D(liveTarget.getX(), liveTarget.getY(),
+                spawn.Location.X, spawn.Location.Y);
+            if (targetSpawnDistance > actorSpawnDistance)
+            {
+                return ContinueDefensiveReturn(actor, ai);
+            }
+
+            destination = GetStoppingPoint(actor, liveTarget, collisionAdjustedRange);
+            if (Distance2D(destination.X, destination.Y, spawn.Location.X, spawn.Location.Y) >
+                actorSpawnDistance)
+            {
+                return ContinueDefensiveReturn(actor, ai);
+            }
+
+            destination = _geo.GetValidLocation(actor.Location.Location3D, destination,
+                actor.getInstanceWorld());
+            if (destination == actor.Location.Location3D)
+            {
+                return ContinueDefensiveReturn(actor, ai);
+            }
+            if (Distance2D(destination.X, destination.Y, spawn.Location.X, spawn.Location.Y) >
+                actorSpawnDistance)
+            {
+                return ContinueDefensiveReturn(actor, ai);
+            }
+        }
+        else if (intent.Constraint == NpcApproachConstraint.None)
+        {
+            destination = liveTarget.Location.Location3D;
+        }
+        else
+        {
+            return Reject(NpcIntentRejectionReason.InvalidIntent);
+        }
+
         if (!_geo.CanMoveToTarget(actor.Location.Location3D, destination, actor.getInstanceWorld()))
         {
-            return Reject(NpcIntentRejectionReason.Blocked);
+            return intent.Constraint == NpcApproachConstraint.TowardSpawnOnly
+                ? ContinueDefensiveReturn(actor, ai)
+                : Reject(NpcIntentRejectionReason.Blocked);
         }
         if (!actor.isRunning())
         {
             _commands.SetRunning(actor);
         }
-        // The actor state is authoritative here. Avoid restarting the follow task on
-        // every Brain evaluation while the same target is already being approached.
-        if (!ReferenceEquals(actor.getTarget(), liveTarget) || !actor.isMoving())
+        if (intent.Constraint == NpcApproachConstraint.TowardSpawnOnly)
+        {
+            // A dynamic follow could turn outward after validation. Move toward a
+            // revalidated static point; the next Think may advance it again.
+            _commands.StopFollow(ai);
+            _commands.MoveTo(ai, destination);
+        }
+        // Generic movement is not enough: it may still be the old route home.
+        // Only an active follow registration proves that this target is already approached.
+        else if (!ReferenceEquals(actor.getTarget(), liveTarget) || !ai.isFollowing())
         {
             _commands.StartFollow(ai, liveTarget, stoppingRange);
         }
         return NpcIntentExecutionResult.Executed();
     }
 
-    private NpcIntentExecutionResult ExecuteReturnHome(Attackable actor)
+    private NpcIntentExecutionResult ExecuteReturnHome(Attackable actor, AttackableAI ai,
+        ReturnHomeIntent intent)
     {
-        if (!actor.canReturnToSpawnPoint() || actor.getSpawn() == null)
+        if (!actor.canReturnToSpawnPoint() || actor.getSpawn() is not { } spawn)
         {
             return Reject(NpcIntentRejectionReason.Policy);
         }
+        if (intent.Mode is not (NpcReturnHomeMode.ResetCombat or NpcReturnHomeMode.PreserveThreat or
+            NpcReturnHomeMode.TeleportReset))
+        {
+            return Reject(NpcIntentRejectionReason.InvalidIntent);
+        }
+
         _commands.AbortAttack(actor);
-        _commands.ClearCombatMemory(actor);
-        _commands.SetTarget(actor, null);
+        _commands.StopFollow(ai);
         _commands.SetWalking(actor);
-        _commands.ReturnHome(actor);
+        switch (intent.Mode)
+        {
+            case NpcReturnHomeMode.ResetCombat:
+                _commands.SetTarget(actor, null);
+                _commands.ClearCombatMemory(actor);
+                _commands.ReturnHome(actor);
+                break;
+            case NpcReturnHomeMode.PreserveThreat:
+                _commands.SetIntention(ai, CtrlIntention.AI_INTENTION_MOVE_TO, spawn.Location.Location3D);
+                break;
+            case NpcReturnHomeMode.TeleportReset:
+                _commands.StopMovement(ai);
+                _commands.SetTarget(actor, null);
+                _commands.ClearCombatMemory(actor);
+                _commands.Teleport(actor, spawn.Location, false);
+                _commands.SetIntention(ai, CtrlIntention.AI_INTENTION_ACTIVE);
+                break;
+        }
         return NpcIntentExecutionResult.Executed();
     }
+
+    private NpcIntentExecutionResult ContinueDefensiveReturn(Attackable actor, AttackableAI ai)
+    {
+        if (!actor.canReturnToSpawnPoint() || actor.getSpawn() is not { } spawn)
+        {
+            return Reject(NpcIntentRejectionReason.Policy);
+        }
+
+        _commands.AbortAttack(actor);
+        _commands.StopFollow(ai);
+        _commands.SetWalking(actor);
+        _commands.SetIntention(ai, CtrlIntention.AI_INTENTION_MOVE_TO, spawn.Location.Location3D);
+        return NpcIntentExecutionResult.Executed();
+    }
+
+    private static Location3D GetStoppingPoint(Attackable actor, Creature target, int stoppingRange)
+    {
+        double dx = target.getX() - actor.getX();
+        double dy = target.getY() - actor.getY();
+        double distance = double.Hypot(dx, dy);
+        if (distance <= stoppingRange || distance <= 0)
+        {
+            return actor.Location.Location3D;
+        }
+
+        double ratio = (distance - stoppingRange) / distance;
+        return new Location3D(
+            actor.getX() + (int)Math.Round(dx * ratio),
+            actor.getY() + (int)Math.Round(dy * ratio),
+            target.getZ());
+    }
+
+    private static double Distance2D(int leftX, int leftY, int rightX, int rightY) =>
+        double.Hypot((double)leftX - rightX, (double)leftY - rightY);
 
     private NpcIntentExecutionResult ExecuteFlee(Attackable actor, AttackableAI ai, FleeIntent intent)
     {

@@ -13,7 +13,7 @@ $snapshotPath = Join-Path $snapshotDirectory "$timestamp-$Label.prom"
 $response = Invoke-WebRequest -UseBasicParsing -Uri $endpoint
 [System.IO.File]::WriteAllText($snapshotPath, $response.Content, [System.Text.UTF8Encoding]::new($false))
 
-$metricPattern = '^(l2dn_(players_online|npc_(combat|loaded|thinking|reaction_latency|scheduler_(queue_delay|queue_depth|reactive_mode|active_workers|singleflight_collision|execution_failure)|wakeup_(total|coalesced|dropped)|think_pending_followup)))'
+$metricPattern = '^(l2dn_(players_online|npc_(combat|loaded|thinking|reaction_latency|guard_pursuit_reset|brain_(mode|decision|reflex|tactical|shadow)|intent_(created|executed|rejected|validation)|scheduler_(queue_delay|queue_depth|reactive_mode|active_workers|singleflight_collision|execution_failure)|wakeup_(total|coalesced|dropped)|think_pending_followup)))'
 $relevant = $response.Content -split "`n" | Where-Object { $_ -match $metricPattern }
 
 Write-Host "NPC telemetry snapshot: $snapshotPath"

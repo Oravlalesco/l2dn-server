@@ -225,6 +225,20 @@ public class NpcBrainTests
     }
 
     [Fact]
+    public void Target_inside_collision_adjusted_physical_reach_is_attacked_instead_of_stalling()
+    {
+        // Physical range is 40, actor radius is 8, and target radius is 10.
+        // The authoritative Gateway permits an attack at 58, so the Brain must
+        // not keep emitting no-op approach intents inside that same envelope.
+        VisibleEntity target = Hostile(Player, 55) with { CollisionRadius = 10 };
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player, visible: [target]);
+
+        NpcIntent intent = new NpcBrainCoordinator().Decide(perception, Context()).Intents.Single();
+
+        intent.Should().BeOfType<BasicAttackIntent>().Which.Target.Should().Be(Player);
+    }
+
+    [Fact]
     public void Caster_without_ready_skill_approaches_physical_attack_range()
     {
         NpcIntelligenceProfile profile = new(NpcIntelligenceArchetype.BasicCasterMob,
@@ -252,6 +266,19 @@ public class NpcBrainTests
 
         intent.Should().BeOfType<CastSkillIntent>().Which.Should().Match<CastSkillIntent>(cast =>
             cast.SkillId == 107 && cast.SkillLevel == 2 && cast.Target == Player);
+    }
+
+    [Fact]
+    public void Target_inside_collision_adjusted_skill_reach_is_cast_on_instead_of_stalling()
+    {
+        NpcSkillObservation skill = new(107, 2, 100, 20, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        VisibleEntity target = Hostile(Player, 115) with { CollisionRadius = 10 };
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player, visible: [target], skills: [skill]);
+
+        NpcIntent intent = new NpcBrainCoordinator().Decide(perception, Context()).Intents.Single();
+
+        intent.Should().BeOfType<CastSkillIntent>().Which.Target.Should().Be(Player);
     }
 
     [Theory]
@@ -295,14 +322,53 @@ public class NpcBrainTests
     }
 
     [Fact]
-    public void Actor_outside_combat_leash_returns_home_even_with_valid_target()
+    public void First_soft_leash_crossing_gets_a_fixed_combat_grace_window()
     {
-        NpcPerceptionSnapshot perception = CreatePerception(target: Player, visible: [Hostile(Player, 30)],
-            position: new NpcPosition(1_501, 0, 0, 0), spawn: new NpcPosition(0, 0, 0, 0));
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 30) with { Position = new NpcPosition(1_530, 0, 0, 0) }],
+            threats: [new ThreatEntry(Player, 100, 50, 30, true, true)],
+            position: new NpcPosition(1_501, 0, 0, 0), spawn: new NpcPosition(0, 0, 0, 0),
+            worldTick: 100);
 
         NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception, Context());
 
-        decision.Intents.Should().ContainSingle().Which.Should().BeOfType<ReturnHomeIntent>();
+        decision.Intents.Should().ContainSingle().Which.Should().BeOfType<BasicAttackIntent>();
+    }
+
+    [Fact]
+    public void Soft_leash_grace_expires_without_being_renewed_by_ranged_damage()
+    {
+        NpcBrainCoordinator brain = new();
+        NpcPosition spawn = new(0, 0, 0, 0);
+        NpcPerceptionSnapshot crossed = CreatePerception(target: Player,
+            visible: [Hostile(Player, 100) with { Position = new NpcPosition(1_700, 0, 0, 0) }],
+            threats: [new ThreatEntry(Player, 100, 50, 100, true, true)],
+            position: new NpcPosition(1_600, 0, 0, 0), spawn: spawn, worldTick: 100);
+        brain.Decide(crossed, Context(NpcBrainStimulus.Attacked)).Intents.Single()
+            .Should().BeOfType<ApproachTargetIntent>();
+
+        NpcPerceptionSnapshot expired = CreatePerception(target: Player,
+            visible: [Hostile(Player, 100) with { Position = new NpcPosition(1_700, 0, 0, 0) }],
+            threats: [new ThreatEntry(Player, 500, 250, 100, true, true)],
+            position: new NpcPosition(1_600, 0, 0, 0), spawn: spawn, revision: 2, worldTick: 300);
+
+        ReturnHomeIntent intent = brain.Decide(expired, Context(NpcBrainStimulus.Attacked)).Intents.Single()
+            .Should().BeOfType<ReturnHomeIntent>().Which;
+        intent.Mode.Should().Be(NpcReturnHomeMode.PreserveThreat);
+    }
+
+    [Fact]
+    public void Hard_leash_stops_the_grace_window_immediately()
+    {
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 100) with { Position = new NpcPosition(2_101, 0, 0, 0) }],
+            threats: [new ThreatEntry(Player, 100, 50, 100, true, true)],
+            position: new NpcPosition(2_001, 0, 0, 0), spawn: new NpcPosition(0, 0, 0, 0),
+            worldTick: 100);
+
+        ReturnHomeIntent intent = new NpcBrainCoordinator().Decide(perception, Context()).Intents.Single()
+            .Should().BeOfType<ReturnHomeIntent>().Which;
+        intent.Mode.Should().Be(NpcReturnHomeMode.PreserveThreat);
     }
 
     [Fact]
@@ -331,6 +397,312 @@ public class NpcBrainTests
 
         decision.Intents.Should().ContainSingle().Which.Should().BeOfType<AcquireTargetIntent>()
             .Which.Target.Should().Be(Player);
+    }
+
+    [Fact]
+    public void Disabled_return_defense_keeps_the_hard_reset_behavior_outside_leash()
+    {
+        NpcPerceptionSnapshot perception = CreatePerception(visible: [Hostile(Player, 30)],
+            threats: [new ThreatEntry(Player, 100, 50, 30, true, true)],
+            position: new NpcPosition(1_600, 0, 0, 0), spawn: new NpcPosition(0, 0, 0, 0),
+            returningToSpawn: true);
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception,
+            new NpcBrainContext(NpcBrainStimulus.Attacked,
+                ReturnDefense: new NpcReturnDefensePolicy(false, 1200)));
+
+        ReturnHomeIntent intent = decision.Intents.Single().Should().BeOfType<ReturnHomeIntent>().Which;
+        intent.Mode.Should().Be(NpcReturnHomeMode.ResetCombat);
+    }
+
+    [Fact]
+    public void Return_defense_attacks_in_range_without_extending_the_combat_leash()
+    {
+        NpcBrainCoordinator brain = new();
+        NpcPerceptionSnapshot interruptedReturn = CreatePerception(visible: [Hostile(Player, 30)],
+            threats: [new ThreatEntry(Player, 100, 50, 30, true, true)],
+            position: new NpcPosition(1_600, 0, 0, 0), spawn: new NpcPosition(0, 0, 0, 0),
+            returningToSpawn: true, worldTick: 100);
+
+        brain.Decide(interruptedReturn, Context(NpcBrainStimulus.Attacked)).Intents.Single()
+            .Should().BeOfType<AcquireTargetIntent>();
+
+        NpcPerceptionSnapshot retaliating = CreatePerception(target: Player, visible: [Hostile(Player, 30)],
+            threats: [new ThreatEntry(Player, 100, 50, 30, true, true)],
+            position: new NpcPosition(1_600, 0, 0, 0), spawn: new NpcPosition(0, 0, 0, 0),
+            revision: 2, worldTick: 101);
+
+        brain.Decide(retaliating, Context()).Intents.Single()
+            .Should().BeOfType<BasicAttackIntent>().Which.Target.Should().Be(Player);
+    }
+
+    [Fact]
+    public void Higher_hate_attacker_replaces_target_during_return_defense()
+    {
+        EntityKey challenger = new(9277, 0, EntityKind.Player);
+        NpcBrainCoordinator brain = new();
+        NpcPosition outsideLeash = new(1_600, 0, 0, 0);
+        NpcPosition spawn = new(0, 0, 0, 0);
+        brain.Decide(CreatePerception(visible: [Hostile(Player, 30)],
+                threats: [new ThreatEntry(Player, 100, 50, 30, true, true)], position: outsideLeash,
+                spawn: spawn, returningToSpawn: true, worldTick: 100),
+            Context(NpcBrainStimulus.Attacked));
+
+        NpcPerceptionSnapshot challenged = CreatePerception(target: Player,
+            visible: [Hostile(Player, 30), Hostile(challenger, 35, 1)],
+            threats:
+            [
+                new ThreatEntry(Player, 100, 50, 30, true, true),
+                new ThreatEntry(challenger, 250, 200, 35, true, true)
+            ],
+            position: outsideLeash, spawn: spawn, revision: 2, worldTick: 110);
+
+        AcquireTargetIntent retarget = brain.Decide(challenged,
+                Context(NpcBrainStimulus.ThreatChanged)).Intents.Single()
+            .Should().BeOfType<AcquireTargetIntent>().Which;
+        retarget.Target.Should().Be(challenger);
+        retarget.Mode.Should().Be(NpcTargetAcquisitionMode.PreserveMovement);
+
+        NpcPerceptionSnapshot switched = CreatePerception(target: challenger,
+            visible: [Hostile(Player, 30), Hostile(challenger, 35, 1)],
+            threats:
+            [
+                new ThreatEntry(Player, 100, 50, 30, true, true),
+                new ThreatEntry(challenger, 250, 200, 35, true, true)
+            ],
+            position: outsideLeash, spawn: spawn, revision: 3, worldTick: 111);
+        brain.Decide(switched, Context()).Intents.Single()
+            .Should().BeOfType<BasicAttackIntent>().Which.Target.Should().Be(challenger);
+    }
+
+    [Fact]
+    public void Nearby_higher_hate_attacker_is_engaged_without_canceling_defensive_return_first()
+    {
+        EntityKey nearby = new(9277, 0, EntityKind.Player);
+        NpcBrainCoordinator brain = new();
+        NpcPosition spawn = new(0, 0, 0, 0);
+        NpcPosition actor = new(1_600, 0, 0, 0);
+        VisibleEntity archer = Hostile(Player, 100) with { Position = new NpcPosition(1_700, 0, 0, 0) };
+
+        AcquireTargetIntent initial = brain.Decide(CreatePerception(visible: [archer],
+                threats: [new ThreatEntry(Player, 100, 50, 100, true, true)], position: actor,
+                spawn: spawn, returningToSpawn: true, worldTick: 100),
+            Context(NpcBrainStimulus.Attacked)).Intents.Single().Should()
+            .BeOfType<AcquireTargetIntent>().Which;
+        initial.Mode.Should().Be(NpcTargetAcquisitionMode.PreserveMovement);
+
+        brain.Decide(CreatePerception(target: Player, visible: [archer],
+                threats: [new ThreatEntry(Player, 100, 50, 100, true, true)], position: actor,
+                spawn: spawn, revision: 2, worldTick: 101), Context()).Intents.Single()
+            .Should().BeOfType<ReturnHomeIntent>();
+
+        VisibleEntity dagger = Hostile(nearby, 20, 1) with { Position = new NpcPosition(1_580, 0, 0, 0) };
+        AcquireTargetIntent retarget = brain.Decide(CreatePerception(target: Player,
+                visible: [archer, dagger], threats:
+                [
+                    new ThreatEntry(Player, 100, 50, 100, true, true),
+                    new ThreatEntry(nearby, 250, 200, 20, true, true)
+                ], position: actor, spawn: spawn, revision: 3, worldTick: 102),
+            Context(NpcBrainStimulus.ThreatChanged)).Intents.Single().Should()
+            .BeOfType<AcquireTargetIntent>().Which;
+        retarget.Target.Should().Be(nearby);
+        retarget.Mode.Should().Be(NpcTargetAcquisitionMode.PreserveMovement);
+
+        brain.Decide(CreatePerception(target: nearby, visible: [archer, dagger], threats:
+            [
+                new ThreatEntry(Player, 100, 50, 100, true, true),
+                new ThreatEntry(nearby, 250, 200, 20, true, true)
+            ], position: actor, spawn: spawn, revision: 4, worldTick: 103), Context()).Intents.Single()
+            .Should().BeOfType<BasicAttackIntent>().Which.Target.Should().Be(nearby);
+    }
+
+    [Fact]
+    public void Return_defense_expires_after_the_legacy_timeout()
+    {
+        NpcBrainCoordinator brain = new();
+        NpcPosition outsideLeash = new(1_600, 0, 0, 0);
+        NpcPosition spawn = new(0, 0, 0, 0);
+        brain.Decide(CreatePerception(visible: [Hostile(Player, 30)],
+                threats: [new ThreatEntry(Player, 100, 50, 30, true, true)], position: outsideLeash,
+                spawn: spawn, returningToSpawn: true, worldTick: 100),
+            Context(NpcBrainStimulus.Attacked));
+
+        NpcPerceptionSnapshot expired = CreatePerception(target: Player, visible: [Hostile(Player, 30)],
+            threats: [new ThreatEntry(Player, 100, 50, 30, true, true)], position: outsideLeash,
+            spawn: spawn, revision: 2, worldTick: 1_301);
+
+        ReturnHomeIntent intent = brain.Decide(expired, Context()).Intents.Single()
+            .Should().BeOfType<ReturnHomeIntent>().Which;
+        intent.Mode.Should().Be(NpcReturnHomeMode.ResetCombat);
+    }
+
+    [Fact]
+    public void Return_defense_approaches_only_when_target_is_toward_spawn()
+    {
+        NpcBrainCoordinator brain = new();
+        NpcPosition spawn = new(0, 0, 0, 0);
+        brain.Decide(CreatePerception(visible: [Hostile(Player, 30) with
+                { Position = new NpcPosition(1_570, 0, 0, 0) }],
+                threats: [new ThreatEntry(Player, 100, 50, 30, true, true)],
+                position: new NpcPosition(1_600, 0, 0, 0), spawn: spawn,
+                returningToSpawn: true, worldTick: 100),
+            Context(NpcBrainStimulus.Attacked));
+
+        NpcPerceptionSnapshot homeward = CreatePerception(target: Player,
+            visible: [Hostile(Player, 100) with { Position = new NpcPosition(1_500, 0, 0, 0) }],
+            threats: [new ThreatEntry(Player, 100, 50, 100, true, true)],
+            position: new NpcPosition(1_600, 0, 0, 0), spawn: spawn, revision: 2, worldTick: 101);
+
+        ApproachTargetIntent intent = brain.Decide(homeward, Context()).Intents.Single()
+            .Should().BeOfType<ApproachTargetIntent>().Which;
+        intent.Constraint.Should().Be(NpcApproachConstraint.TowardSpawnOnly);
+    }
+
+    [Fact]
+    public void Return_defense_continues_home_without_discarding_hate_when_target_is_outward()
+    {
+        NpcBrainCoordinator brain = new();
+        NpcPosition spawn = new(0, 0, 0, 0);
+        brain.Decide(CreatePerception(visible: [Hostile(Player, 30) with
+                { Position = new NpcPosition(1_570, 0, 0, 0) }],
+                threats: [new ThreatEntry(Player, 100, 50, 30, true, true)],
+                position: new NpcPosition(1_600, 0, 0, 0), spawn: spawn,
+                returningToSpawn: true, worldTick: 100),
+            Context(NpcBrainStimulus.Attacked));
+
+        NpcPerceptionSnapshot outward = CreatePerception(target: Player,
+            visible: [Hostile(Player, 100) with { Position = new NpcPosition(1_700, 0, 0, 0) }],
+            threats: [new ThreatEntry(Player, 100, 50, 100, true, true)],
+            position: new NpcPosition(1_600, 0, 0, 0), spawn: spawn, revision: 2, worldTick: 101);
+
+        ReturnHomeIntent intent = brain.Decide(outward, Context()).Intents.Single()
+            .Should().BeOfType<ReturnHomeIntent>().Which;
+        intent.Mode.Should().Be(NpcReturnHomeMode.PreserveThreat);
+
+        NpcPerceptionSnapshot returning = CreatePerception(target: Player,
+            visible: [Hostile(Player, 100) with { Position = new NpcPosition(1_700, 0, 0, 0) }],
+            threats: [new ThreatEntry(Player, 100, 50, 100, true, true)],
+            position: new NpcPosition(1_600, 0, 0, 0), spawn: spawn,
+            returningToSpawn: true, revision: 3, worldTick: 102);
+        brain.Decide(returning, Context()).Intents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Return_defense_does_not_resume_outward_chase_until_target_reenters_leash()
+    {
+        NpcBrainCoordinator brain = new();
+        NpcPosition spawn = new(0, 0, 0, 0);
+        brain.Decide(CreatePerception(visible: [Hostile(Player, 30) with
+                { Position = new NpcPosition(1_630, 0, 0, 0) }],
+                threats: [new ThreatEntry(Player, 100, 50, 30, true, true)],
+                position: new NpcPosition(1_600, 0, 0, 0), spawn: spawn,
+                returningToSpawn: true, worldTick: 100),
+            Context(NpcBrainStimulus.Attacked));
+
+        NpcPerceptionSnapshot actorInsideTargetOutside = CreatePerception(target: Player,
+            visible: [Hostile(Player, 110) with { Position = new NpcPosition(1_600, 0, 0, 0) }],
+            threats: [new ThreatEntry(Player, 100, 50, 110, true, true)],
+            position: new NpcPosition(1_490, 0, 0, 0), spawn: spawn, revision: 2, worldTick: 101);
+
+        ReturnHomeIntent intent = brain.Decide(actorInsideTargetOutside, Context()).Intents.Single()
+            .Should().BeOfType<ReturnHomeIntent>().Which;
+        intent.Mode.Should().Be(NpcReturnHomeMode.PreserveThreat);
+    }
+
+    [Fact]
+    public void Third_soft_leash_excursion_requests_teleport_and_combat_reset()
+    {
+        NpcBrainCoordinator brain = new();
+        NpcPosition spawn = new(0, 0, 0, 0);
+        NpcPosition outsideActor = new(1_600, 0, 0, 0);
+        VisibleEntity outsideTarget = Hostile(Player, 30) with
+        {
+            Position = new NpcPosition(1_630, 0, 0, 0)
+        };
+        NpcPosition insideActor = new(1_400, 0, 0, 0);
+        VisibleEntity insideTarget = Hostile(Player, 30) with
+        {
+            Position = new NpcPosition(1_430, 0, 0, 0)
+        };
+
+        brain.Decide(CreatePerception(target: Player, visible: [outsideTarget],
+                threats: [new ThreatEntry(Player, 100, 50, 30, true, true)], position: outsideActor,
+                spawn: spawn, worldTick: 100), Context()).Intents.Single()
+            .Should().BeOfType<BasicAttackIntent>();
+        brain.Decide(CreatePerception(target: Player, visible: [insideTarget],
+                threats: [new ThreatEntry(Player, 100, 50, 30, true, true)], position: insideActor,
+                spawn: spawn, revision: 2, worldTick: 101), Context()).Intents.Single()
+            .Should().BeOfType<BasicAttackIntent>();
+
+        brain.Decide(CreatePerception(target: Player, visible: [outsideTarget],
+                threats: [new ThreatEntry(Player, 100, 50, 30, true, true)], position: outsideActor,
+                spawn: spawn, revision: 3, worldTick: 102), Context()).Intents.Single()
+            .Should().BeOfType<BasicAttackIntent>();
+        brain.Decide(CreatePerception(target: Player, visible: [insideTarget],
+                threats: [new ThreatEntry(Player, 100, 50, 30, true, true)], position: insideActor,
+                spawn: spawn, revision: 4, worldTick: 103), Context()).Intents.Single()
+            .Should().BeOfType<BasicAttackIntent>();
+
+        ReturnHomeIntent emergency = brain.Decide(CreatePerception(target: Player,
+                visible: [outsideTarget], threats: [new ThreatEntry(Player, 100, 50, 30, true, true)],
+                position: outsideActor, spawn: spawn, revision: 5, worldTick: 104), Context()).Intents.Single()
+            .Should().BeOfType<ReturnHomeIntent>().Which;
+        emergency.Mode.Should().Be(NpcReturnHomeMode.TeleportReset);
+    }
+
+    [Fact]
+    public void New_damage_renews_the_legacy_return_defense_timeout()
+    {
+        NpcBrainCoordinator brain = new();
+        NpcPosition position = new(1_600, 0, 0, 0);
+        NpcPosition spawn = new(0, 0, 0, 0);
+        brain.Decide(CreatePerception(visible: [Hostile(Player, 30)],
+                threats: [new ThreatEntry(Player, 100, 50, 30, true, true)], position: position,
+                spawn: spawn, returningToSpawn: true, worldTick: 100),
+            Context(NpcBrainStimulus.Attacked));
+
+        NpcPerceptionSnapshot renewed = CreatePerception(target: Player, visible: [Hostile(Player, 30)],
+            threats: [new ThreatEntry(Player, 200, 100, 30, true, true)], position: position,
+            spawn: spawn, revision: 2, worldTick: 1_299);
+        brain.Decide(renewed, Context(NpcBrainStimulus.ThreatChanged)).Intents.Single()
+            .Should().BeOfType<BasicAttackIntent>();
+
+        NpcPerceptionSnapshot afterOriginalDeadline = renewed with
+        {
+            Envelope = renewed.Envelope with { StateRevision = 3, WorldTick = 1_301 }
+        };
+        brain.Decide(afterOriginalDeadline, Context()).Intents.Single()
+            .Should().BeOfType<BasicAttackIntent>();
+    }
+
+    [Fact]
+    public void Zero_combat_leash_remains_unbounded_instead_of_using_profile_leash()
+    {
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player, visible: [Hostile(Player, 30)],
+            threats: [new ThreatEntry(Player, 100, 50, 30, true, true)],
+            position: new NpcPosition(5_000, 0, 0, 0), spawn: new NpcPosition(0, 0, 0, 0),
+            combatLeashDistance: 0);
+
+        new NpcBrainCoordinator().Decide(perception, Context()).Intents.Single()
+            .Should().BeOfType<BasicAttackIntent>();
+    }
+
+    [Fact]
+    public void Reaching_home_during_return_defense_clears_combat_before_reacquisition()
+    {
+        NpcBrainCoordinator brain = new();
+        NpcPosition spawn = new(0, 0, 0, 0);
+        brain.Decide(CreatePerception(visible: [Hostile(Player, 30)],
+                threats: [new ThreatEntry(Player, 100, 50, 30, true, true)],
+                position: new NpcPosition(1_600, 0, 0, 0), spawn: spawn,
+                returningToSpawn: true, worldTick: 100),
+            Context(NpcBrainStimulus.Attacked));
+
+        NpcPerceptionSnapshot atHome = CreatePerception(target: Player, visible: [Hostile(Player, 30)],
+            threats: [new ThreatEntry(Player, 100, 50, 30, true, true)], position: spawn,
+            spawn: spawn, revision: 2, worldTick: 101);
+
+        brain.Decide(atHome, Context()).Intents.Single().Should().BeOfType<StopCombatIntent>();
     }
 
     [Fact]
@@ -432,7 +804,9 @@ public class NpcBrainTests
         NpcPosition? spawn = null,
         bool returningToSpawn = false,
         double hp = 100,
-        long revision = 1)
+        long revision = 1,
+        long? worldTick = null,
+        int combatLeashDistance = 1500)
     {
         NpcKey npc = actor ?? Actor;
         NpcIdentity identity = new(100, NpcKind.Monster, LegacyNpcAiType.Fighter, 20, 300, [], capabilities);
@@ -440,8 +814,9 @@ public class NpcBrainTests
             physicalFlags);
         NpcCombatFacts combat = new(target, 40, 500, NpcCombatFlags.None);
         NpcEnvironment environment = new(new RegionKey(0, 1, 1), spawn, true, true, false,
-            returningToSpawn, true, 300, 1500);
+            returningToSpawn, true, 300, combatLeashDistance);
         NpcPerceptionState state = new(identity, physical, combat, environment, visible, threats, [], [], skills);
-        return new NpcPerceptionSnapshot(new NpcPerceptionEnvelope(1, npc, revision, revision, revision), state);
+        return new NpcPerceptionSnapshot(
+            new NpcPerceptionEnvelope(1, npc, revision, worldTick ?? revision, revision), state);
     }
 }

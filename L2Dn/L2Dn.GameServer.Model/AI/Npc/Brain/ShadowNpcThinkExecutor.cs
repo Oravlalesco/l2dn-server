@@ -9,11 +9,14 @@ internal sealed class ShadowNpcThinkExecutor: INpcThinkExecutor, INpcThinkLifecy
 {
     private readonly LegacyNpcThinkExecutor _legacy;
     private readonly INpcBrain _brain;
+    private readonly NpcReturnDefensePolicy _returnDefense;
 
-    public ShadowNpcThinkExecutor(LegacyNpcThinkExecutor legacy, INpcBrain brain)
+    public ShadowNpcThinkExecutor(LegacyNpcThinkExecutor legacy, INpcBrain brain,
+        NpcReturnDefensePolicy returnDefense)
     {
         _legacy = legacy;
         _brain = brain;
+        _returnDefense = returnDefense;
     }
 
     public ValueTask ExecuteAsync(NpcKey npc, NpcWakeContext context, CancellationToken cancellationToken)
@@ -24,7 +27,7 @@ internal sealed class ShadowNpcThinkExecutor: INpcThinkExecutor, INpcThinkLifecy
         {
             return ValueTask.CompletedTask;
         }
-        if (actor.getAI() is not AttackableAI attackableAi || attackableAi.GetType() != typeof(AttackableAI))
+        if (!NpcBrainEligibility.TryGetIntentAi(actor, out AttackableAI attackableAi))
         {
             return _legacy.ExecuteAsync(npc, context, cancellationToken);
         }
@@ -41,7 +44,8 @@ internal sealed class ShadowNpcThinkExecutor: INpcThinkExecutor, INpcThinkLifecy
 
             NpcBrainDecision decision = NpcAiTelemetry.ObserveBrainDecision(() => _brain.Decide(
                 perception.Snapshot,
-                new NpcBrainContext(NpcBrainStimulusMapper.Map(context.Reasons))));
+                new NpcBrainContext(NpcBrainStimulusMapper.Map(context.Reasons),
+                    ReturnDefense: _returnDefense)));
             using LegacyNpcCommandObserver.Scope observed = LegacyNpcCommandObserver.Begin(perception.Snapshot);
             if (NpcPerceptionCoordinator.Instance.Mode == NpcPerceptionMode.SnapshotRead)
             {

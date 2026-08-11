@@ -3,6 +3,14 @@ using L2Dn.NpcContracts;
 
 namespace L2Dn.NpcBrain;
 
+internal enum NpcReturnEngagementState
+{
+    None = 0,
+    LeashGrace = 1,
+    ReturningHome = 2,
+    DefensiveReturn = 3
+}
+
 internal sealed class NpcBrainState
 {
     public NpcBrainState(NpcKey npc) => Npc = npc;
@@ -13,8 +21,13 @@ internal sealed class NpcBrainState
     public EntityKey? LastTarget { get; set; }
     public NpcIntentType? LastDecision { get; set; }
     public long LastDecisionWorldTick { get; set; }
-    public bool ReturnHomeRequested { get; set; }
+    public NpcReturnEngagementState ReturnState { get; set; }
     public bool FleeMode { get; set; }
+    public EntityKey? ReturnDefenseTarget { get; set; }
+    public long ReturnDefenseExpiresAtWorldTick { get; set; }
+    public long LeashGraceExpiresAtWorldTick { get; set; }
+    public int LeashExcursionCount { get; set; }
+    public bool ReturnMovementIssued { get; set; }
 }
 
 internal readonly record struct NpcBrainStateSnapshot(
@@ -23,8 +36,13 @@ internal readonly record struct NpcBrainStateSnapshot(
     EntityKey? LastTarget,
     NpcIntentType? LastDecision,
     long LastDecisionWorldTick,
-    bool ReturnHomeRequested,
-    bool FleeMode);
+    NpcReturnEngagementState ReturnState,
+    bool FleeMode,
+    EntityKey? ReturnDefenseTarget,
+    long ReturnDefenseExpiresAtWorldTick,
+    long LeashGraceExpiresAtWorldTick,
+    int LeashExcursionCount,
+    bool ReturnMovementIssued);
 
 internal sealed class NpcBrainStateStore
 {
@@ -85,7 +103,9 @@ internal sealed class NpcBrainStateStore
         lock (state.SyncRoot)
         {
             return new NpcBrainStateSnapshot(state.Npc, state.DecisionSequence, state.LastTarget,
-                state.LastDecision, state.LastDecisionWorldTick, state.ReturnHomeRequested, state.FleeMode);
+                state.LastDecision, state.LastDecisionWorldTick, state.ReturnState, state.FleeMode,
+                state.ReturnDefenseTarget, state.ReturnDefenseExpiresAtWorldTick,
+                state.LeashGraceExpiresAtWorldTick, state.LeashExcursionCount, state.ReturnMovementIssued);
         }
     }
 }

@@ -26,11 +26,13 @@ public sealed class NpcIntentSemanticComparer: IEqualityComparer<NpcIntent>
 
         return (x, y) switch
         {
-            (AcquireTargetIntent left, AcquireTargetIntent right) => left.Target == right.Target,
+            (AcquireTargetIntent left, AcquireTargetIntent right) => left.Target == right.Target &&
+                left.Mode == right.Mode,
             (ClearTargetIntent left, ClearTargetIntent right) => left.ExpectedTarget == right.ExpectedTarget,
             (BasicAttackIntent left, BasicAttackIntent right) => left.Target == right.Target,
-            (ApproachTargetIntent left, ApproachTargetIntent right) => left.Target == right.Target,
-            (ReturnHomeIntent, ReturnHomeIntent) => true,
+            (ApproachTargetIntent left, ApproachTargetIntent right) => left.Target == right.Target &&
+                left.Constraint == right.Constraint,
+            (ReturnHomeIntent left, ReturnHomeIntent right) => left.Mode == right.Mode,
             (FleeIntent left, FleeIntent right) => left.Threat == right.Threat,
             (CastSkillIntent left, CastSkillIntent right) => left.SkillId == right.SkillId &&
                 left.SkillLevel == right.SkillLevel && left.Target == right.Target,
@@ -48,6 +50,7 @@ public sealed class NpcIntentSemanticComparer: IEqualityComparer<NpcIntent>
         {
             case AcquireTargetIntent acquire:
                 hash.Add(acquire.Target);
+                hash.Add(acquire.Mode);
                 break;
             case ClearTargetIntent clear:
                 hash.Add(clear.ExpectedTarget);
@@ -57,6 +60,10 @@ public sealed class NpcIntentSemanticComparer: IEqualityComparer<NpcIntent>
                 break;
             case ApproachTargetIntent approach:
                 hash.Add(approach.Target);
+                hash.Add(approach.Constraint);
+                break;
+            case ReturnHomeIntent returnHome:
+                hash.Add(returnHome.Mode);
                 break;
             case FleeIntent flee:
                 hash.Add(flee.Threat);

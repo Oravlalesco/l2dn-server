@@ -59,7 +59,7 @@ public class AttackableAI: CreatureAI
 	// Only the exact base AI is migrated in Phase 3. Derived/scripted AIs must retain
 	// every legacy event side effect until they receive an explicit Brain profile.
 	internal bool UsesIntentBrain => NpcBrainRuntime.Mode == NpcBrainMode.Intent &&
-		GetType() == typeof(AttackableAI);
+		NpcBrainEligibility.IsIntentEligible(getActiveChar(), this);
 
 	public AttackableAI(Attackable attackable): this(attackable, NpcAiDependencies.Legacy)
 	{
@@ -669,21 +669,7 @@ public class AttackableAI: CreatureAI
 
 		if (_attackTimeout < _worldQuery.GetWorldTick())
 		{
-			// Set the AI Intention to AI_INTENTION_ACTIVE
-			_commands.SetIntention(this, CtrlIntention.AI_INTENTION_ACTIVE);
-
-			if (!_actor.isFakePlayer())
-			{
-				_commands.SetWalking(npc);
-			}
-
-			// Monster teleport to spawn
-			if (npc.isMonster() && npc.getSpawn() is {} spawn && !npc.isInInstance() &&
-			    (npc.isInCombat() || _worldQuery.GetVisibleObjects<Player>(npc).Count == 0))
-			{
-				_commands.Teleport(npc, spawn.Location, false);
-			}
-
+			handleAttackTimeout(npc);
 			return;
 		}
 
@@ -1037,6 +1023,56 @@ public class AttackableAI: CreatureAI
 
 		// Attacks target
 		_commands.AutoAttack(_actor, target);
+	}
+
+	/// <summary>
+	/// Ends a legacy attack after its pursuit window expires. Guards must discard the
+	/// previous combat state before returning home; otherwise <see cref="thinkActive"/>
+	/// immediately reacquires the same hated target and starts another two-minute window.
+	/// </summary>
+	protected virtual void handleAttackTimeout(Attackable npc)
+	{
+		if (npc is Guard)
+		{
+			_commands.AbortAttack(npc);
+			_commands.StopFollow(this);
+			setTarget(null);
+			_commands.ClearCombatMemory(npc);
+
+			if (!npc.isFakePlayer())
+			{
+				_commands.SetWalking(npc);
+			}
+
+			bool returnHome = npc.canReturnToSpawnPoint() && npc.getSpawn() != null;
+			if (returnHome)
+			{
+				_commands.ReturnHome(npc);
+			}
+			else
+			{
+				_commands.SetIntention(this, CtrlIntention.AI_INTENTION_ACTIVE);
+			}
+
+			NpcAiTelemetry.RecordGuardPursuitReset(returnHome ? "return_home" : "active");
+			return;
+		}
+
+		// Preserve the existing timeout semantics for actors that have not yet received
+		// an explicit migration policy.
+		_commands.SetIntention(this, CtrlIntention.AI_INTENTION_ACTIVE);
+
+		if (!_actor.isFakePlayer())
+		{
+			_commands.SetWalking(npc);
+		}
+
+		// Monster teleport to spawn
+		if (npc.isMonster() && npc.getSpawn() is {} spawn && !npc.isInInstance() &&
+		    (npc.isInCombat() || _worldQuery.GetVisibleObjects<Player>(npc).Count == 0))
+		{
+			_commands.Teleport(npc, spawn.Location, false);
+		}
 	}
 
 	private bool checkSkillTarget(Skill skill, WorldObject? target)

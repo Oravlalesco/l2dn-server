@@ -20,7 +20,7 @@ public readonly record struct NpcTacticalScore(
 public sealed class TacticalActionEvaluator
 {
     public NpcTacticalScore Evaluate(NpcPerceptionSnapshot perception, NpcIntelligenceProfile profile,
-        double targetDistance)
+        double targetDistance, double targetCollisionRadius = 0)
     {
         if (profile.FleeAllowed && NpcPerceptionFacts.HpPercent(perception.State.Physical) <= profile.FleeHpPercent)
         {
@@ -49,7 +49,8 @@ public sealed class TacticalActionEvaluator
         if (offensive.HasValue)
         {
             int skillRange = Math.Max(0, offensive.Value.Range);
-            if (skillRange <= 0 || targetDistance <= skillRange + perception.State.Physical.CollisionRadius)
+            double collisionPadding = perception.State.Physical.CollisionRadius + targetCollisionRadius;
+            if (skillRange <= 0 || targetDistance <= skillRange + collisionPadding)
             {
                 return new NpcTacticalScore(NpcTacticalAction.CastSkill, 90, offensive);
             }
@@ -62,7 +63,9 @@ public sealed class TacticalActionEvaluator
         }
 
         int physicalAttackRange = Math.Max(1, perception.State.Combat.PhysicalAttackRange);
-        return targetDistance > physicalAttackRange
+        double physicalReach = physicalAttackRange + perception.State.Physical.CollisionRadius +
+            targetCollisionRadius;
+        return targetDistance > physicalReach
             ? new NpcTacticalScore(NpcTacticalAction.Approach, 80, null, physicalAttackRange)
             : new NpcTacticalScore(NpcTacticalAction.BasicAttack, 60);
     }

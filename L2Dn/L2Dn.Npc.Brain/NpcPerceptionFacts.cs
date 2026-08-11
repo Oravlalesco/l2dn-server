@@ -87,6 +87,22 @@ internal static class NpcPerceptionFacts
         return target;
     }
 
+    public static bool TryGetVisibleEntity(NpcPerceptionSnapshot perception, EntityKey key,
+        out VisibleEntity visible)
+    {
+        foreach (VisibleEntity candidate in perception.State.VisibleEntities)
+        {
+            if (candidate.Entity == key)
+            {
+                visible = candidate;
+                return true;
+            }
+        }
+
+        visible = default;
+        return false;
+    }
+
     public static double HpPercent(NpcPhysicalState physical) =>
         physical.MaximumHp <= 0 ? 0 : physical.CurrentHp / physical.MaximumHp * 100;
 

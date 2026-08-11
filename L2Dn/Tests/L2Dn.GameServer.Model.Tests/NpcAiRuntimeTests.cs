@@ -6,6 +6,7 @@ using L2Dn.GameServer.AI;
 using L2Dn.GameServer.AI.Runtime;
 using L2Dn.GameServer.AI.Scheduling;
 using L2Dn.GameServer.Model.Actor;
+using L2Dn.GameServer.Model.Actor.Instances;
 using L2Dn.GameServer.Model.Actor.Templates;
 using L2Dn.GameServer.Model.InstanceZones;
 using L2Dn.GameServer.Model.Items.Instances;
@@ -20,6 +21,18 @@ public class NpcAiRuntimeTests
 {
     private static int _nextObjectId = 1_910_000_000;
     private static int _nextTemplateId = 9_100_000;
+
+    [Fact]
+    public void Intent_eligibility_accepts_only_plain_monsters_not_guards_or_specialized_actors()
+    {
+        Monster monster = new(CreateNpcTemplate());
+        Guard guard = new(CreateNpcTemplate());
+        Attackable plainAttackable = CreateAttackable();
+
+        NpcBrainEligibility.IsIntentEligible(monster, new AttackableAI(monster)).Should().BeTrue();
+        NpcBrainEligibility.IsIntentEligible(guard, new AttackableAI(guard)).Should().BeFalse();
+        NpcBrainEligibility.IsIntentEligible(plainAttackable, new AttackableAI(plainAttackable)).Should().BeFalse();
+    }
 
     [Fact]
     public void Legacy_world_query_matches_world_visibility()
@@ -130,6 +143,31 @@ public class NpcAiRuntimeTests
 
         actor.getTarget().Should().BeSameAs(target);
         ai.LegacyMovementTarget.Should().BeSameAs(target);
+    }
+
+    [Fact]
+    public void Guard_attack_timeout_clears_stale_combat_state_and_returns_home_immediately()
+    {
+        NpcTemplate template = CreateNpcTemplate();
+        Guard guard = new(template);
+        Attackable attacker = CreateSpawnedAttackable();
+        guard.setSpawn(new Spawn(template) { Location = new Location(100, 200, 300, 0) });
+        guard.addDamageHate(attacker, 5, 10);
+        guard.getAttackByList().add(new WeakReference<Creature>(attacker));
+        PursuitResetCommandExecutor commands = new();
+        NpcAiDependencies dependencies = new(new EmptyWorldQuery(), new EmptyGeoQuery(),
+            LegacyNpcThreatQuery.Instance, commands, new DeterministicRandomSource(), new NullEntityResolver());
+        AttackTimeoutTestAI ai = new(guard, dependencies);
+        ai.setTarget(attacker);
+        commands.Commands.Clear();
+
+        ai.HandleAttackTimeout();
+
+        commands.Commands.Should().Equal(
+            "abort_attack", "stop_follow", "clear_target", "clear_combat_memory", "set_walking", "return_home");
+        guard.getTarget().Should().BeNull();
+        guard.getAggroList().Should().BeEmpty();
+        guard.getAttackByList().Should().BeEmpty();
     }
 
     [Fact]
@@ -526,15 +564,17 @@ public class NpcAiRuntimeTests
     }
 
     [Fact]
-    public void Intent_mode_applies_only_to_exact_base_attackable_ai()
+    public void Intent_mode_applies_only_to_exact_base_monster_and_attackable_ai()
     {
         NpcBrainMode previous = NpcBrainRuntime.Mode;
-        Attackable actor = CreateAttackable();
+        Monster actor = new(CreateNpcTemplate());
+        Guard guard = new(CreateNpcTemplate());
         NpcAiDependencies dependencies = new(new EmptyWorldQuery(), new EmptyGeoQuery(),
             new EmptyThreatQuery(), new RecordingCommandExecutor(), new DeterministicRandomSource(),
             new NullEntityResolver());
         AttackableAI exact = new(actor, dependencies);
         TargetReadingAttackableAI derived = new(actor, dependencies);
+        AttackableAI guardAi = new(guard, dependencies);
 
         try
         {
@@ -542,6 +582,7 @@ public class NpcAiRuntimeTests
 
             exact.UsesIntentBrain.Should().BeTrue();
             derived.UsesIntentBrain.Should().BeFalse();
+            guardAi.UsesIntentBrain.Should().BeFalse();
         }
         finally
         {
@@ -578,6 +619,7 @@ public class NpcAiRuntimeTests
         NpcAiTelemetry.ObserveGeoQuery("test_geo", static () => true,
             static result => result ? "allowed" : "blocked");
         NpcAiTelemetry.ObserveCommand("test_command", static () => { });
+        NpcAiTelemetry.RecordGuardPursuitReset("return_home");
         NpcAiTelemetry.SetPerceptionMode(NpcPerceptionMode.CaptureOnly);
         NpcAiTelemetry.SetReactiveSchedulerMode(NpcReactiveSchedulerMode.Enabled);
         NpcAiTelemetry.SetBrainMode(NpcBrainMode.Intent);
@@ -593,6 +635,8 @@ public class NpcAiRuntimeTests
             item.Tags.Any(tag => tag.Key == "outcome" && Equals(tag.Value, "allowed")));
         measurements.Should().Contain(item => item.Name == "l2dn.npc.command.calls" &&
             item.Tags.Any(tag => tag.Key == "outcome" && Equals(tag.Value, "success")));
+        measurements.Should().Contain(item => item.Name == "l2dn.npc.guard.pursuit_reset" &&
+            item.Tags.Any(tag => tag.Key == "outcome" && Equals(tag.Value, "return_home")));
         measurements.Should().Contain(item => item.Name == "l2dn.npc.perception.mode" &&
             item.Tags.Any(tag => tag.Key == "mode" && Equals(tag.Value, "CaptureOnly")));
         measurements.Should().Contain(item => item.Name == "l2dn.npc.scheduler.reactive.mode" &&
@@ -744,6 +788,12 @@ public class NpcAiRuntimeTests
         public override void onEvtThink() => ObservedTarget = getTarget();
     }
 
+    private sealed class AttackTimeoutTestAI(Attackable actor, NpcAiDependencies dependencies):
+        AttackableAI(actor, dependencies)
+    {
+        public void HandleAttackTimeout() => handleAttackTimeout(getActiveChar());
+    }
+
     private sealed class PassiveTestAttackable(NpcTemplate template): Attackable(template)
     {
         public override void onSpawn()
@@ -766,6 +816,7 @@ public class NpcAiRuntimeTests
         public void MoveTo(AbstractAI ai, Location3D destination) => throw Unexpected();
         public void StartFollow(AbstractAI ai, Creature target, int range = -1) => throw Unexpected();
         public void StopFollow(AbstractAI ai) => throw Unexpected();
+        public void StopMovement(AbstractAI ai) => throw Unexpected();
         public void SetRunning(Creature actor) => throw Unexpected();
         public void SetWalking(Creature actor) => throw Unexpected();
         public void ReturnHome(Attackable npc) => throw Unexpected();
@@ -780,6 +831,43 @@ public class NpcAiRuntimeTests
         public void PickUpDroppedItem(Attackable npc, Item item) => throw Unexpected();
 
         private static Exception Unexpected() => new InvalidOperationException("Unexpected command in test.");
+    }
+
+    private sealed class PursuitResetCommandExecutor: ILegacyNpcCommandExecutor
+    {
+        public List<string> Commands { get; } = [];
+
+        public void SetIntention(AbstractAI ai, CtrlIntention intention, object? argument = null) =>
+            Commands.Add($"set_intention:{intention}");
+        public void MoveTo(AbstractAI ai, Location3D destination) => throw Unexpected();
+        public void StartFollow(AbstractAI ai, Creature target, int range = -1) => throw Unexpected();
+        public void StopFollow(AbstractAI ai) => Commands.Add("stop_follow");
+        public void StopMovement(AbstractAI ai) => throw Unexpected();
+        public void SetTarget(Creature actor, WorldObject? target)
+        {
+            actor.setTarget(target);
+            Commands.Add(target == null ? "clear_target" : "set_target");
+        }
+        public void SetRunning(Creature actor) => throw Unexpected();
+        public void SetWalking(Creature actor) => Commands.Add("set_walking");
+        public void ReturnHome(Attackable npc) => Commands.Add("return_home");
+        public void RestoreFullHealth(Creature actor) => throw Unexpected();
+        public void Teleport(Creature actor, Location destination, bool randomOffset) => throw Unexpected();
+        public void AbortAttack(Creature actor) => Commands.Add("abort_attack");
+        public void Cast(Creature actor, Skill skill, Item? item = null, bool forceUse = false, bool dontMove = false) =>
+            throw Unexpected();
+        public void AutoAttack(Creature actor, Creature target) => throw Unexpected();
+        public void AddThreat(Attackable npc, Creature target, long damage, long hate) => throw Unexpected();
+        public void StopHating(Attackable npc, Creature? target) => throw Unexpected();
+        public void ClearCombatMemory(Attackable npc)
+        {
+            npc.clearAggroList();
+            npc.getAttackByList().clear();
+            Commands.Add("clear_combat_memory");
+        }
+        public void PickUpDroppedItem(Attackable npc, Item item) => throw Unexpected();
+
+        private static Exception Unexpected() => new InvalidOperationException("Unexpected command in pursuit-reset test.");
     }
 
     private sealed class DeterministicRandomSource: INpcRandomSource

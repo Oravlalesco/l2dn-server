@@ -14,6 +14,25 @@ public enum NpcIntentType
     StopCombat = 8
 }
 
+public enum NpcApproachConstraint
+{
+    None = 0,
+    TowardSpawnOnly = 1
+}
+
+public enum NpcReturnHomeMode
+{
+    ResetCombat = 0,
+    PreserveThreat = 1,
+    TeleportReset = 2
+}
+
+public enum NpcTargetAcquisitionMode
+{
+    Engage = 0,
+    PreserveMovement = 1
+}
+
 public sealed record NpcIntentEnvelope(
     int SchemaVersion,
     NpcKey Actor,
@@ -52,10 +71,16 @@ public abstract record NpcIntent
 public sealed record AcquireTargetIntent: NpcIntent
 {
     [JsonConstructor]
-    public AcquireTargetIntent(NpcIntentEnvelope envelope, EntityKey target)
-        : base(envelope, NpcIntentType.AcquireTarget) => Target = target;
+    public AcquireTargetIntent(NpcIntentEnvelope envelope, EntityKey target,
+        NpcTargetAcquisitionMode mode = NpcTargetAcquisitionMode.Engage)
+        : base(envelope, NpcIntentType.AcquireTarget)
+    {
+        Target = target;
+        Mode = mode;
+    }
 
     public EntityKey Target { get; }
+    public NpcTargetAcquisitionMode Mode { get; }
 }
 
 public sealed record ClearTargetIntent: NpcIntent
@@ -79,25 +104,32 @@ public sealed record BasicAttackIntent: NpcIntent
 public sealed record ApproachTargetIntent: NpcIntent
 {
     [JsonConstructor]
-    public ApproachTargetIntent(NpcIntentEnvelope envelope, EntityKey target, int preferredRange)
+    public ApproachTargetIntent(NpcIntentEnvelope envelope, EntityKey target, int preferredRange,
+        NpcApproachConstraint constraint = NpcApproachConstraint.None)
         : base(envelope, NpcIntentType.ApproachTarget)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(preferredRange);
         Target = target;
         PreferredRange = preferredRange;
+        Constraint = constraint;
     }
 
     public EntityKey Target { get; }
     public int PreferredRange { get; }
+    public NpcApproachConstraint Constraint { get; }
 }
 
 public sealed record ReturnHomeIntent: NpcIntent
 {
     [JsonConstructor]
-    public ReturnHomeIntent(NpcIntentEnvelope envelope)
+    public ReturnHomeIntent(NpcIntentEnvelope envelope,
+        NpcReturnHomeMode mode = NpcReturnHomeMode.ResetCombat)
         : base(envelope, NpcIntentType.ReturnHome)
     {
+        Mode = mode;
     }
+
+    public NpcReturnHomeMode Mode { get; }
 }
 
 public sealed record FleeIntent: NpcIntent

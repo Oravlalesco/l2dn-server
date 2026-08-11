@@ -53,6 +53,9 @@ public static class NpcAiTelemetry
     private static readonly Counter<long> CommandCalls =
         Meter.CreateCounter<long>("l2dn.npc.command.calls", "{call}", "Commands executed by the legacy NPC command adapter.");
 
+    private static readonly Counter<long> GuardPursuitResets =
+        Meter.CreateCounter<long>("l2dn.npc.guard.pursuit_reset", "{reset}", "Guard pursuits ended after the legacy attack timeout.");
+
     private static readonly Counter<long> PerceptionCaptureCalls =
         Meter.CreateCounter<long>("l2dn.npc.perception.capture.count", "{capture}", "NPC perception captures completed.");
 
@@ -248,6 +251,9 @@ public static class NpcAiTelemetry
         ThinkErrors.Add(1, tags);
     }
 
+    internal static void RecordGuardPursuitReset(string outcome) =>
+        GuardPursuitResets.Add(1, new KeyValuePair<string, object?>("outcome", outcome));
+
     internal static void SetPerceptionMode(NpcPerceptionMode mode) =>
         Volatile.Write(ref _perceptionMode, (int)mode);
 
@@ -277,7 +283,10 @@ public static class NpcAiTelemetry
         }
         foreach (NpcIntent intent in decision.Intents)
         {
-            IntentsCreated.Add(1, new KeyValuePair<string, object?>("intent_type", intent.Envelope.IntentType.ToString()));
+            TagList intentTags = default;
+            intentTags.Add("intent_type", intent.Envelope.IntentType.ToString());
+            intentTags.Add("intent_policy", GetIntentPolicyTag(intent));
+            IntentsCreated.Add(1, intentTags);
         }
         activity?.SetTag("brain.layer", decision.Layer.ToString());
         activity?.SetTag("intent.count", decision.Intents.Length);
@@ -289,6 +298,7 @@ public static class NpcAiTelemetry
     {
         using Activity? activity = Activities.StartActivity("npc.intent.validate", ActivityKind.Internal);
         activity?.SetTag("intent.type", intent.Envelope.IntentType.ToString());
+        activity?.SetTag("intent.policy", GetIntentPolicyTag(intent));
         long startedAt = Stopwatch.GetTimestamp();
         NpcIntentExecutionResult result;
         try
@@ -302,6 +312,7 @@ public static class NpcAiTelemetry
 
         TagList tags = default;
         tags.Add("intent_type", intent.Envelope.IntentType.ToString());
+        tags.Add("intent_policy", GetIntentPolicyTag(intent));
         tags.Add("status", result.Status.ToString());
         tags.Add("reason", ToRejectionTag(result.RejectionReason));
         IntentValidationDuration.Record(Stopwatch.GetElapsedTime(startedAt).TotalSeconds, tags);
@@ -317,6 +328,14 @@ public static class NpcAiTelemetry
         activity?.SetTag("intent.rejection_reason", ToRejectionTag(result.RejectionReason));
         return result;
     }
+
+    private static string GetIntentPolicyTag(NpcIntent intent) => intent switch
+    {
+        AcquireTargetIntent acquire => acquire.Mode.ToString(),
+        ApproachTargetIntent approach => approach.Constraint.ToString(),
+        ReturnHomeIntent returnHome => returnHome.Mode.ToString(),
+        _ => "default"
+    };
 
     internal static void RecordShadowComparison(NpcIntentComparisonKind comparison)
     {

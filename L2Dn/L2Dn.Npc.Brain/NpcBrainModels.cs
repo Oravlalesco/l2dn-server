@@ -46,9 +46,20 @@ public sealed record NpcIntelligenceProfile(
     int PreferredRange,
     int LeashDistance);
 
+public sealed record NpcReturnDefensePolicy(
+    bool Enabled,
+    int TimeoutWorldTicks,
+    int LeashGraceWorldTicks = 200,
+    int MaxLeashExcursions = 3,
+    int HardLeashExtension = 500)
+{
+    public static NpcReturnDefensePolicy Default { get; } = new(true, 1200, 200, 3, 500);
+}
+
 public sealed record NpcBrainContext(
     NpcBrainStimulus Stimuli,
-    NpcIntelligenceProfile? Profile = null);
+    NpcIntelligenceProfile? Profile = null,
+    NpcReturnDefensePolicy? ReturnDefense = null);
 
 public sealed record NpcBrainDecision
 {

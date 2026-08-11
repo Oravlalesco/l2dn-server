@@ -12,9 +12,9 @@ internal static class NpcThinkExecutorFactory
         return options.Mode switch
         {
             NpcBrainMode.Shadow => new ShadowNpcThinkExecutor(LegacyNpcThinkExecutor.Instance,
-                new NpcBrainCoordinator()),
+                new NpcBrainCoordinator(), options.ReturnDefense),
             NpcBrainMode.Intent => new BrainNpcThinkExecutor(LegacyNpcThinkExecutor.Instance,
-                new NpcBrainCoordinator(), NpcIntentGateway.Instance),
+                new NpcBrainCoordinator(), NpcIntentGateway.Instance, options.ReturnDefense),
             _ => LegacyNpcThinkExecutor.Instance
         };
     }

@@ -5,10 +5,11 @@ namespace L2Dn.NpcBrain;
 public sealed class ReflexBrain
 {
     internal NpcIntent? Decide(NpcPerceptionSnapshot perception, NpcBrainContext context,
-        NpcIntelligenceProfile profile, long decisionSequence)
+        NpcIntelligenceProfile profile, NpcBrainState state, long decisionSequence)
     {
         if (!profile.ReflexEnabled || !NpcPerceptionFacts.IsActorOperational(perception))
         {
+            ResetReturnState(state);
             return null;
         }
 
@@ -19,36 +20,183 @@ public sealed class ReflexBrain
         if (environment.SpawnPosition is { } spawn)
         {
             double distanceFromSpawn = NpcPerceptionFacts.Distance2D(perception.State.Physical.Position, spawn);
-            int returnHomeDistance = environment.ReturnHomeDistance > 0
-                ? environment.ReturnHomeDistance
-                : profile.LeashDistance;
+            int returnHomeDistance = environment.ReturnHomeDistance;
             int combatLeashDistance = environment.CombatLeashDistance;
+            bool atHome = returnHomeDistance > 0 && distanceFromSpawn <= returnHomeDistance;
+            bool outsideCombatLeash = combatLeashDistance > 0 && distanceFromSpawn > combatLeashDistance;
+            bool attacked = (context.Stimuli & NpcBrainStimulus.Attacked) != 0;
+            bool threatChanged = (context.Stimuli & NpcBrainStimulus.ThreatChanged) != 0;
+            NpcReturnDefensePolicy defensePolicy = context.ReturnDefense ?? NpcReturnDefensePolicy.Default;
+            bool outsideHardLeash = outsideCombatLeash && defensePolicy.HardLeashExtension >= 0 &&
+                distanceFromSpawn > (long)combatLeashDistance + defensePolicy.HardLeashExtension;
 
-            bool outsideCombatLeash = currentTarget.HasValue && combatLeashDistance > 0 &&
-                distanceFromSpawn > combatLeashDistance;
-            bool outsideHomeRange = !currentTarget.HasValue && returnHomeDistance > 0 &&
-                distanceFromSpawn > returnHomeDistance;
-            if (environment.CanReturnToSpawn && !environment.ReturningToSpawn &&
-                (outsideCombatLeash || outsideHomeRange))
+            if (environment.ReturningToSpawn && state.ReturnState == NpcReturnEngagementState.None)
             {
-                return new ReturnHomeIntent(Envelope(snapshot, decisionSequence, NpcIntentType.ReturnHome));
+                state.ReturnState = NpcReturnEngagementState.ReturningHome;
             }
 
-            // Match legacy MOVE_TO behavior: a mere spectator cannot interrupt the
-            // return, but a new attack/aggression event with authoritative hate can.
+            if (state.ReturnState == NpcReturnEngagementState.LeashGrace)
+            {
+                if (!outsideCombatLeash)
+                {
+                    ResumeCombat(state);
+                }
+                else if (outsideHardLeash || GraceExpired(state, snapshot.WorldTick))
+                {
+                    if (!defensePolicy.Enabled || !highestThreat.HasValue)
+                    {
+                        SetReturningHome(state);
+                        return ReturnHome(snapshot, decisionSequence, NpcReturnHomeMode.ResetCombat);
+                    }
+
+                    EnterDefensiveReturn(state, highestThreat.Value, snapshot.WorldTick,
+                        defensePolicy.TimeoutWorldTicks);
+                    state.ReturnMovementIssued = true;
+                    return ReturnHome(snapshot, decisionSequence, NpcReturnHomeMode.PreserveThreat);
+                }
+            }
+
+            if (state.ReturnState == NpcReturnEngagementState.DefensiveReturn)
+            {
+                if (atHome)
+                {
+                    ResetReturnState(state);
+                    return new StopCombatIntent(Envelope(snapshot, decisionSequence, NpcIntentType.StopCombat));
+                }
+
+                bool threatOutsideCombatLeash = combatLeashDistance > 0 && highestThreat.HasValue &&
+                    !IsEntityInsideLeash(perception, highestThreat.Value, spawn, combatLeashDistance);
+                if (!outsideCombatLeash && !threatOutsideCombatLeash)
+                {
+                    // Ordinary pursuit resumes only after both actor and threat are
+                    // back inside the authoritative territory.
+                    ResumeCombat(state);
+                }
+                else
+                {
+                    if ((attacked || threatChanged) && defensePolicy.TimeoutWorldTicks > 0)
+                    {
+                        state.ReturnDefenseExpiresAtWorldTick = AddSaturating(snapshot.WorldTick,
+                            defensePolicy.TimeoutWorldTicks);
+                    }
+
+                    if (!defensePolicy.Enabled || DefenseExpired(state, snapshot.WorldTick) ||
+                        !highestThreat.HasValue)
+                    {
+                        SetReturningHome(state);
+                        return ReturnHome(snapshot, decisionSequence, NpcReturnHomeMode.ResetCombat);
+                    }
+
+                    if (state.ReturnDefenseTarget != highestThreat)
+                    {
+                        state.ReturnDefenseTarget = highestThreat;
+                        state.ReturnMovementIssued = false;
+                    }
+
+                    if (!currentTarget.HasValue || currentTarget != highestThreat ||
+                        !NpcPerceptionFacts.TryGetValidTarget(perception, currentTarget.Value, out _, out _))
+                    {
+                        return new AcquireTargetIntent(
+                            Envelope(snapshot, decisionSequence, NpcIntentType.AcquireTarget),
+                            highestThreat.Value, NpcTargetAcquisitionMode.PreserveMovement);
+                    }
+
+                    // Tactical decides whether to attack in place, approach homeward,
+                    // or keep returning without discarding the current hate table.
+                    return null;
+                }
+            }
+
+            if (outsideCombatLeash && currentTarget.HasValue)
+            {
+                if (!highestThreat.HasValue)
+                {
+                    SetReturningHome(state);
+                    return ReturnHome(snapshot, decisionSequence, NpcReturnHomeMode.ResetCombat);
+                }
+
+                if (!defensePolicy.Enabled)
+                {
+                    SetReturningHome(state);
+                    return ReturnHome(snapshot, decisionSequence, NpcReturnHomeMode.ResetCombat);
+                }
+
+                EnterLeashGrace(state, snapshot.WorldTick, defensePolicy.LeashGraceWorldTicks);
+                if (ShouldTeleportHome(state, defensePolicy) || outsideHardLeash)
+                {
+                    if (ShouldTeleportHome(state, defensePolicy))
+                    {
+                        ResetReturnState(state);
+                        return ReturnHome(snapshot, decisionSequence, NpcReturnHomeMode.TeleportReset);
+                    }
+
+                    if (defensePolicy.Enabled)
+                    {
+                        EnterDefensiveReturn(state, highestThreat.Value, snapshot.WorldTick,
+                            defensePolicy.TimeoutWorldTicks);
+                        state.ReturnMovementIssued = true;
+                        return ReturnHome(snapshot, decisionSequence, NpcReturnHomeMode.PreserveThreat);
+                    }
+
+                    SetReturningHome(state);
+                    return ReturnHome(snapshot, decisionSequence, NpcReturnHomeMode.ResetCombat);
+                }
+
+                // Crossing the soft leash opens one fixed grace window. Damage does
+                // not renew it, so a ranged attacker cannot keep the chase alive forever.
+            }
+
             if (environment.ReturningToSpawn && returnHomeDistance > 0 &&
                 distanceFromSpawn > returnHomeDistance)
             {
-                NpcBrainStimulus interruptingStimuli = NpcBrainStimulus.Attacked |
-                    NpcBrainStimulus.ThreatChanged | NpcBrainStimulus.AllyAttacked;
-                if ((context.Stimuli & interruptingStimuli) != 0 && highestThreat.HasValue)
+                state.ReturnState = NpcReturnEngagementState.ReturningHome;
+                if (attacked && highestThreat.HasValue)
                 {
+                    if (outsideCombatLeash &&
+                        (!defensePolicy.Enabled || defensePolicy.TimeoutWorldTicks <= 0))
+                    {
+                        SetReturningHome(state);
+                        return ReturnHome(snapshot, decisionSequence, NpcReturnHomeMode.ResetCombat);
+                    }
+
+                    if (outsideCombatLeash)
+                    {
+                        EnterDefensiveReturn(state, highestThreat.Value, snapshot.WorldTick,
+                            defensePolicy.TimeoutWorldTicks);
+                    }
+                    else
+                    {
+                        ResumeCombat(state);
+                    }
+
                     return new AcquireTargetIntent(
                         Envelope(snapshot, decisionSequence, NpcIntentType.AcquireTarget),
-                        highestThreat.Value);
+                        highestThreat.Value, outsideCombatLeash
+                            ? NpcTargetAcquisitionMode.PreserveMovement
+                            : NpcTargetAcquisitionMode.Engage);
                 }
+
+                // Visibility and faction events alone never interrupt a physical return.
                 return null;
             }
+
+            bool outsideHomeRange = !currentTarget.HasValue && returnHomeDistance > 0 &&
+                distanceFromSpawn > returnHomeDistance;
+            if (environment.CanReturnToSpawn && outsideHomeRange)
+            {
+                SetReturningHome(state);
+                return ReturnHome(snapshot, decisionSequence, NpcReturnHomeMode.ResetCombat);
+            }
+
+            if (atHome && !currentTarget.HasValue &&
+                (state.ReturnState != NpcReturnEngagementState.None || state.LeashExcursionCount > 0))
+            {
+                ResetReturnState(state);
+            }
+        }
+        else
+        {
+            ResetReturnState(state);
         }
 
         if (currentTarget.HasValue)
@@ -65,8 +213,6 @@ public sealed class ReflexBrain
                     currentTarget);
             }
 
-            // Legacy thinkAttack() continuously follows getMostHated(). The current
-            // target is therefore not sticky when another visible attacker has won hate.
             if (highestThreat.HasValue && highestThreat.Value != currentTarget.Value)
             {
                 return new AcquireTargetIntent(
@@ -92,6 +238,82 @@ public sealed class ReflexBrain
 
         return null;
     }
+
+    private static bool DefenseExpired(NpcBrainState state, long worldTick) =>
+        !state.ReturnDefenseTarget.HasValue || worldTick >= state.ReturnDefenseExpiresAtWorldTick;
+
+    private static bool GraceExpired(NpcBrainState state, long worldTick) =>
+        state.LeashGraceExpiresAtWorldTick <= 0 || worldTick >= state.LeashGraceExpiresAtWorldTick;
+
+    private static bool ShouldTeleportHome(NpcBrainState state, NpcReturnDefensePolicy policy) =>
+        policy.MaxLeashExcursions > 0 && state.LeashExcursionCount >= policy.MaxLeashExcursions;
+
+    private static bool IsEntityInsideLeash(NpcPerceptionSnapshot perception, EntityKey entity,
+        NpcPosition spawn, int combatLeashDistance) =>
+        NpcPerceptionFacts.TryGetVisibleEntity(perception, entity, out VisibleEntity visible) &&
+        NpcPerceptionFacts.Distance2D(visible.Position, spawn) <= combatLeashDistance;
+
+    private static void EnterDefensiveReturn(NpcBrainState state, EntityKey target, long worldTick,
+        int timeoutWorldTicks)
+    {
+        state.ReturnState = NpcReturnEngagementState.DefensiveReturn;
+        state.ReturnDefenseTarget = target;
+        state.ReturnDefenseExpiresAtWorldTick = timeoutWorldTicks > 0
+            ? AddSaturating(worldTick, timeoutWorldTicks)
+            : worldTick;
+        state.LeashGraceExpiresAtWorldTick = 0;
+        state.ReturnMovementIssued = false;
+    }
+
+    private static void EnterLeashGrace(NpcBrainState state, long worldTick, int graceWorldTicks)
+    {
+        if (state.ReturnState == NpcReturnEngagementState.LeashGrace)
+        {
+            return;
+        }
+
+        state.ReturnState = NpcReturnEngagementState.LeashGrace;
+        state.LeashExcursionCount = state.LeashExcursionCount == int.MaxValue
+            ? int.MaxValue
+            : state.LeashExcursionCount + 1;
+        state.LeashGraceExpiresAtWorldTick = graceWorldTicks > 0
+            ? AddSaturating(worldTick, graceWorldTicks)
+            : worldTick;
+        state.ReturnDefenseTarget = null;
+        state.ReturnDefenseExpiresAtWorldTick = 0;
+        state.ReturnMovementIssued = false;
+    }
+
+    private static void SetReturningHome(NpcBrainState state)
+    {
+        state.ReturnState = NpcReturnEngagementState.ReturningHome;
+        state.ReturnDefenseTarget = null;
+        state.ReturnDefenseExpiresAtWorldTick = 0;
+        state.LeashGraceExpiresAtWorldTick = 0;
+        state.ReturnMovementIssued = false;
+    }
+
+    private static void ResumeCombat(NpcBrainState state)
+    {
+        state.ReturnState = NpcReturnEngagementState.None;
+        state.ReturnDefenseTarget = null;
+        state.ReturnDefenseExpiresAtWorldTick = 0;
+        state.LeashGraceExpiresAtWorldTick = 0;
+        state.ReturnMovementIssued = false;
+    }
+
+    private static void ResetReturnState(NpcBrainState state)
+    {
+        ResumeCombat(state);
+        state.LeashExcursionCount = 0;
+    }
+
+    private static ReturnHomeIntent ReturnHome(NpcPerceptionEnvelope snapshot, long sequence,
+        NpcReturnHomeMode mode) =>
+        new(Envelope(snapshot, sequence, NpcIntentType.ReturnHome), mode);
+
+    private static long AddSaturating(long value, int increment) =>
+        increment > 0 && value > long.MaxValue - increment ? long.MaxValue : value + increment;
 
     private static NpcIntentEnvelope Envelope(NpcPerceptionEnvelope snapshot, long sequence, NpcIntentType type) =>
         new(NpcIntent.CurrentSchemaVersion, snapshot.Npc, snapshot.StateRevision, sequence, type);

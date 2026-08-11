@@ -10,17 +10,61 @@ public sealed class TacticalBrain
         _evaluator = evaluator ?? new TacticalActionEvaluator();
 
     internal NpcIntent? Decide(NpcPerceptionSnapshot perception, NpcIntelligenceProfile profile,
-        long decisionSequence)
+        NpcBrainState state, long decisionSequence)
     {
         if (!profile.TacticalEnabled || !NpcPerceptionFacts.IsActorOperational(perception) ||
             perception.State.Combat.CurrentTarget is not { } target ||
-            !NpcPerceptionFacts.TryGetValidTarget(perception, target, out _, out double distance))
+            !NpcPerceptionFacts.TryGetValidTarget(perception, target, out VisibleEntity visibleTarget,
+                out double distance))
         {
             return null;
         }
 
-        NpcTacticalScore score = _evaluator.Evaluate(perception, profile, distance);
+        double targetCollisionRadius = visibleTarget.Entity == target ? visibleTarget.CollisionRadius : 0;
+        NpcTacticalScore score = _evaluator.Evaluate(perception, profile, distance, targetCollisionRadius);
         NpcPerceptionEnvelope snapshot = perception.Envelope;
+        bool defensiveReturn = state.ReturnState == NpcReturnEngagementState.DefensiveReturn;
+        if (defensiveReturn && score.Action == NpcTacticalAction.Flee)
+        {
+            if (state.ReturnMovementIssued)
+            {
+                return null;
+            }
+
+            state.ReturnMovementIssued = true;
+            return new ReturnHomeIntent(Envelope(snapshot, decisionSequence, NpcIntentType.ReturnHome),
+                NpcReturnHomeMode.PreserveThreat);
+        }
+
+        if (defensiveReturn && score.Action == NpcTacticalAction.Approach)
+        {
+            if (perception.State.Environment.SpawnPosition is not { } spawn ||
+                !NpcPerceptionFacts.TryGetVisibleEntity(perception, target, out VisibleEntity visible) ||
+                NpcPerceptionFacts.Distance2D(visible.Position, spawn) >
+                NpcPerceptionFacts.Distance2D(perception.State.Physical.Position, spawn))
+            {
+                if (state.ReturnMovementIssued)
+                {
+                    return null;
+                }
+
+                state.ReturnMovementIssued = true;
+                return new ReturnHomeIntent(Envelope(snapshot, decisionSequence, NpcIntentType.ReturnHome),
+                    NpcReturnHomeMode.PreserveThreat);
+            }
+
+            state.ReturnMovementIssued = false;
+            return new ApproachTargetIntent(
+                Envelope(snapshot, decisionSequence, NpcIntentType.ApproachTarget), target,
+                score.DesiredRange > 0 ? score.DesiredRange : perception.State.Combat.PhysicalAttackRange,
+                NpcApproachConstraint.TowardSpawnOnly);
+        }
+
+        if (defensiveReturn)
+        {
+            state.ReturnMovementIssued = false;
+        }
+
         return score.Action switch
         {
             NpcTacticalAction.BasicAttack => new BasicAttackIntent(
