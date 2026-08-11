@@ -238,6 +238,93 @@ public class NpcBrainTests
         intent.Should().BeOfType<BasicAttackIntent>().Which.Target.Should().Be(Player);
     }
 
+    [Theory]
+    [InlineData(LegacyNpcAiType.Fighter, NpcStrategyArchetype.AggressivePressure)]
+    [InlineData(LegacyNpcAiType.Mage, NpcStrategyArchetype.RangedControl)]
+    [InlineData(LegacyNpcAiType.Healer, NpcStrategyArchetype.Survival)]
+    [InlineData(LegacyNpcAiType.Balanced, NpcStrategyArchetype.Balanced)]
+    public void Strategy_profile_is_resolved_deterministically_from_immutable_identity(
+        LegacyNpcAiType aiType, NpcStrategyArchetype expected)
+    {
+        NpcPerceptionSnapshot perception = CreatePerception(legacyAiType: aiType);
+        NpcIntelligenceProfile intelligence = NpcIntelligenceProfileResolver.Instance
+            .Resolve(perception.State.Identity);
+
+        NpcStrategyProfile first = NpcStrategyProfileResolver.Instance
+            .Resolve(perception.State.Identity, intelligence);
+        NpcStrategyProfile second = NpcStrategyProfileResolver.Instance
+            .Resolve(perception.State.Identity, intelligence);
+
+        first.Archetype.Should().Be(expected);
+        second.Should().BeSameAs(first);
+    }
+
+    [Fact]
+    public void Template_strategy_overrides_are_copied_and_cannot_be_mutated_after_registration()
+    {
+        Dictionary<int, NpcStrategyProfile> overrides = new()
+        {
+            [100] = NpcStrategyProfileResolver.Survival
+        };
+        NpcStrategyProfileResolver resolver = new(overrides);
+        overrides[100] = NpcStrategyProfileResolver.AggressivePressure;
+        NpcPerceptionSnapshot perception = CreatePerception();
+        NpcIntelligenceProfile intelligence = NpcIntelligenceProfileResolver.Instance
+            .Resolve(perception.State.Identity);
+
+        resolver.Resolve(perception.State.Identity, intelligence)
+            .Should().BeSameAs(NpcStrategyProfileResolver.Survival);
+    }
+
+    [Fact]
+    public void Ranged_strategy_approaches_to_its_profile_range()
+    {
+        NpcSkillObservation skill = new(107, 2, 800, 20, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 1_000)], skills: [skill], legacyAiType: LegacyNpcAiType.Mage);
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception, Context());
+
+        decision.Strategy.Should().Be(NpcStrategyArchetype.RangedControl);
+        decision.Intents.Should().ContainSingle().Which.Should().BeOfType<ApproachTargetIntent>()
+            .Which.PreferredRange.Should().Be(600);
+    }
+
+    [Fact]
+    public void Survival_strategy_prefers_an_early_heal_over_an_offensive_skill()
+    {
+        NpcSkillObservation heal = new(205, 1, 0, 10, NpcSkillCategory.Heal,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcSkillObservation offensive = new(107, 2, 600, 20, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 30)], skills: [offensive, heal], hp: 40);
+
+        CastSkillIntent intent = (CastSkillIntent)new NpcBrainCoordinator().Decide(perception,
+            new NpcBrainContext(NpcBrainStimulus.PeriodicDue, StrategyProfile:
+                NpcStrategyProfileResolver.Survival)).Intents.Single();
+
+        intent.SkillId.Should().Be(205);
+        intent.Target.Should().Be(new EntityKey(Actor.ObjectId, Actor.Generation, EntityKind.Npc));
+    }
+
+    [Fact]
+    public void Aggressive_strategy_lowers_flee_threshold_without_bypassing_reflex_authority()
+    {
+        NpcIntelligenceProfile intelligence = new(NpcIntelligenceArchetype.BasicMeleeMob,
+            true, true, true, true, 20, 0, 200);
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 30)], hp: 10);
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception,
+            new NpcBrainContext(NpcBrainStimulus.Attacked, intelligence,
+                StrategyProfile: NpcStrategyProfileResolver.AggressivePressure));
+
+        decision.Strategy.Should().Be(NpcStrategyArchetype.AggressivePressure);
+        decision.Intents.Should().ContainSingle().Which.Should().BeOfType<BasicAttackIntent>();
+    }
+
     [Fact]
     public void Caster_without_ready_skill_approaches_physical_attack_range()
     {
@@ -806,10 +893,11 @@ public class NpcBrainTests
         double hp = 100,
         long revision = 1,
         long? worldTick = null,
-        int combatLeashDistance = 1500)
+        int combatLeashDistance = 1500,
+        LegacyNpcAiType legacyAiType = LegacyNpcAiType.Fighter)
     {
         NpcKey npc = actor ?? Actor;
-        NpcIdentity identity = new(100, NpcKind.Monster, LegacyNpcAiType.Fighter, 20, 300, [], capabilities);
+        NpcIdentity identity = new(100, NpcKind.Monster, legacyAiType, 20, 300, [], capabilities);
         NpcPhysicalState physical = new(position ?? new NpcPosition(0, 0, 0, 0), hp, 100, 50, 50, 8, 16,
             physicalFlags);
         NpcCombatFacts combat = new(target, 40, 500, NpcCombatFlags.None);

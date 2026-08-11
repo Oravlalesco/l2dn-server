@@ -7,20 +7,25 @@ public sealed class NpcBrainCoordinator: INpcBrain
 {
     private readonly NpcBrainStateStore _states;
     private readonly NpcIntelligenceProfileResolver _profiles;
+    private readonly NpcStrategyProfileResolver _strategyProfiles;
+    private readonly StrategyBrain _strategy;
     private readonly ReflexBrain _reflex;
     private readonly TacticalBrain _tactical;
 
     public NpcBrainCoordinator()
         : this(new NpcBrainStateStore(), NpcIntelligenceProfileResolver.Instance,
-            new ReflexBrain(), new TacticalBrain())
+            NpcStrategyProfileResolver.Instance, new StrategyBrain(), new ReflexBrain(), new TacticalBrain())
     {
     }
 
     internal NpcBrainCoordinator(NpcBrainStateStore states, NpcIntelligenceProfileResolver profiles,
+        NpcStrategyProfileResolver strategyProfiles, StrategyBrain strategy,
         ReflexBrain reflex, TacticalBrain tactical)
     {
         _states = states;
         _profiles = profiles;
+        _strategyProfiles = strategyProfiles;
+        _strategy = strategy;
         _reflex = reflex;
         _tactical = tactical;
     }
@@ -50,11 +55,15 @@ public sealed class NpcBrainCoordinator: INpcBrain
     {
         long sequence = ++state.DecisionSequence;
         NpcIntelligenceProfile profile = context.Profile ?? _profiles.Resolve(perception.State.Identity);
-        NpcIntent? intent = _reflex.Decide(perception, context, profile, state, sequence);
+        NpcStrategyProfile strategyProfile = context.StrategyProfile ?? (context.Profile == null
+            ? _strategyProfiles.Resolve(perception.State.Identity, profile)
+            : NpcStrategyProfileResolver.Balanced);
+        NpcStrategyDecision strategy = _strategy.Decide(perception, profile, strategyProfile);
+        NpcIntent? intent = _reflex.Decide(perception, context, profile, strategy, state, sequence);
         NpcBrainLayer layer = intent == null ? NpcBrainLayer.None : NpcBrainLayer.Reflex;
         if (intent == null)
         {
-            intent = _tactical.Decide(perception, profile, state, sequence);
+            intent = _tactical.Decide(perception, profile, strategy, state, sequence);
             layer = intent == null ? NpcBrainLayer.None : NpcBrainLayer.Tactical;
         }
 
@@ -62,8 +71,9 @@ public sealed class NpcBrainCoordinator: INpcBrain
         state.LastDecision = intent?.Envelope.IntentType;
         state.LastDecisionWorldTick = perception.Envelope.WorldTick;
         state.FleeMode = intent is FleeIntent;
+        state.LastStrategy = strategy.Archetype;
 
         ImmutableArray<NpcIntent> intents = intent == null ? [] : [intent];
-        return new NpcBrainDecision(perception.Envelope.Npc, sequence, layer, intents);
+        return new NpcBrainDecision(perception.Envelope.Npc, sequence, layer, intents, strategy.Archetype);
     }
 }

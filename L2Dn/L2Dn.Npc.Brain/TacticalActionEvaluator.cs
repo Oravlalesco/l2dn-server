@@ -20,11 +20,14 @@ public readonly record struct NpcTacticalScore(
 public sealed class TacticalActionEvaluator
 {
     public NpcTacticalScore Evaluate(NpcPerceptionSnapshot perception, NpcIntelligenceProfile profile,
-        double targetDistance, double targetCollisionRadius = 0)
+        NpcStrategyDecision strategy, double targetDistance, double targetCollisionRadius = 0)
     {
-        if (profile.FleeAllowed && NpcPerceptionFacts.HpPercent(perception.State.Physical) <= profile.FleeHpPercent)
+        NpcTacticalScore selected = default;
+        double hpPercent = NpcPerceptionFacts.HpPercent(perception.State.Physical);
+        if (profile.FleeAllowed && hpPercent <= strategy.EffectiveFleeHpPercent)
         {
-            return new NpcTacticalScore(NpcTacticalAction.Flee, 100);
+            selected = Prefer(selected,
+                new NpcTacticalScore(NpcTacticalAction.Flee, strategy.Profile.FleeScore));
         }
 
         NpcSkillObservation? heal = perception.State.Skills
@@ -34,9 +37,10 @@ public sealed class TacticalActionEvaluator
             .ThenBy(static skill => skill.SkillId)
             .Cast<NpcSkillObservation?>()
             .FirstOrDefault();
-        if (heal.HasValue && NpcPerceptionFacts.HpPercent(perception.State.Physical) <= 35)
+        if (heal.HasValue && hpPercent <= Math.Clamp(strategy.Profile.HealHpPercent, 0, 100))
         {
-            return new NpcTacticalScore(NpcTacticalAction.CastSkill, 100, heal);
+            selected = Prefer(selected, new NpcTacticalScore(NpcTacticalAction.CastSkill,
+                strategy.Profile.HealScore, heal));
         }
 
         NpcSkillObservation? offensive = perception.State.Skills
@@ -52,21 +56,29 @@ public sealed class TacticalActionEvaluator
             double collisionPadding = perception.State.Physical.CollisionRadius + targetCollisionRadius;
             if (skillRange <= 0 || targetDistance <= skillRange + collisionPadding)
             {
-                return new NpcTacticalScore(NpcTacticalAction.CastSkill, 90, offensive);
+                selected = Prefer(selected, new NpcTacticalScore(NpcTacticalAction.CastSkill,
+                    strategy.Profile.OffensiveSkillScore, offensive));
             }
-
-            int desiredRange = profile.PreferredRange > 0
-                ? Math.Min(profile.PreferredRange, skillRange)
-                : skillRange;
-            return new NpcTacticalScore(NpcTacticalAction.Approach, 80, offensive,
-                Math.Max(1, desiredRange));
+            else
+            {
+                int desiredRange = strategy.EffectivePreferredRange > 0
+                    ? Math.Min(strategy.EffectivePreferredRange, skillRange)
+                    : skillRange;
+                selected = Prefer(selected, new NpcTacticalScore(NpcTacticalAction.Approach,
+                    strategy.Profile.ApproachScore, offensive, Math.Max(1, desiredRange)));
+            }
         }
 
         int physicalAttackRange = Math.Max(1, perception.State.Combat.PhysicalAttackRange);
         double physicalReach = physicalAttackRange + perception.State.Physical.CollisionRadius +
             targetCollisionRadius;
-        return targetDistance > physicalReach
-            ? new NpcTacticalScore(NpcTacticalAction.Approach, 80, null, physicalAttackRange)
-            : new NpcTacticalScore(NpcTacticalAction.BasicAttack, 60);
+        NpcTacticalScore physical = targetDistance > physicalReach
+            ? new NpcTacticalScore(NpcTacticalAction.Approach, strategy.Profile.ApproachScore,
+                null, physicalAttackRange)
+            : new NpcTacticalScore(NpcTacticalAction.BasicAttack, strategy.Profile.BasicAttackScore);
+        return Prefer(selected, physical);
     }
+
+    private static NpcTacticalScore Prefer(NpcTacticalScore current, NpcTacticalScore candidate) =>
+        candidate.Score > current.Score ? candidate : current;
 }

@@ -12,6 +12,7 @@ using L2Dn.GameServer.Model.InstanceZones;
 using L2Dn.GameServer.Model.Items.Instances;
 using L2Dn.GameServer.Model.Skills;
 using L2Dn.Geometry;
+using L2Dn.NpcBrain;
 using L2Dn.NpcContracts;
 using System.Collections.Immutable;
 
@@ -620,6 +621,8 @@ public class NpcAiRuntimeTests
             static result => result ? "allowed" : "blocked");
         NpcAiTelemetry.ObserveCommand("test_command", static () => { });
         NpcAiTelemetry.RecordGuardPursuitReset("return_home");
+        NpcAiTelemetry.ObserveBrainDecision(() => new NpcBrainDecision(
+            new NpcKey(1, 1), 1, NpcBrainLayer.Tactical, [], NpcStrategyArchetype.RangedControl));
         NpcAiTelemetry.SetPerceptionMode(NpcPerceptionMode.CaptureOnly);
         NpcAiTelemetry.SetReactiveSchedulerMode(NpcReactiveSchedulerMode.Enabled);
         NpcAiTelemetry.SetBrainMode(NpcBrainMode.Intent);
@@ -637,6 +640,8 @@ public class NpcAiRuntimeTests
             item.Tags.Any(tag => tag.Key == "outcome" && Equals(tag.Value, "success")));
         measurements.Should().Contain(item => item.Name == "l2dn.npc.guard.pursuit_reset" &&
             item.Tags.Any(tag => tag.Key == "outcome" && Equals(tag.Value, "return_home")));
+        measurements.Should().Contain(item => item.Name == "l2dn.npc.brain.decision.count" &&
+            item.Tags.Any(tag => tag.Key == "strategy" && Equals(tag.Value, "RangedControl")));
         measurements.Should().Contain(item => item.Name == "l2dn.npc.perception.mode" &&
             item.Tags.Any(tag => tag.Key == "mode" && Equals(tag.Value, "CaptureOnly")));
         measurements.Should().Contain(item => item.Name == "l2dn.npc.scheduler.reactive.mode" &&

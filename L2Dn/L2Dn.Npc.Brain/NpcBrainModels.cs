@@ -59,23 +59,26 @@ public sealed record NpcReturnDefensePolicy(
 public sealed record NpcBrainContext(
     NpcBrainStimulus Stimuli,
     NpcIntelligenceProfile? Profile = null,
-    NpcReturnDefensePolicy? ReturnDefense = null);
+    NpcReturnDefensePolicy? ReturnDefense = null,
+    NpcStrategyProfile? StrategyProfile = null);
 
 public sealed record NpcBrainDecision
 {
     public NpcBrainDecision(NpcKey actor, long decisionSequence, NpcBrainLayer layer,
-        ImmutableArray<NpcIntent> intents)
+        ImmutableArray<NpcIntent> intents, NpcStrategyArchetype strategy = NpcStrategyArchetype.Balanced)
     {
         Actor = actor;
         DecisionSequence = decisionSequence;
         Layer = layer;
         Intents = intents.IsDefault ? [] : intents;
+        Strategy = strategy;
     }
 
     public NpcKey Actor { get; }
     public long DecisionSequence { get; }
     public NpcBrainLayer Layer { get; }
     public ImmutableArray<NpcIntent> Intents { get; }
+    public NpcStrategyArchetype Strategy { get; }
 }
 
 public interface INpcBrain

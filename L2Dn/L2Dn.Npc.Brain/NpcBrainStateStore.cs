@@ -21,6 +21,7 @@ internal sealed class NpcBrainState
     public EntityKey? LastTarget { get; set; }
     public NpcIntentType? LastDecision { get; set; }
     public long LastDecisionWorldTick { get; set; }
+    public NpcStrategyArchetype LastStrategy { get; set; }
     public NpcReturnEngagementState ReturnState { get; set; }
     public bool FleeMode { get; set; }
     public EntityKey? ReturnDefenseTarget { get; set; }
@@ -36,6 +37,7 @@ internal readonly record struct NpcBrainStateSnapshot(
     EntityKey? LastTarget,
     NpcIntentType? LastDecision,
     long LastDecisionWorldTick,
+    NpcStrategyArchetype LastStrategy,
     NpcReturnEngagementState ReturnState,
     bool FleeMode,
     EntityKey? ReturnDefenseTarget,
@@ -103,7 +105,8 @@ internal sealed class NpcBrainStateStore
         lock (state.SyncRoot)
         {
             return new NpcBrainStateSnapshot(state.Npc, state.DecisionSequence, state.LastTarget,
-                state.LastDecision, state.LastDecisionWorldTick, state.ReturnState, state.FleeMode,
+                state.LastDecision, state.LastDecisionWorldTick, state.LastStrategy,
+                state.ReturnState, state.FleeMode,
                 state.ReturnDefenseTarget, state.ReturnDefenseExpiresAtWorldTick,
                 state.LeashGraceExpiresAtWorldTick, state.LeashExcursionCount, state.ReturnMovementIssued);
         }

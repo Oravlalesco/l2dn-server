@@ -270,6 +270,7 @@ public static class NpcAiTelemetry
         double elapsed = Stopwatch.GetElapsedTime(startedAt).TotalSeconds;
         TagList tags = default;
         tags.Add("layer", decision.Layer.ToString());
+        tags.Add("strategy", decision.Strategy.ToString());
         tags.Add("outcome", decision.Intents.IsEmpty ? "no_intent" : "intent");
         BrainDecisions.Add(1, tags);
         BrainDecisionDuration.Record(elapsed, tags);
