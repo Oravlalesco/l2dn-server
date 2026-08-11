@@ -64,7 +64,8 @@ public static class Broadcast
 					long relation = ((Player) creature).getRelation(player);
 					bool isAutoAttackable = creature.isAutoAttackable(player);
 					RelationCache? oldrelation = creature.getKnownRelations().get(player.ObjectId);
-					if ((oldrelation == null) || (oldrelation.getRelation() != relation) || (oldrelation.isAutoAttackable() != isAutoAttackable))
+					if (oldrelation == null || !oldrelation.Matches(relation, isAutoAttackable,
+						creature.getReputation(), creature.getPvpFlag()))
 					{
 						RelationChangedPacket rc = new RelationChangedPacket();
 						rc.addRelation((Player) creature, relation, isAutoAttackable);
@@ -81,7 +82,9 @@ public static class Broadcast
 							}
 						}
 						player.sendPacket(rc);
-						creature.getKnownRelations().put(player.ObjectId, new RelationCache(relation, isAutoAttackable));
+						creature.getKnownRelations().put(player.ObjectId,
+							new RelationCache(relation, isAutoAttackable, creature.getReputation(),
+								creature.getPvpFlag()));
 					}
 				}
 			}

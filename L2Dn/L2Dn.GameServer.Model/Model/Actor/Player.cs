@@ -1713,6 +1713,11 @@ public class Player: Playable
 			sendPacket(su);
 		}
 
+		// Modern clients also carry the PvP flag in the SOCIAL UserInfo block and
+		// CharacterInfo. Publish both representations so the local player and all
+		// observers update the purple-name state immediately.
+		broadcastUserInfo(UserInfoType.SOCIAL);
+
 		// If this player has a pet update the pets pvp flag as well
 		if (hasSummon())
 		{
@@ -1739,7 +1744,8 @@ public class Player: Playable
 			long relation = getRelation(player);
 			bool isAutoAttackable = this.isAutoAttackable(player);
 			RelationCache? oldrelation = getKnownRelations().get(player.ObjectId);
-			if (oldrelation == null || oldrelation.getRelation() != relation || oldrelation.isAutoAttackable() != isAutoAttackable)
+			if (oldrelation == null ||
+				!oldrelation.Matches(relation, isAutoAttackable, getReputation(), _pvpFlag))
 			{
 				RelationChangedPacket rc = new RelationChangedPacket();
 				rc.addRelation(this, relation, isAutoAttackable);
@@ -1756,7 +1762,8 @@ public class Player: Playable
 					}
 				}
 				player.sendPacket(rc);
-				getKnownRelations().put(player.ObjectId, new RelationCache(relation, isAutoAttackable));
+				getKnownRelations().put(player.ObjectId,
+					new RelationCache(relation, isAutoAttackable, getReputation(), _pvpFlag));
 			}
 		});
 	}
@@ -4239,7 +4246,8 @@ public class Player: Playable
 						long relation = getRelation(player);
 						bool isAutoAttackable = this.isAutoAttackable(player);
 						RelationCache? oldrelation = getKnownRelations().get(player.ObjectId);
-						if (oldrelation == null || oldrelation.getRelation() != relation || oldrelation.isAutoAttackable() != isAutoAttackable)
+						if (oldrelation == null ||
+							!oldrelation.Matches(relation, isAutoAttackable, getReputation(), _pvpFlag))
 						{
 							RelationChangedPacket rc = new RelationChangedPacket();
 							rc.addRelation(this, relation, isAutoAttackable);
@@ -4256,7 +4264,8 @@ public class Player: Playable
 								}
 							}
 							player.sendPacket(rc);
-							getKnownRelations().put(player.ObjectId, new RelationCache(relation, isAutoAttackable));
+							getKnownRelations().put(player.ObjectId,
+								new RelationCache(relation, isAutoAttackable, getReputation(), _pvpFlag));
 						}
 					}
 				});
@@ -5393,10 +5402,9 @@ public class Player: Playable
 		}
 
 		setPvpFlagLasts(DateTime.UtcNow + Config.Pvp.PVP_NORMAL_TIME);
-		if (_pvpFlag.IsUnflagged())
-		{
-			startPvPFlag();
-		}
+		// Idempotently re-register and immediately restore Enabled when a hostile
+		// action refreshes a flag that was already flashing.
+		startPvPFlag();
 	}
 
 	public void updatePvPStatus(Creature target)
@@ -5432,10 +5440,7 @@ public class Player: Playable
 			{
 				setPvpFlagLasts(DateTime.UtcNow + Config.Pvp.PVP_NORMAL_TIME);
 			}
-			if (_pvpFlag.IsUnflagged())
-			{
-				startPvPFlag();
-			}
+			startPvPFlag();
 		}
 	}
 
@@ -6533,7 +6538,8 @@ public class Player: Playable
 			long relation = getRelation(player);
 			bool isAutoAttackable = this.isAutoAttackable(player);
 			RelationCache? oldrelation = getKnownRelations().get(player.ObjectId);
-			if (oldrelation == null || oldrelation.getRelation() != relation || oldrelation.isAutoAttackable() != isAutoAttackable)
+			if (oldrelation == null ||
+				!oldrelation.Matches(relation, isAutoAttackable, getReputation(), _pvpFlag))
 			{
 				RelationChangedPacket rc = new RelationChangedPacket();
 				rc.addRelation(this, relation, isAutoAttackable);
@@ -6549,7 +6555,8 @@ public class Player: Playable
 					}
 				}
 				player.sendPacket(rc);
-				getKnownRelations().put(player.ObjectId, new RelationCache(relation, isAutoAttackable));
+				getKnownRelations().put(player.ObjectId,
+					new RelationCache(relation, isAutoAttackable, getReputation(), _pvpFlag));
 			}
 		});
 	}

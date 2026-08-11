@@ -162,11 +162,10 @@ public class SiegeZone: Zone
 			{
 				player.exitedNoLanding();
 			}
-			// Set pvp flag
-			if (player.getPvpFlag() == PvpFlagStatus.None)
-			{
-				player.startPvPFlag();
-			}
+			// Leaving a combat zone starts a complete normal PvP flag window. Refresh
+			// it even when the player was already flashing inside the siege.
+			player.setPvpFlagLasts(DateTime.UtcNow + Config.Pvp.PVP_NORMAL_TIME);
+			player.startPvPFlag();
 		}
 		if (creature.isPlayer() && player != null)
 		{

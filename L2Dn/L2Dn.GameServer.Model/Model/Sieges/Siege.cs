@@ -582,7 +582,8 @@ public class Siege: Siegable
 					long relation = member.getRelation(player);
 					bool isAutoAttackable = member.isAutoAttackable(player);
 					RelationCache? oldrelation = member.getKnownRelations().get(player.ObjectId);
-					if (oldrelation == null || oldrelation.getRelation() != relation || oldrelation.isAutoAttackable() != isAutoAttackable)
+					if (oldrelation == null || !oldrelation.Matches(relation, isAutoAttackable,
+						member.getReputation(), member.getPvpFlag()))
 					{
 						RelationChangedPacket rc = new RelationChangedPacket();
 						rc.addRelation(member, relation, isAutoAttackable);
@@ -599,7 +600,9 @@ public class Siege: Siegable
 							}
 						}
 						player.sendPacket(rc);
-						member.getKnownRelations().put(player.ObjectId, new RelationCache(relation, isAutoAttackable));
+						member.getKnownRelations().put(player.ObjectId,
+							new RelationCache(relation, isAutoAttackable, member.getReputation(),
+								member.getPvpFlag()));
 					}
 				});
 			}
@@ -642,7 +645,8 @@ public class Siege: Siegable
 					long relation = member.getRelation(player);
 					bool isAutoAttackable = member.isAutoAttackable(player);
 					RelationCache? oldrelation = member.getKnownRelations().get(player.ObjectId);
-					if (oldrelation == null || oldrelation.getRelation() != relation || oldrelation.isAutoAttackable() != isAutoAttackable)
+					if (oldrelation == null || !oldrelation.Matches(relation, isAutoAttackable,
+						member.getReputation(), member.getPvpFlag()))
 					{
 						RelationChangedPacket rc = new RelationChangedPacket();
 						rc.addRelation(member, relation, isAutoAttackable);
@@ -659,7 +663,9 @@ public class Siege: Siegable
 							}
 						}
 						player.sendPacket(rc);
-						member.getKnownRelations().put(player.ObjectId, new RelationCache(relation, isAutoAttackable));
+						member.getKnownRelations().put(player.ObjectId,
+							new RelationCache(relation, isAutoAttackable, member.getReputation(),
+								member.getPvpFlag()));
 					}
 				});
 			}

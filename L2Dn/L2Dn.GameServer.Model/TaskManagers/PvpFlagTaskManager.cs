@@ -1,6 +1,7 @@
 using L2Dn.GameServer.Enums;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Utilities;
+using NLog;
 using ThreadPool = L2Dn.GameServer.Utilities.ThreadPool;
 
 namespace L2Dn.GameServer.TaskManagers;
@@ -10,8 +11,9 @@ namespace L2Dn.GameServer.TaskManagers;
  */
 public class PvpFlagTaskManager: Runnable
 {
+	private static readonly Logger LOGGER = LogManager.GetLogger(nameof(PvpFlagTaskManager));
 	private static readonly Set<Player> PLAYERS = new();
-	private static bool _working = false;
+	private static int _working;
 	
 	protected PvpFlagTaskManager()
 	{
@@ -20,33 +22,43 @@ public class PvpFlagTaskManager: Runnable
 	
 	public void run()
 	{
-		if (_working)
+		if (Interlocked.Exchange(ref _working, 1) != 0)
 		{
 			return;
 		}
-		_working = true;
-		
-		if (!PLAYERS.isEmpty())
+
+		try
 		{
+			if (PLAYERS.isEmpty())
+			{
+				return;
+			}
+
 			DateTime currentTime = DateTime.UtcNow;
 			foreach (Player player in PLAYERS)
 			{
-				if (currentTime > player.getPvpFlagLasts())
+				try
 				{
-					player.stopPvPFlag();
+					PvpFlagStatus status = PvpFlagStateMachine.Evaluate(currentTime, player.getPvpFlagLasts());
+					if (status == PvpFlagStatus.None)
+					{
+						player.stopPvPFlag();
+					}
+					else
+					{
+						player.updatePvPFlag(status);
+					}
 				}
-				else if (currentTime > player.getPvpFlagLasts() - TimeSpan.FromMilliseconds(20000))
+				catch (Exception exception)
 				{
-					player.updatePvPFlag(PvpFlagStatus.Flashing);
-				}
-				else
-				{
-					player.updatePvPFlag(PvpFlagStatus.Enabled);
+					LOGGER.Error(exception, $"Failed to update PvP flag for player {player.ObjectId}.");
 				}
 			}
 		}
-		
-		_working = false;
+		finally
+		{
+			Volatile.Write(ref _working, 0);
+		}
 	}
 	
 	public void add(Player player)
