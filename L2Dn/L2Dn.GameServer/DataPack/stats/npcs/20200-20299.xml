@@ -2366,7 +2366,7 @@
 		<acquire exp="1316282" sp="39489" attributeExp="1328" />
 		<stats str="40" int="21" dex="30" wit="20" con="43" men="20">
 			<vitals hp="86910.30" hpRegen="5.5" mp="2959.74" mpRegen="2.1" />
-			<attack physical="1305.69549" magical="890.7041" random="30" critical="4.75" accuracy="4.75" attackSpeed="253" type="SWORD" range="40" distance="80" width="120" />
+			<attack physical="1305.69549" magical="890.7041" random="30" critical="4.75" accuracy="4.75" attackSpeed="253" reuseDelay="1500" type="BOW" range="500" distance="10" width="0" />
 			<defence physical="372.63569" magical="272.5719" /> <!-- <defence physical="186.63569" magical="136.5719" /> -->
 			<attribute>
 				<attack type="earth" value="20" />
@@ -3953,7 +3953,7 @@
 		<acquire exp="2141" sp="65" />
 		<stats str="40" int="21" dex="30" wit="20" con="43" men="20">
 			<vitals hp="705.162" hpRegen="4.5" mp="398.223" mpRegen="1.8" />
-			<attack physical="106.16525" magical="72.49711" random="30" critical="4.75" accuracy="4.75" attackSpeed="253" type="SWORD" range="40" distance="80" width="120" />
+			<attack physical="106.16525" magical="72.49711" random="30" critical="4.75" accuracy="4.75" attackSpeed="253" reuseDelay="1500" type="BOW" range="500" distance="10" width="0" />
 			<defence physical="125.57727" magical="91.89199" />
 			<speed>
 				<walk ground="45" />
@@ -4282,7 +4282,7 @@
 		<acquire exp="1316282" sp="39489" attributeExp="1328" />
 		<stats str="40" int="21" dex="30" wit="20" con="43" men="20">
 			<vitals hp="86910.30" hpRegen="5.5" mp="2959.74" mpRegen="2.1" />
-			<attack physical="1305.69549" magical="890.7041" random="30" critical="4.75" accuracy="4.75" attackSpeed="253" type="SWORD" range="40" distance="80" width="120" />
+			<attack physical="1305.69549" magical="890.7041" random="30" critical="4.75" accuracy="4.75" attackSpeed="253" reuseDelay="1500" type="BOW" range="500" distance="10" width="0" />
 			<defence physical="372.63569" magical="272.5719" /> <!-- <defence physical="186.63569" magical="136.5719" /> -->
 			<attribute>
 				<attack type="earth" value="20" />

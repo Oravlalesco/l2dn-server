@@ -93,8 +93,24 @@ public sealed class NpcDataLoadingTests
                 template.getAISkills(AISkillScope.LONG_RANGE).Count == 0)
             .Select(template => template.getId())
             .Should().BeEmpty("every RangedControl assignment needs Archer or long-range AI capability");
+        templates.Single(template => template.getId() == 20006).getBaseAttackRange()
+            .Should().BeGreaterThanOrEqualTo(500, "Orc Archer must shoot from bow range, not melee");
         templates.SelectMany(template => template.getAISkills(AISkillScope.HEAL))
             .Should().BeEmpty("Talking Island has no heal-capable base mob for the Survival profile");
+    }
+
+    [Fact]
+    public void Archer_templates_use_ranged_physical_attack_range()
+    {
+        (string dataPackPath, string configPath) = LocateGameServerData();
+        ServerConfig.Instance.DataPack.Path = dataPackPath;
+        ServerConfig.Instance.DataPack.ConfigPath = configPath;
+        Scripts.Scripts.RegisterHandlers();
+
+        NpcData.getInstance().getTemplates(template => template.getAIType() == AIType.ARCHER)
+            .Where(template => template.getBaseAttackRange() < 500)
+            .Select(template => template.getId())
+            .Should().BeEmpty("ARCHER templates must not inherit melee attack range");
     }
 
     [Fact]
