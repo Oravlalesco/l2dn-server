@@ -260,17 +260,24 @@ The seven-template Balanced area wave was accepted in the client on 2026-08-12. 
 
 With Balanced accepted, the second area wave enables all 12 `AggressivePressure` templates: 20093, 20096, 20098, 20103, 20106, 20108, 20130, 20131, 20132, 20326, 20342, and 20343. Template 20130 remains the already accepted stun control; the other 11 are the only newly enabled area templates. The four remaining normal ranged templates stay on Phase 3, while 20115 and 20292 remain accepted laboratory controls.
 
+The AggressivePressure area wave was accepted in the client on 2026-08-12 after a restored Intent/Strategy session (the preceding spawn-only restart had dropped those environment variables and is not evidence). Observed cases:
+
+- Orc 20130 stunned when reuse permitted, interleaved with physical attacks, with authoritative movement lock;
+- Undine Noble used Windstrike after the player opened range and physical attacks at contact;
+- Enku Orc Shaman used offensive magic and self-heal at low HP;
+- Orc Captain, Giant Spider / Fang / Blade, Werewolf, Goblin Scout, and Orc Soldier applied melee pressure, approached, and returned at leash without restoring full HP.
+
+The restored service instance recorded 37,943 Strategy evaluations, all `success`, with no fallback series. Selected actions included AggressivePressure 26 `offensive_skill` / 188 `attack` / 526 `approach`; RangedControl 1 `offensive_skill` / 34 `attack` / 1 `approach`; Survival 3 `offensive_skill` / 2 `heal` / 2 `attack`. Gateway created 801 intents and executed 800. All 31 of 32 `CastSkill` intents executed; the single rejection was bounded `skillunavailable`. There were no cooldown, MP, range, geodata, or blocked-movement rejections, no `callSkill() failed`, no dropped wakeups, and no scheduler-execution-failure series. Single-flight collisions were 99 coalesced wakes, not concurrent Think. One `ReturnHome(PreserveThreat)` executed. Mean Strategy evaluation was 20.7 µs for AggressivePressure.
+
 ## Manual rollout gate
 
-The development compose configuration now stages `NPC_STRATEGY_MODE=Enabled` for the accepted seven-template Balanced wave, all 12 `AggressivePressure` area templates, and the accepted RangedControl/Survival laboratory controls. The only newly enabled templates in this checkpoint are the 11 AggressivePressure templates other than the already accepted Orc 20130. The remaining normal ranged templates stay on the Phase 3 pipeline. Crasher therefore remains a useful unmodified control while Undine Noble exercises RangedControl.
+The development compose configuration now stages `NPC_STRATEGY_MODE=Enabled` for the accepted seven-template Balanced wave, the accepted 12 `AggressivePressure` area templates, and the accepted RangedControl/Survival laboratory controls. The remaining normal ranged templates stay on the Phase 3 pipeline. Crasher therefore remains a useful unmodified control while Undine Noble already exercises RangedControl.
 
-The Balanced deployment and manual gate are complete. The remaining required evidence is:
+The Balanced and AggressivePressure deployment gates are complete. The remaining required evidence is:
 
-1. validate the AggressivePressure area wave and collect its OTLP delta, including physical-skill cadence and control-effect completion where applicable;
-2. require zero scheduler drops/failures, single-flight one, no duplicated effects, no pathological oscillation, a bounded Gateway rejection ratio, and zero `callSkill() failed` from control AI notify;
-3. enable and validate the four remaining RangedControl area templates;
-4. observe the complete Talking Island cohort under the same safety gates;
-5. switch Strategy back to `Disabled` and verify Phase 3 rollback while retaining the `skillList`, fighter-cadence, range-wakeup, and control-effect corrections;
-6. restore the accepted final mode, repeat final Release/tests and R1-R5 evidence, record live results, clean the worktree, then and only then create `npc-brain-phase4-complete`.
+1. enable and validate the four remaining RangedControl area templates (20006 Orc Archer, 20101 Crasher, 20110 Undine, 20113 Undine Elder);
+2. observe the complete Talking Island cohort under the same safety gates;
+3. switch Strategy back to `Disabled` and verify Phase 3 rollback while retaining the `skillList`, fighter-cadence, range-wakeup, and control-effect corrections;
+4. restore the accepted final mode, repeat final Release/tests and R1-R5 evidence, record live results, clean the worktree, then and only then create `npc-brain-phase4-complete`.
 
 No Phase 5 work, live-result commit, or completion tag is authorized before this gate passes.
