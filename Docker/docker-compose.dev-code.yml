@@ -22,7 +22,7 @@ services:
     environment:
       NPC_REACTIVE_SCHEDULER_MODE: Enabled
       NPC_BRAIN_MODE: Intent
-      NPC_STRATEGY_MODE: Enabled
+      NPC_STRATEGY_MODE: Disabled
       NPC_STRATEGY_TEMPLATE_PROFILES: >-
         20016:balanced,20120:balanced,20121:balanced,
         20432:balanced,20442:balanced,20481:balanced,20544:balanced,

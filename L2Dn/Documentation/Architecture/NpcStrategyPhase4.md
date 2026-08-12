@@ -277,17 +277,23 @@ With AggressivePressure accepted, the third area wave enables the four remaining
 | southwest | 20101 | Crasher | `-98000, 237600, -3450` |
 | north+ | 20006 | Orc Archer | `-95500, 243200, -3400` |
 
-Orc Archer is a data-defined `ARCHER` with no active offensive skill; the gate is kiting and ranged physical pressure, not a cast. Crasher remains the FIGHTER ranged-magic control (skill 4247). Undine and Undine Elder share Undine Noble's Windstrike (4001) cadence: opener or after the player opens range, then physical attacks at contact.
+Orc Archer is a data-defined `ARCHER` with no active offensive skill; the gate is kiting and ranged physical pressure, not a cast. Its datapack attack was melee (`type="SWORD" range="40"`); it now matches the other bow archers (`type="BOW" range="500"`). Crasher remains the FIGHTER ranged-magic control (skill 4247). Undine and Undine Elder share Undine Noble's Windstrike (4001) cadence: opener or after the player opens range, then physical attacks at contact.
+
+The RangedControl area wave was accepted in the client on 2026-08-12 after the bow-range datapack correction. Observed cases:
+
+- Orc Archer 20006 attacked from bow range (~500) and pursued when the player opened distance, without closing to melee;
+- Crasher answered melee at contact and used skill 4247 after the player stepped back;
+- Undine used Windstrike while the player walked at contact (range-wakeup), consistent with the already accepted Noble cadence.
+
+The restored service instance `7d9c985f-e29d-45a9-94a1-74cd4217dd79` recorded 32,468 Strategy evaluations, all `success`, with no fallback series. RangedControl selected 3 `offensive_skill` / 77 `attack` / 50 `approach`. Gateway created 236 intents and executed 235. All 13 of 14 `CastSkill` intents executed; the single rejection was bounded `dead_actor`. There were no cooldown, MP, range, geodata, or blocked-movement rejections, no `callSkill() failed`, no dropped wakeups, and no scheduler-execution-failure series. Single-flight collisions were 81 coalesced wakes, not concurrent Think. Mean Strategy evaluation was 30.7 µs for RangedControl.
 
 ## Manual rollout gate
 
-The development compose configuration now stages `NPC_STRATEGY_MODE=Enabled` for every Talking Island area template (7 Balanced, 12 AggressivePressure, 5 RangedControl) plus the Survival laboratory control 20292. The only newly enabled templates in this checkpoint are 20006, 20101, 20110, and 20113.
+The Talking Island Strategy waves are accepted (7 Balanced, 12 AggressivePressure, 5 RangedControl, plus Survival 20292). The development compose now stages `NPC_STRATEGY_MODE=Disabled` with `NPC_BRAIN_MODE=Intent` so the Phase 3 Reflex/Tactical path can be rechecked without Strategy weights. The template profile list remains in compose but is unused until Strategy is restored.
 
-The Balanced and AggressivePressure deployment gates are complete. The remaining required evidence is:
+The remaining required evidence is:
 
-1. validate the four remaining RangedControl area templates and collect the OTLP delta, including Crasher's 4247 cadence, Undine/Elder Windstrike, and Orc Archer ranged pressure without skill spam;
-2. observe the complete Talking Island cohort under the same safety gates;
-3. switch Strategy back to `Disabled` and verify Phase 3 rollback while retaining the `skillList`, fighter-cadence, range-wakeup, and control-effect corrections;
-4. restore the accepted final mode, repeat final Release/tests and R1-R5 evidence, record live results, clean the worktree, then and only then create `npc-brain-phase4-complete`.
+1. verify Phase 3 rollback in the laboratory: skills, fighter cadence, range-wakeup, control-effect stun lock, and Orc Archer bow range still work; leash still does not restore full HP;
+2. restore `NPC_STRATEGY_MODE=Enabled`, repeat final Release/tests and R1-R5 evidence, record live results, clean the worktree, then and only then create `npc-brain-phase4-complete`.
 
 No Phase 5 work, live-result commit, or completion tag is authorized before this gate passes.
