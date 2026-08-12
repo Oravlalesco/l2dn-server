@@ -163,7 +163,7 @@ S1-S7 cover melee/offensive skill, low HP/heal, ranged range, outside all ranges
 | Gate | Result |
 |---|---:|
 | `L2Dn.Npc.Contracts.Tests` | 17/17 passed |
-| `L2Dn.Npc.Brain.Tests` | 91/91 passed |
+| `L2Dn.Npc.Brain.Tests` | 93/93 passed |
 | `L2Dn.GameServer.Model.Tests` | 126/126 passed |
 | focused NPC data/Talking Island/laboratory loading | 3/3 passed |
 | GameServer Release build | succeeded, 0 errors |
@@ -225,6 +225,20 @@ Each lane contains three fixed-anchor copies with a 20-second respawn. Lanes are
 The laboratory is test infrastructure, not part of the normal Talking Island population used to derive the 24-template area rollout. Automated data coverage checks that it contains exactly three unique spawn anchors for each profile, uses only base `Monster` templates, and does not silently alter the production-area template inventory.
 
 Deployment checkpoint on 2026-08-12: the focused data suite passed 3/3, the spawn XML passed schema validation, and the GameServer publish completed with zero errors (the two existing XML serializer-generator warnings remain). Startup loaded 29,151 spawns and completed initialization without rejecting a laboratory entry. The effective container environment contains exactly the four mappings above, while the latest OTLP mode gauges report reactive scheduler `Enabled`, Brain `Intent`, and Strategy `enabled`.
+
+### First Enabled laboratory pass
+
+The first four-lane client pass produced three accepted capability-level results:
+
+- Balanced Stone Golem remained a pure physical control, as expected because its active AI skill set has no offensive cast.
+- RangedControl Undine Noble used physical attacks at melee distance and Windstrike after the player opened range.
+- Survival Enku Orc Shaman remained a caster and selected self-heal at low HP. OTLP recorded four `heal` selections for the observed pass.
+
+AggressivePressure Orc was not accepted in that pass: it produced 64 `attack` selections and zero `offensive_skill` selections even though template 20130 owns skill 4072. Static-data inspection established that 4072 is a physical, point-blank stun represented with cast range `-1` and loaded through the effective `DEBUFF` scope. The Fighter safety rule introduced for Crasher/Undine ranged magic was suppressing this legitimate melee skill together with ranged casts.
+
+Tactical eligibility now distinguishes physical point-blank/melee skills from ranged or magical Fighter skills. A ready physical contact skill may compete by Strategy score once the actor reaches physical range; immediate repetition is still suppressed, so the expected Orc cadence is `Stun -> BasicAttack`, followed by normal attacks until the six-second skill reuse permits another stun. A non-positive offensive cast range now means physical contact rather than unlimited range. Ranged magic still yields to physical attacks in melee, and Gateway cooldown, MP, target, range, geodata, and generation validation is unchanged.
+
+Automated validation after this correction reports Contracts 17/17, Brain 93/93, GameServer.Model 126/126, and focused data/laboratory 3/3. Enabled R1-R5 at 5,000 NPCs/100,000 mixed events reports zero drops, zero overflow states, and maximum concurrent Think/NPC of one in all five scenarios; worst Strategy P99 was 1.0521 ms.
 
 ## Manual rollout gate
 
