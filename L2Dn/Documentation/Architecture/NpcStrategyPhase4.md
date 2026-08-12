@@ -185,6 +185,33 @@ All 15 scenarios reported zero dropped wakeups, zero overflow states, and exactl
 
 R1-R5 were repeated after the fighter-pursuit and one-shot range-wakeup corrections. All 15 scenarios again reported zero drops, zero overflow, and maximum concurrent Think/NPC of one. Worst Strategy P99 was 0.3546 ms in Shadow and 0.8802 ms in Enabled.
 
+### Final Enabled-mode gate — 2026-08-12
+
+Repeated in Docker SDK `mcr.microsoft.com/dotnet/sdk:9.0-alpine` on the restored `NPC_STRATEGY_MODE=Enabled` Talking Island registry, after the RangedControl wave, bow-range datapack correction, and accepted Phase 3 rollback.
+
+| Gate | Result |
+|---|---:|
+| `L2Dn.Npc.Contracts.Tests` | 17/17 passed |
+| `L2Dn.Npc.Brain.Tests` | 93/93 passed |
+| `L2Dn.GameServer.Model.Tests` | 133/133 passed |
+| focused NPC data/Talking Island/laboratory loading | 4/4 passed |
+| GameServer Release build | succeeded, 0 errors |
+| `git diff --check` | passed |
+
+Release retains only the two pre-existing XML serializer-generator warnings from `L2Dn.Model`. The focused data suite is now 4/4 because it includes the ARCHER physical-attack-range contract.
+
+R1-R5 again used 5,000 NPCs, 100,000 mixed/storm events, 16 workers, and identical loads. Timings remain diagnostic on a shared local Docker host.
+
+| Pipeline | R1 P95/P99 | R2 P95/P99 | R3 P95/P99 | R4 P95/P99 | R5 P95/P99 | Worst Strategy P99 |
+|---|---:|---:|---:|---:|---:|---:|
+| Strategy Disabled | 24.41 / 24.52 ms | 13.12 / 13.14 ms | 10.58 / 10.88 ms | 41.85 / 43.51 ms | 4.27 / 4.28 ms | n/a |
+| Strategy Shadow | 37.88 / 38.14 ms | 16.81 / 16.92 ms | 10.99 / 11.24 ms | 34.24 / 35.26 ms | 4.45 / 4.46 ms | 0.3906 ms |
+| Strategy Enabled | 22.99 / 23.07 ms | 13.75 / 13.78 ms | 10.24 / 10.63 ms | 43.17 / 44.35 ms | 3.89 / 3.89 ms | 0.3132 ms |
+
+All 15 scenarios reported zero dropped wakeups, zero overflow states, and exactly one maximum concurrent Think per NPC. Enabled Critical P95 stayed within 5.6% of Disabled in the worst comparable scenario (R4: 37.17 ms vs 35.22 ms), below the 25% regression budget. Enabled allocations/event stayed close to Disabled in every scenario (R1 2909 vs 2875, R2 291 vs 285, R3 29 vs 29, R4 150 vs 146, R5 15 vs 15). Shadow allocations were higher but bounded because it performs two decisions and comparison. The benchmark performs no network, database, or disk I/O in the decision pipeline.
+
+R1-R5 is NPC-scheduler and Brain/Strategy CPU load, not player concurrency. It wakes synthetic `Attackable` actors; it does not simulate many clients, geodata/pathfinding contention, clan-help storms, or Gateway revalidation under a populated world.
+
 ### Shadow gameplay observation: repeated melee skill selection
 
 The first Talking Island Shadow play pass made NPC skills visible after the `skillList` data correction, but exposed a Phase 3 tactical baseline issue: Crasher, another observed skill-capable mob, and Orc repeatedly selected their ready offensive/control skill, including at melee distance. This was not Strategy execution. Shadow executes only the baseline intent; Strategy remained hypothetical and never reached the Gateway.
@@ -287,15 +314,22 @@ The RangedControl area wave was accepted in the client on 2026-08-12 after the b
 
 The restored service instance `7d9c985f-e29d-45a9-94a1-74cd4217dd79` recorded 32,468 Strategy evaluations, all `success`, with no fallback series. RangedControl selected 3 `offensive_skill` / 77 `attack` / 50 `approach`. Gateway created 236 intents and executed 235. All 13 of 14 `CastSkill` intents executed; the single rejection was bounded `dead_actor`. There were no cooldown, MP, range, geodata, or blocked-movement rejections, no `callSkill() failed`, no dropped wakeups, and no scheduler-execution-failure series. Single-flight collisions were 81 coalesced wakes, not concurrent Think. Mean Strategy evaluation was 30.7 µs for RangedControl.
 
+### Live concurrency scope
+
+Every accepted client pass in this document (Shadow gameplay, four-profile laboratory, Balanced / AggressivePressure / RangedControl waves, and the Disabled rollback) was exercised with **one or two players**. That certifies cadence, Gateway execution, control effects, leash, and rollback. It does not certify a populated Talking Island or a high-concurrency world.
+
+High player concurrency can still become an operational problem even though R1-R5 stayed inside its synthetic budget. The first pressure is not Strategy scoring (mean tens of microseconds; Enabled Strategy P99 0.3132 ms in the final synthetic run). The first pressure is the live world path that R1-R5 does not replay: many simultaneous aggros, clan-help, geodata and follow/pathfinding, Gateway revalidation, known-list and hate-list contention, and client broadcast. Phase 3 Intent is already global for base `Monster` + `AttackableAI`, so that world path is already in production for those actors; Strategy Enabled only adds profile weights for the 24 Talking Island templates plus Survival 20292.
+
+A later populated-area or multi-party session must treat drops, overflow, `MaximumConcurrentThinkPerNpc > 1`, Gateway rejection storms, `callSkill() failed`, and unexplained Critical P95 growth as reopeners. They are not implied PASS by the 1-2 player gates.
+
 ## Manual rollout gate
 
 The Talking Island Strategy waves are accepted (7 Balanced, 12 AggressivePressure, 5 RangedControl, plus Survival 20292). Phase 3 rollback with `NPC_STRATEGY_MODE=Disabled` and `NPC_BRAIN_MODE=Intent` was accepted in the client on 2026-08-12: laboratory mobs kept skills, fighter cadence, range-wakeup, bow range, and leash without full-HP restore. The player observed no large behavior change versus Enabled, which matches Strategy as a weight/threshold layer over the same Reflex/Tactical path.
 
 Rollback instance `f88bbea7-764c-4044-a702-11b3ccf6c88b` reported Strategy `disabled` and zero Strategy evaluations. Gateway still created and executed intents (AcquireTarget 21, ApproachTarget 146, BasicAttack 113/112, CastSkill 13/13, ReturnHome 3, ClearTarget 1). The single rejection was bounded `dead_actor` on `BasicAttack`. There were no `callSkill() failed`, dropped wakeups, or scheduler-execution-failure series. Single-flight collisions were 87 coalesced wakes.
 
-The development compose now restores `NPC_STRATEGY_MODE=Enabled` with the accepted Talking Island template registry. The remaining required evidence is:
+The development compose remains on `NPC_STRATEGY_MODE=Enabled` with the accepted Talking Island template registry. Automated Release/tests and R1-R5 on that restored Enabled mode are PASS. Live Talking Island waves and the Disabled rollback are already recorded above. Those live results are 1-2 player laboratory/area evidence, not a high-concurrency certification.
 
-1. repeat final Release/tests and R1-R5 evidence on the restored Enabled mode;
-2. record live results, clean the worktree, then and only then create `npc-brain-phase4-complete`.
+Phase 4 is complete at this checkpoint. The tag `npc-brain-phase4-complete` marks this evidence, including the live concurrency scope. A later populated-area or multi-party session can reopen the operational gate without reopening Phase 4 design.
 
-No Phase 5 work, live-result commit, or completion tag is authorized before this gate passes.
+No Phase 5 work is authorized by this tag.
