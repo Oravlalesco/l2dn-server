@@ -1133,6 +1133,16 @@ public class NpcBrainTests
             pair.First.Intents.SequenceEqual(pair.Second.Intents, EqualityComparer<NpcIntent>.Default));
     }
 
+    [Fact]
+    public void Unknown_runtime_archetype_falls_back_to_balanced_without_throwing()
+    {
+        NpcStrategyProfile profile = NpcStrategyProfileResolver.ResolveArchetype(
+            (NpcStrategyArchetype)999, out bool usedFallback);
+
+        usedFallback.Should().BeTrue();
+        profile.Should().BeSameAs(NpcStrategyProfileResolver.Balanced);
+    }
+
     private static Dictionary<NpcStrategyArchetype, NpcStrategyBrainEvaluation> EvaluateAll(
         NpcPerceptionSnapshot perception, NpcBrainContext? context = null) =>
         Enum.GetValues<NpcStrategyArchetype>().ToDictionary(archetype => archetype, archetype =>

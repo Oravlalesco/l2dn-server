@@ -326,6 +326,67 @@ public class NpcIntentGatewayTests
     }
 
     [Fact]
+    public void S8_actor_dying_after_strategy_decision_is_rejected_by_gateway()
+    {
+        Attackable actor = CreateActor();
+        Attackable target = CreateActor();
+        actor.addDamageHate(target, 0, 10);
+        actor.setTarget(target);
+        BasicAttackIntent strategyIntent = AttackIntent(actor, Key(target));
+        actor.setDead(true);
+
+        NpcIntentExecutionResult result = CreateGateway(new RecordingCommands(), actor, target)
+            .Execute(strategyIntent);
+
+        result.RejectionReason.Should().Be(NpcIntentRejectionReason.ActorDead);
+    }
+
+    [Fact]
+    public void S9_generation_changing_after_strategy_decision_is_rejected_by_gateway()
+    {
+        Attackable actor = CreateActor();
+        Attackable target = CreateActor();
+        actor.addDamageHate(target, 0, 10);
+        actor.setTarget(target);
+        BasicAttackIntent strategyIntent = AttackIntent(actor, Key(target));
+        actor.beginRespawnLifecycle();
+
+        NpcIntentExecutionResult result = CreateGateway(new RecordingCommands(), actor, target)
+            .Execute(strategyIntent);
+
+        result.RejectionReason.Should().Be(NpcIntentRejectionReason.GenerationMismatch);
+    }
+
+    [Fact]
+    public void Strategy_skill_preference_cannot_bypass_live_mana_validation()
+    {
+        Attackable actor = CreateActor();
+        Skill skill = CreateSkill(7002, 1, mpConsume: 50);
+        actor.addSkill(skill);
+        actor.setCurrentMp(0);
+        CastSkillIntent strategyIntent = new(Envelope(actor, NpcIntentType.CastSkill),
+            skill.getId(), skill.getLevel(), null);
+
+        CreateGateway(new RecordingCommands(), actor).Execute(strategyIntent).RejectionReason
+            .Should().Be(NpcIntentRejectionReason.InsufficientMana);
+    }
+
+    [Fact]
+    public void Strategy_skill_preference_cannot_bypass_live_range_validation()
+    {
+        Attackable actor = CreateActor();
+        Attackable target = CreateActor();
+        target.setXYZ(500, 0, 0);
+        Skill skill = CreateSkill(7003, 1, castRange: 100);
+        actor.addSkill(skill);
+        CastSkillIntent strategyIntent = new(Envelope(actor, NpcIntentType.CastSkill),
+            skill.getId(), skill.getLevel(), Key(target));
+
+        CreateGateway(new RecordingCommands(), actor, target).Execute(strategyIntent).RejectionReason
+            .Should().Be(NpcIntentRejectionReason.OutOfRange);
+    }
+
+    [Fact]
     public void Brain_mode_parses_independently_from_reactive_scheduler_mode()
     {
         NpcBrainOptions defaults = NpcBrainOptions.FromEnvironment(
@@ -486,13 +547,15 @@ public class NpcIntentGatewayTests
         return new NpcTemplate(set);
     }
 
-    private static Skill CreateSkill(int id, int level)
+    private static Skill CreateSkill(int id, int level, int mpConsume = 0, int castRange = -1)
     {
         StatSet set = new();
         set.set(".id", id);
         set.set(".level", level);
         set.set(".name", "Intent Test Skill");
         set.set("operateType", SkillOperateType.A1);
+        set.set("mpConsume", mpConsume);
+        set.set("castRange", castRange);
         return new Skill(set);
     }
 
