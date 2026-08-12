@@ -22,6 +22,8 @@ services:
     environment:
       NPC_REACTIVE_SCHEDULER_MODE: Enabled
       NPC_BRAIN_MODE: Intent
+      NPC_STRATEGY_MODE: Shadow
+      NPC_STRATEGY_TEMPLATE_PROFILES: 20003:balanced,20004:aggressive_pressure,21101:ranged_control,20292:survival
       NPC_PERCEPTION_MODE: CaptureOnly
       NPC_RETURN_DEFENSE_ENABLED: "true"
       NPC_RETURN_DEFENSE_TIMEOUT_MS: 120000

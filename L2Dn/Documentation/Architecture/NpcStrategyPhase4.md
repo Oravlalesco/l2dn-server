@@ -98,3 +98,87 @@ Validated locally on 2026-08-11 from branch `feature/npc-strategy-brain`:
 | `git diff --check` | passed |
 
 The Release build retains the two pre-existing XML serializer generation warnings from `L2Dn.Model`; this increment adds no build error. The deployed GameServer remains on the Phase 3 checkpoint until Phase 4 replay and Shadow evidence are available.
+
+## Phase 4B: strategy validation and controlled rollout
+
+Phase 4B validates the four static profiles without adding dynamic selection, memory, groups, special AIs, remote services, or generative models. The schema-compliant `skillList` NPC data correction is part of the Phase 4B baseline so Strategy is never credited with behavior that was actually caused by previously missing NPC skills.
+
+### Operating modes and causal Shadow
+
+`NPC_STRATEGY_MODE` is independent from `NPC_BRAIN_MODE` and accepts `Disabled`, `Shadow`, or `Enabled`. Strategy is supported only with reactive scheduling `Enabled` and Brain `Intent`; any other combination disables only Strategy and preserves the configured scheduler and Brain modes.
+
+- `Disabled` bypasses `StrategyBrain` and its template registry. This is the exact Phase 3 Reflex/Tactical path plus the `skillList` data correction.
+- `Shadow` clones one pre-decision state, evaluates baseline and Strategy from that same state, persists only the baseline transition, executes only baseline intents, and discards the hypothetical Strategy transition.
+- `Enabled` evaluates Strategy only for templates present in the immutable startup registry. Every other eligible base monster remains on the Phase 3 path.
+
+Offline comparative replay intentionally differs from online Shadow: it maintains one independent longitudinal coordinator per profile so profile-specific trajectories can be compared across the same perception sequence.
+
+The development Shadow registry is:
+
+| Template | NPC | Profile | Laboratory purpose |
+|---:|---|---|---|
+| 20003 | Goblin | Balanced | Phase 3 identity control |
+| 20004 | Imp | AggressivePressure | melee pressure and approach |
+| 21101 | Langk Lizardman Shaman | RangedControl | ranged/offensive skills |
+| 20292 | Enku Orc Shaman | Survival | healing and low-HP behavior |
+
+All four are `Monster` templates and remain subject to the exact base `AttackableAI` runtime eligibility check. Guards, raids, minions, scripted AIs, specialized AIs, and controllables remain excluded.
+
+Registry parsing occurs only at startup. It trims whitespace, accepts profile names case-insensitively, requires positive template IDs, ignores empty entries, rejects malformed or unknown-profile entries with warnings, and uses last-wins plus a warning for duplicate template IDs. An invalid configuration entry never silently enables Balanced. A non-resolvable runtime archetype uses Balanced and increments bounded fallback telemetry.
+
+### Diagnostics, comparison, and telemetry
+
+The production decision carries only selected action, reason, and modifier flags. Candidate score and applied-modifier arrays are opt-in replay diagnostics and are not allocated on the Enabled hot path.
+
+Semantic comparison uses deterministic precedence: comparability, intent type, target, skill ID/level, movement semantics, semantic equivalence, then exact equivalence. The bounded result set is `ExactMatch`, `SemanticMatch`, `DifferentAction`, `DifferentTarget`, `DifferentSkill`, `DifferentMovement`, and `NotComparable`.
+
+Strategy telemetry contains only bounded `profile`, `action`, `comparison`, `modifier`, `mode`, `outcome`, and fallback-reason values. `TemplateId` and runtime object IDs are deliberately absent from metric tags. The instruments are:
+
+- `l2dn.npc.strategy.evaluation.total` and `.duration`;
+- `l2dn.npc.strategy.profile.resolved`;
+- `l2dn.npc.strategy.modifier.applied`;
+- `l2dn.npc.strategy.action.selected`;
+- `l2dn.npc.strategy.shadow.comparison` and `.changed_decision`;
+- `l2dn.npc.strategy.fallback`;
+- observable `l2dn.npc.strategy.mode`.
+
+### Automated validation — 2026-08-11
+
+The isolated determinism gate creates a new coordinator from identical perception, state, profile, and inputs 1,000 times for each profile and compares the complete decision: actor, sequence, layer, selected intent payload, target, skill, reason, and modifier flags. A separate gate replays the same multi-frame sequence twice per profile and requires exact output sequences. No RNG was introduced; if nondeterminism is added later it must be an explicit injected dependency with independent streams for comparison branches.
+
+S1-S7 cover melee/offensive skill, low HP/heal, ranged range, outside all ranges, cooldown, insufficient mana, and eligible flee. S8-S9 mutate actor/target lifecycle and generation after decision. Gateway tests separately prove that Strategy cannot bypass cooldown, mana, range, geodata, dead actor/target, or generation validation.
+
+| Gate | Result |
+|---|---:|
+| `L2Dn.Npc.Contracts.Tests` | 17/17 passed |
+| `L2Dn.Npc.Brain.Tests` | 75/75 passed |
+| `L2Dn.GameServer.Model.Tests` | 124/124 passed |
+| focused NPC `skillList` loading | 1/1 passed |
+| GameServer Release build | succeeded, 0 errors |
+| `git diff --check` | passed |
+
+The full StaticData suite was not used as a Phase 4B gate because it did not finish within four minutes in the local Docker environment; the focused NPC loading test completed and validates templates 20001, 21101, and 20292 including their AI skill scopes. Release retains only the two pre-existing XML serializer warnings.
+
+### Synthetic R1-R5
+
+R1-R5 ran with 5,000 NPCs, 100,000 mixed/storm events, 16 workers, and identical loads. Timings are diagnostic on a shared local Docker host; drops, overflow, scheduler failures, and single-flight are hard gates.
+
+| Pipeline | R1 P95/P99 | R2 P95/P99 | R3 P95/P99 | R4 P95/P99 | R5 P95/P99 | Worst Strategy P99 |
+|---|---:|---:|---:|---:|---:|---:|
+| Strategy Disabled | 35.25 / 35.35 ms | 23.46 / 23.48 ms | 10.80 / 11.11 ms | 41.51 / 43.35 ms | 3.70 / 3.70 ms | n/a |
+| Strategy Shadow | 30.12 / 30.31 ms | 23.57 / 23.62 ms | 10.74 / 11.33 ms | 38.82 / 40.00 ms | 19.41 / 19.42 ms | 0.3643 ms |
+| Strategy Enabled | 22.42 / 22.54 ms | 17.59 / 17.62 ms | 10.40 / 10.75 ms | 41.48 / 42.83 ms | 18.82 / 18.85 ms | 0.5766 ms |
+
+All 15 scenarios reported zero dropped wakeups, zero overflow states, and exactly one maximum concurrent Think per NPC. Enabled allocations/event were close to Disabled in every scenario; Shadow allocations were higher but bounded because it performs two decisions and comparison. The benchmark performs no network, database, or disk I/O in the decision pipeline.
+
+## Manual rollout gate
+
+The development compose configuration now stages `NPC_STRATEGY_MODE=Shadow` with the four-template registry above. Phase 4 is not complete yet. The next required evidence is:
+
+1. publish/restart the local GameServer and play normally for 15–30 minutes in Shadow;
+2. verify Strategy evaluations/comparisons are non-zero, Strategy Gateway executions remain zero, drops/failures remain zero, single-flight remains one, and gameplay matches Phase 3 plus the NPC skill correction;
+3. switch to `Enabled`, test only the four laboratory templates and inspect intent rejection ratios and oscillations;
+4. switch Strategy back to `Disabled` and verify Phase 3 rollback;
+5. record live results, then and only then create `npc-brain-phase4-complete`.
+
+No Phase 5 work, live-result commit, or completion tag is authorized before this gate passes.
