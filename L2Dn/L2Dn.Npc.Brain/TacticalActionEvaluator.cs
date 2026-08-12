@@ -61,14 +61,20 @@ public sealed class TacticalActionEvaluator
             targetCollisionRadius, null);
 
     internal NpcTacticalScore Evaluate(NpcPerceptionSnapshot perception, NpcIntelligenceProfile profile,
+        double targetDistance, double targetCollisionRadius, bool suppressRepeatedOffensiveSkill) =>
+        EvaluateCore(perception, profile, NpcTacticalPolicy.Baseline(profile), targetDistance,
+            targetCollisionRadius, null, suppressRepeatedOffensiveSkill);
+
+    internal NpcTacticalScore Evaluate(NpcPerceptionSnapshot perception, NpcIntelligenceProfile profile,
         NpcStrategyDecision strategy, double targetDistance, double targetCollisionRadius,
-        NpcStrategyDiagnosticsCollector? diagnostics) =>
+        NpcStrategyDiagnosticsCollector? diagnostics, bool suppressRepeatedOffensiveSkill = false) =>
         EvaluateCore(perception, profile, NpcTacticalPolicy.FromStrategy(strategy), targetDistance,
-            targetCollisionRadius, diagnostics);
+            targetCollisionRadius, diagnostics, suppressRepeatedOffensiveSkill);
 
     private static NpcTacticalScore EvaluateCore(NpcPerceptionSnapshot perception,
         NpcIntelligenceProfile profile, NpcTacticalPolicy policy, double targetDistance,
-        double targetCollisionRadius, NpcStrategyDiagnosticsCollector? diagnostics)
+        double targetCollisionRadius, NpcStrategyDiagnosticsCollector? diagnostics,
+        bool suppressRepeatedOffensiveSkill = false)
     {
         NpcTacticalScore selected = default;
         double hpPercent = NpcPerceptionFacts.HpPercent(perception.State.Physical);
@@ -108,13 +114,19 @@ public sealed class TacticalActionEvaluator
             offensiveInRange = skillRange <= 0 || targetDistance <= skillRange + collisionPadding;
             diagnostics?.AddCandidate(new NpcStrategyCandidateScore(NpcStrategyAction.OffensiveSkill,
                 NpcTacticalBaseline.OffensiveSkillScore, policy.OffensiveSkillScore,
-                offensiveInRange ? NpcStrategyCandidateEligibility.Eligible :
-                    NpcStrategyCandidateEligibility.OutOfRange,
+                !offensiveInRange
+                    ? NpcStrategyCandidateEligibility.OutOfRange
+                    : suppressRepeatedOffensiveSkill
+                        ? NpcStrategyCandidateEligibility.RepeatedActionSuppressed
+                        : NpcStrategyCandidateEligibility.Eligible,
                 offensive.Value.SkillId, offensive.Value.Level));
             if (offensiveInRange)
             {
-                selected = Prefer(selected, new NpcTacticalScore(NpcTacticalAction.CastSkill,
-                    policy.OffensiveSkillScore, offensive));
+                if (!suppressRepeatedOffensiveSkill)
+                {
+                    selected = Prefer(selected, new NpcTacticalScore(NpcTacticalAction.CastSkill,
+                        policy.OffensiveSkillScore, offensive));
+                }
             }
             else
             {

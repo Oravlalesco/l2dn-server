@@ -356,6 +356,82 @@ public class NpcBrainTests
             cast.SkillId == 107 && cast.SkillLevel == 2 && cast.Target == Player);
     }
 
+    [Theory]
+    [InlineData(NpcStrategyArchetype.Balanced)]
+    [InlineData(NpcStrategyArchetype.AggressivePressure)]
+    [InlineData(NpcStrategyArchetype.RangedControl)]
+    [InlineData(NpcStrategyArchetype.Survival)]
+    public void Consecutive_ready_offensive_skills_are_suppressed_when_basic_attack_is_in_range(
+        NpcStrategyArchetype archetype)
+    {
+        NpcSkillObservation skill = new(4247, 1, 1_000, 13, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcBrainCoordinator brain = new();
+        NpcStrategyProfile strategy = NpcStrategyProfileResolver.ResolveArchetype(archetype, out _);
+
+        NpcIntent[] sequence = Enumerable.Range(1, 4).Select(revision =>
+            brain.DecideWithStrategy(CreatePerception(target: Player,
+                    visible: [Hostile(Player, 30)], skills: [skill], revision: revision),
+                Context(), strategy).Intents.Single()).ToArray();
+
+        sequence.Select(intent => intent.Envelope.IntentType).Should().Equal(
+            NpcIntentType.CastSkill, NpcIntentType.BasicAttack,
+            NpcIntentType.CastSkill, NpcIntentType.BasicAttack);
+    }
+
+    [Fact]
+    public void Phase3_baseline_also_suppresses_consecutive_offensive_casts_after_skilllist_fix()
+    {
+        NpcSkillObservation skill = new(4072, 1, 40, 10, NpcSkillCategory.Control,
+            NpcSkillObservationFlags.Ready);
+        NpcBrainCoordinator brain = new();
+
+        NpcIntent first = brain.Decide(CreatePerception(target: Player,
+            visible: [Hostile(Player, 30)], skills: [skill]), Context()).Intents.Single();
+        NpcIntent second = brain.Decide(CreatePerception(target: Player,
+            visible: [Hostile(Player, 30)], skills: [skill], revision: 2), Context()).Intents.Single();
+
+        first.Should().BeOfType<CastSkillIntent>();
+        second.Should().BeOfType<BasicAttackIntent>();
+    }
+
+    [Fact]
+    public void Repeated_ranged_cast_is_not_suppressed_when_basic_attack_is_out_of_range()
+    {
+        NpcSkillObservation skill = new(4247, 1, 1_000, 13, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcBrainCoordinator brain = new();
+
+        NpcIntent first = brain.DecideWithStrategy(CreatePerception(target: Player,
+                visible: [Hostile(Player, 500)], skills: [skill]), Context(),
+            NpcStrategyProfileResolver.RangedControl).Intents.Single();
+        NpcIntent second = brain.DecideWithStrategy(CreatePerception(target: Player,
+                visible: [Hostile(Player, 500)], skills: [skill], revision: 2), Context(),
+            NpcStrategyProfileResolver.RangedControl).Intents.Single();
+
+        first.Should().BeOfType<CastSkillIntent>();
+        second.Should().BeOfType<CastSkillIntent>();
+    }
+
+    [Fact]
+    public void Replay_diagnostics_explain_melee_repeat_suppression()
+    {
+        NpcSkillObservation skill = new(4247, 1, 1_000, 13, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcBrainCoordinator brain = new();
+        brain.DecideWithStrategy(CreatePerception(target: Player,
+                visible: [Hostile(Player, 30)], skills: [skill]), Context(),
+            NpcStrategyProfileResolver.RangedControl);
+
+        NpcStrategyBrainEvaluation evaluation = brain.DecideWithStrategyDiagnostics(
+            CreatePerception(target: Player, visible: [Hostile(Player, 30)],
+                skills: [skill], revision: 2), Context(), NpcStrategyProfileResolver.RangedControl);
+
+        evaluation.Decision.Intents.Single().Should().BeOfType<BasicAttackIntent>();
+        Candidate(evaluation, NpcStrategyAction.OffensiveSkill).Eligibility
+            .Should().Be(NpcStrategyCandidateEligibility.RepeatedActionSuppressed);
+    }
+
     [Fact]
     public void Target_inside_collision_adjusted_skill_reach_is_cast_on_instead_of_stalling()
     {

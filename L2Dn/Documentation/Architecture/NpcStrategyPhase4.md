@@ -163,9 +163,9 @@ S1-S7 cover melee/offensive skill, low HP/heal, ranged range, outside all ranges
 | Gate | Result |
 |---|---:|
 | `L2Dn.Npc.Contracts.Tests` | 17/17 passed |
-| `L2Dn.Npc.Brain.Tests` | 75/75 passed |
-| `L2Dn.GameServer.Model.Tests` | 124/124 passed |
-| focused NPC `skillList` loading | 1/1 passed |
+| `L2Dn.Npc.Brain.Tests` | 82/82 passed |
+| `L2Dn.GameServer.Model.Tests` | 125/125 passed |
+| focused NPC data/Talking Island loading | 2/2 passed |
 | GameServer Release build | succeeded, 0 errors |
 | `git diff --check` | passed |
 
@@ -177,20 +177,29 @@ R1-R5 ran with 5,000 NPCs, 100,000 mixed/storm events, 16 workers, and identical
 
 | Pipeline | R1 P95/P99 | R2 P95/P99 | R3 P95/P99 | R4 P95/P99 | R5 P95/P99 | Worst Strategy P99 |
 |---|---:|---:|---:|---:|---:|---:|
-| Strategy Disabled | 35.25 / 35.35 ms | 23.46 / 23.48 ms | 10.80 / 11.11 ms | 41.51 / 43.35 ms | 3.70 / 3.70 ms | n/a |
-| Strategy Shadow | 30.12 / 30.31 ms | 23.57 / 23.62 ms | 10.74 / 11.33 ms | 38.82 / 40.00 ms | 19.41 / 19.42 ms | 0.3643 ms |
-| Strategy Enabled | 22.42 / 22.54 ms | 17.59 / 17.62 ms | 10.40 / 10.75 ms | 41.48 / 42.83 ms | 18.82 / 18.85 ms | 0.5766 ms |
+| Strategy Disabled | 25.14 / 25.28 ms | 30.89 / 30.91 ms | 11.21 / 11.54 ms | 33.49 / 34.64 ms | 3.94 / 3.96 ms | n/a |
+| Strategy Shadow | 30.60 / 30.88 ms | 20.37 / 20.43 ms | 10.22 / 10.46 ms | 44.52 / 45.45 ms | 19.15 / 19.18 ms | 0.6806 ms |
+| Strategy Enabled | 30.36 / 30.56 ms | 25.85 / 25.89 ms | 10.67 / 11.02 ms | 36.61 / 37.53 ms | 3.53 / 3.54 ms | 1.2590 ms |
 
-All 15 scenarios reported zero dropped wakeups, zero overflow states, and exactly one maximum concurrent Think per NPC. Enabled allocations/event were close to Disabled in every scenario; Shadow allocations were higher but bounded because it performs two decisions and comparison. The benchmark performs no network, database, or disk I/O in the decision pipeline.
+All 15 scenarios reported zero dropped wakeups, zero overflow states, and exactly one maximum concurrent Think per NPC. Enabled Critical P95 stayed within 20.8% of Disabled in the worst comparable scenario, below the 25% regression budget. Enabled allocations/event were close to Disabled in every scenario; Shadow allocations were higher but bounded because it performs two decisions and comparison. The benchmark performs no network, database, or disk I/O in the decision pipeline.
+
+### Shadow gameplay observation: repeated melee skill selection
+
+The first Talking Island Shadow play pass made NPC skills visible after the `skillList` data correction, but exposed a Phase 3 tactical baseline issue: Crasher, another observed skill-capable mob, and Orc repeatedly selected their ready offensive/control skill, including at melee distance. This was not Strategy execution. Shadow executes only the baseline intent; Strategy remained hypothetical and never reached the Gateway.
+
+The cause was the static Phase 3 offensive-skill score winning every evaluation while the skill remained ready. Tactical selection now suppresses only the immediately repeated offensive skill when the same target is already inside physical attack reach. The basic attack can therefore win the next evaluation, producing a deterministic `CastSkill, BasicAttack, CastSkill, BasicAttack` cadence for the canonical melee case. Outside physical reach, repeated ranged casting remains available, so a caster is not forced into an unnecessary approach loop. The rule applies equally to Disabled, Shadow baseline, and Enabled; it adds no RNG, dynamic profile selection, direct execution, or Gateway bypass.
+
+Replay diagnostics expose the condition as `RepeatedActionSuppressed`. Automated coverage proves the four profiles share the melee safety behavior, the exact Phase 3 path receives the same correction, and ranged casts are not suppressed merely for being consecutive.
 
 ## Manual rollout gate
 
-The development compose configuration now stages `NPC_STRATEGY_MODE=Shadow` with the four-template registry above. Phase 4 is not complete yet. The next required evidence is:
+The development compose configuration stages `NPC_STRATEGY_MODE=Shadow` with the 28-entry registry: all 24 Talking Island templates plus the four laboratory templates. Phase 4 is not complete yet. The next required evidence is:
 
-1. publish/restart the local GameServer and play normally for 15–30 minutes in Shadow;
-2. verify Strategy evaluations/comparisons are non-zero, Strategy Gateway executions remain zero, drops/failures remain zero, single-flight remains one, and gameplay matches Phase 3 plus the NPC skill correction;
-3. switch to `Enabled`, test only the four laboratory templates and inspect intent rejection ratios and oscillations;
-4. switch Strategy back to `Disabled` and verify Phase 3 rollback;
-5. record live results, then and only then create `npc-brain-phase4-complete`.
+1. publish/restart the corrected local GameServer in Shadow;
+2. retest Crasher and the observed Orc/skill-capable mobs at melee and ranged distances, checking that melee skill spam is gone without suppressing legitimate ranged casting;
+3. verify Strategy evaluations/comparisons are non-zero, Strategy Gateway executions remain zero, drops/failures remain zero, single-flight remains one, and gameplay remains the Phase 3 baseline plus the data/tactical corrections;
+4. switch to `Enabled`, validate Talking Island coverage and the four dedicated laboratory profiles, and inspect intent rejection ratios and oscillations;
+5. switch Strategy back to `Disabled` and verify Phase 3 rollback;
+6. record live results, then and only then create `npc-brain-phase4-complete`.
 
 No Phase 5 work, live-result commit, or completion tag is authorized before this gate passes.

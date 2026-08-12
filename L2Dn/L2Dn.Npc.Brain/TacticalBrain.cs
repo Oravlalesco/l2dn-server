@@ -35,10 +35,15 @@ public sealed class TacticalBrain
         }
 
         double targetCollisionRadius = visibleTarget.Entity == target ? visibleTarget.CollisionRadius : 0;
+        double physicalReach = Math.Max(1, perception.State.Combat.PhysicalAttackRange) +
+            perception.State.Physical.CollisionRadius + targetCollisionRadius;
+        bool suppressRepeatedOffensiveSkill = state.LastDecision == NpcIntentType.CastSkill &&
+            distance <= physicalReach;
         NpcTacticalScore score = strategy.HasValue
             ? _evaluator.Evaluate(perception, profile, strategy.Value, distance,
-                targetCollisionRadius, diagnostics)
-            : _evaluator.Evaluate(perception, profile, distance, targetCollisionRadius);
+                targetCollisionRadius, diagnostics, suppressRepeatedOffensiveSkill)
+            : _evaluator.Evaluate(perception, profile, distance, targetCollisionRadius,
+                suppressRepeatedOffensiveSkill);
         NpcPerceptionEnvelope snapshot = perception.Envelope;
         bool defensiveReturn = state.ReturnState == NpcReturnEngagementState.DefensiveReturn;
         if (defensiveReturn && score.Action == NpcTacticalAction.Flee)
