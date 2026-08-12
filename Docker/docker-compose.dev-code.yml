@@ -23,7 +23,15 @@ services:
       NPC_REACTIVE_SCHEDULER_MODE: Enabled
       NPC_BRAIN_MODE: Intent
       NPC_STRATEGY_MODE: Shadow
-      NPC_STRATEGY_TEMPLATE_PROFILES: 20003:balanced,20004:aggressive_pressure,21101:ranged_control,20292:survival
+      NPC_STRATEGY_TEMPLATE_PROFILES: >-
+        20003:balanced,20004:aggressive_pressure,21101:ranged_control,20292:survival,
+        20016:balanced,20120:balanced,20121:balanced,20432:balanced,20442:balanced,20481:balanced,20544:balanced,
+        20093:aggressive_pressure,20096:aggressive_pressure,20098:aggressive_pressure,
+        20103:aggressive_pressure,20106:aggressive_pressure,20108:aggressive_pressure,
+        20130:aggressive_pressure,20131:aggressive_pressure,20132:aggressive_pressure,
+        20326:aggressive_pressure,20342:aggressive_pressure,20343:aggressive_pressure,
+        20006:ranged_control,20101:ranged_control,
+        20110:ranged_control,20113:ranged_control,20115:ranged_control
       NPC_PERCEPTION_MODE: CaptureOnly
       NPC_RETURN_DEFENSE_ENABLED: "true"
       NPC_RETURN_DEFENSE_TIMEOUT_MS: 120000

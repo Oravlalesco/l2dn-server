@@ -444,6 +444,31 @@ public class NpcIntentGatewayTests
         warnings.Should().Contain(message => message.Contains("malformed", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Talking_island_rollout_adds_every_area_template_without_replacing_the_laboratory_set()
+    {
+        const string Configuration =
+            "20003:balanced,20004:aggressive_pressure,21101:ranged_control,20292:survival," +
+            "20016:balanced,20120:balanced,20121:balanced,20432:balanced,20442:balanced,20481:balanced,20544:balanced," +
+            "20093:aggressive_pressure,20096:aggressive_pressure,20098:aggressive_pressure," +
+            "20103:aggressive_pressure,20106:aggressive_pressure,20108:aggressive_pressure," +
+            "20130:aggressive_pressure,20131:aggressive_pressure,20132:aggressive_pressure," +
+            "20326:aggressive_pressure,20342:aggressive_pressure,20343:aggressive_pressure," +
+            "20006:ranged_control,20101:ranged_control," +
+            "20110:ranged_control,20113:ranged_control,20115:ranged_control";
+        NpcStrategyTemplateRegistry registry = NpcStrategyTemplateRegistry.Parse(Configuration);
+
+        registry.Count.Should().Be(28);
+        AssertProfiles(registry, NpcStrategyArchetype.Balanced,
+            20003, 20016, 20120, 20121, 20432, 20442, 20481, 20544);
+        AssertProfiles(registry, NpcStrategyArchetype.AggressivePressure,
+            20004, 20093, 20096, 20098, 20103, 20106, 20108, 20130, 20131, 20132,
+            20326, 20342, 20343);
+        AssertProfiles(registry, NpcStrategyArchetype.RangedControl,
+            21101, 20006, 20101, 20110, 20113, 20115);
+        AssertProfiles(registry, NpcStrategyArchetype.Survival, 20292);
+    }
+
     [Theory]
     [InlineData(NpcBrainMode.Legacy, NpcReactiveSchedulerMode.Enabled)]
     [InlineData(NpcBrainMode.Shadow, NpcReactiveSchedulerMode.Enabled)]
@@ -491,6 +516,18 @@ public class NpcIntentGatewayTests
         params Attackable[] actors) =>
         new(id => actors.FirstOrDefault(item => item.ObjectId == id), _ => 1,
             new TestGeo(geoAllowed), commands);
+
+    private static void AssertProfiles(NpcStrategyTemplateRegistry registry,
+        NpcStrategyArchetype expected, params int[] templateIds)
+    {
+        foreach (int templateId in templateIds)
+        {
+            registry.TryResolve(templateId, out NpcStrategyProfile profile, out bool fallback)
+                .Should().BeTrue();
+            fallback.Should().BeFalse();
+            profile.Archetype.Should().Be(expected);
+        }
+    }
 
     private static BasicAttackIntent AttackIntent(Attackable actor, EntityKey target, int? generation = null,
         long revision = 1) =>

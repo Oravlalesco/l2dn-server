@@ -113,7 +113,7 @@ Phase 4B validates the four static profiles without adding dynamic selection, me
 
 Offline comparative replay intentionally differs from online Shadow: it maintains one independent longitudinal coordinator per profile so profile-specific trajectories can be compared across the same perception sequence.
 
-The development Shadow registry is:
+The initial four-template laboratory registry is:
 
 | Template | NPC | Profile | Laboratory purpose |
 |---:|---|---|---|
@@ -123,6 +123,18 @@ The development Shadow registry is:
 | 20292 | Enku Orc Shaman | Survival | healing and low-HP behavior |
 
 All four are `Monster` templates and remain subject to the exact base `AttackableAI` runtime eligibility check. Guards, raids, minions, scripted AIs, specialized AIs, and controllables remain excluded.
+
+### Talking Island Shadow expansion
+
+After the four-template automated checkpoint, Shadow coverage was expanded to every template referenced by XML under `DataPack/spawns/TalkingIsland`. This adds 24 templates while retaining the original four laboratory templates, for 28 configured entries total. The grouping is static and capability-based:
+
+- `Balanced`: 20016 Stone Golem, 20120 Wolf, 20121 Giant Toad, 20432 Elpy, 20442 Elder Wolf, 20481 Bearded Keltir, and 20544 Elder Keltir;
+- `AggressivePressure`: 20093 Orc Warrior, 20096 Orc Lieutenant, 20098 Orc Captain, 20103 Giant Spider, 20106 Giant Fang Spider, 20108 Giant Blade Spider, 20130 Orc, 20131 Orc Soldier, 20132 Werewolf, 20326 Goblin Scout, 20342 Werewolf Chieftain, and 20343 Werewolf Hunter;
+- `RangedControl`: 20006 Orc Archer, 20101 Crasher, 20110 Undine, 20113 Undine Elder, and 20115 Undine Noble.
+
+No Talking Island template is assigned `Survival`: the loaded AI scopes contain no heal-capable mob and the current intelligence profiles do not make flee eligible there. Assigning Survival merely to distribute labels would not create meaningful validation. Template 20292 remains the dedicated Survival laboratory NPC.
+
+All 24 area templates declare `type="Monster"`, and none is referenced by an ID-specific script. Runtime eligibility still requires the exact base `Monster` instance and exact base `AttackableAI`; a future specialized runtime instance therefore falls back safely even if its template appears in the registry. A data test derives the complete template set from the Talking Island spawn XML, prevents omissions, verifies every template loads as `Monster`, verifies the ranged group has Archer or long-range AI capability, and verifies the absence of heal scopes.
 
 Registry parsing occurs only at startup. It trims whitespace, accepts profile names case-insensitively, requires positive template IDs, ignores empty entries, rejects malformed or unknown-profile entries with warnings, and uses last-wins plus a warning for duplicate template IDs. An invalid configuration entry never silently enables Balanced. A non-resolvable runtime archetype uses Balanced and increments bounded fallback telemetry.
 
