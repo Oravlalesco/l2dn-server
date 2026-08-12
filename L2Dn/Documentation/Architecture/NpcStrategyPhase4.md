@@ -289,11 +289,13 @@ The restored service instance `7d9c985f-e29d-45a9-94a1-74cd4217dd79` recorded 32
 
 ## Manual rollout gate
 
-The Talking Island Strategy waves are accepted (7 Balanced, 12 AggressivePressure, 5 RangedControl, plus Survival 20292). The development compose now stages `NPC_STRATEGY_MODE=Disabled` with `NPC_BRAIN_MODE=Intent` so the Phase 3 Reflex/Tactical path can be rechecked without Strategy weights. The template profile list remains in compose but is unused until Strategy is restored.
+The Talking Island Strategy waves are accepted (7 Balanced, 12 AggressivePressure, 5 RangedControl, plus Survival 20292). Phase 3 rollback with `NPC_STRATEGY_MODE=Disabled` and `NPC_BRAIN_MODE=Intent` was accepted in the client on 2026-08-12: laboratory mobs kept skills, fighter cadence, range-wakeup, bow range, and leash without full-HP restore. The player observed no large behavior change versus Enabled, which matches Strategy as a weight/threshold layer over the same Reflex/Tactical path.
 
-The remaining required evidence is:
+Rollback instance `f88bbea7-764c-4044-a702-11b3ccf6c88b` reported Strategy `disabled` and zero Strategy evaluations. Gateway still created and executed intents (AcquireTarget 21, ApproachTarget 146, BasicAttack 113/112, CastSkill 13/13, ReturnHome 3, ClearTarget 1). The single rejection was bounded `dead_actor` on `BasicAttack`. There were no `callSkill() failed`, dropped wakeups, or scheduler-execution-failure series. Single-flight collisions were 87 coalesced wakes.
 
-1. verify Phase 3 rollback in the laboratory: skills, fighter cadence, range-wakeup, control-effect stun lock, and Orc Archer bow range still work; leash still does not restore full HP;
-2. restore `NPC_STRATEGY_MODE=Enabled`, repeat final Release/tests and R1-R5 evidence, record live results, clean the worktree, then and only then create `npc-brain-phase4-complete`.
+The development compose now restores `NPC_STRATEGY_MODE=Enabled` with the accepted Talking Island template registry. The remaining required evidence is:
+
+1. repeat final Release/tests and R1-R5 evidence on the restored Enabled mode;
+2. record live results, clean the worktree, then and only then create `npc-brain-phase4-complete`.
 
 No Phase 5 work, live-result commit, or completion tag is authorized before this gate passes.
