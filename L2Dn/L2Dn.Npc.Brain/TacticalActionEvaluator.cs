@@ -105,15 +105,21 @@ public sealed class TacticalActionEvaluator
                 new NpcTacticalScore(NpcTacticalAction.CastSkill, policy.HealScore, heal));
         }
 
+        int physicalAttackRange = Math.Max(1, perception.State.Combat.PhysicalAttackRange);
+        double collisionPadding = perception.State.Physical.CollisionRadius + targetCollisionRadius;
+        double physicalReach = physicalAttackRange + collisionPadding;
         NpcSkillObservation? offensive = SelectSkill(perception, NpcSkillCategory.Offensive, false);
         bool offensiveReady = offensive is { } offensiveSkill &&
             offensiveSkill.Flags.HasFlag(NpcSkillObservationFlags.Ready);
         bool offensiveInRange = false;
         if (offensiveReady)
         {
-            int skillRange = Math.Max(0, offensive!.Value.Range);
-            double collisionPadding = perception.State.Physical.CollisionRadius + targetCollisionRadius;
-            offensiveInRange = skillRange <= 0 || targetDistance <= skillRange + collisionPadding;
+            // Offensive point-blank skills report cast range zero. They are usable only after reaching
+            // physical contact; zero must never be interpreted as unlimited range.
+            int skillRange = offensive!.Value.Range > 0
+                ? offensive.Value.Range
+                : physicalAttackRange;
+            offensiveInRange = targetDistance <= skillRange + collisionPadding;
             diagnostics?.AddCandidate(new NpcStrategyCandidateScore(NpcStrategyAction.OffensiveSkill,
                 NpcTacticalBaseline.OffensiveSkillScore, policy.OffensiveSkillScore,
                 !offensiveInRange
@@ -149,9 +155,6 @@ public sealed class TacticalActionEvaluator
                 offensive?.SkillId, offensive?.Level));
         }
 
-        int physicalAttackRange = Math.Max(1, perception.State.Combat.PhysicalAttackRange);
-        double physicalReach = physicalAttackRange + perception.State.Physical.CollisionRadius +
-            targetCollisionRadius;
         bool needsApproach = targetDistance > physicalReach;
         NpcStrategyAction physicalAction = needsApproach
             ? NpcStrategyAction.Approach

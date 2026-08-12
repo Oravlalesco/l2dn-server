@@ -381,9 +381,9 @@ public class NpcBrainTests
     }
 
     [Fact]
-    public void Phase3_fighter_prefers_physical_attacks_when_already_in_melee_range()
+    public void Phase3_fighter_uses_a_ready_physical_melee_skill_once_then_returns_to_basic_attack()
     {
-        NpcSkillObservation skill = new(4072, 1, 40, 10, NpcSkillCategory.Control,
+        NpcSkillObservation skill = new(4072, 1, -1, 10, NpcSkillCategory.Control,
             NpcSkillObservationFlags.Ready);
         NpcBrainCoordinator brain = new();
 
@@ -392,7 +392,7 @@ public class NpcBrainTests
         NpcIntent second = brain.Decide(CreatePerception(target: Player,
             visible: [Hostile(Player, 30)], skills: [skill], revision: 2), Context()).Intents.Single();
 
-        first.Should().BeOfType<BasicAttackIntent>();
+        first.Should().BeOfType<CastSkillIntent>().Which.SkillId.Should().Be(4072);
         second.Should().BeOfType<BasicAttackIntent>();
     }
 
@@ -458,6 +458,38 @@ public class NpcBrainTests
             Context(), strategy);
 
         decision.Intents.Single().Should().BeOfType<BasicAttackIntent>();
+    }
+
+    [Fact]
+    public void Fighter_uses_a_ready_physical_melee_skill_once_then_returns_to_basic_attack()
+    {
+        NpcSkillObservation stun = new(4072, 1, -1, 13, NpcSkillCategory.Control,
+            NpcSkillObservationFlags.Ready);
+        NpcBrainCoordinator brain = new();
+
+        NpcIntent first = brain.DecideWithStrategy(CreatePerception(target: Player,
+                visible: [Hostile(Player, 30)], skills: [stun]), Context(),
+            NpcStrategyProfileResolver.AggressivePressure).Intents.Single();
+        NpcIntent second = brain.DecideWithStrategy(CreatePerception(target: Player,
+                visible: [Hostile(Player, 30)], skills: [stun], revision: 2), Context(),
+            NpcStrategyProfileResolver.AggressivePressure).Intents.Single();
+
+        first.Should().BeOfType<CastSkillIntent>().Which.SkillId.Should().Be(4072);
+        second.Should().BeOfType<BasicAttackIntent>();
+    }
+
+    [Fact]
+    public void Fighter_approaches_before_using_a_zero_cast_range_offensive_skill()
+    {
+        NpcSkillObservation stun = new(4072, 1, -1, 13, NpcSkillCategory.Control,
+            NpcSkillObservationFlags.Ready);
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().DecideWithStrategy(
+            CreatePerception(target: Player, visible: [Hostile(Player, 500)], skills: [stun]),
+            Context(), NpcStrategyProfileResolver.AggressivePressure);
+
+        decision.Intents.Single().Should().BeOfType<ApproachTargetIntent>()
+            .Which.PreferredRange.Should().Be(40);
     }
 
     [Fact]

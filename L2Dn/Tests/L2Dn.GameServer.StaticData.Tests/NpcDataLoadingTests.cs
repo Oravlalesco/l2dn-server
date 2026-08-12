@@ -3,6 +3,7 @@ using L2Dn.GameServer.Configuration;
 using L2Dn.GameServer.Data.Xml;
 using L2Dn.GameServer.Enums;
 using L2Dn.GameServer.Model.Actor.Templates;
+using L2Dn.GameServer.Model.Skills;
 using System.Xml.Linq;
 
 namespace L2Dn.GameServer.StaticData.Tests;
@@ -23,6 +24,7 @@ public sealed class NpcDataLoadingTests
         NpcTemplate? survivalLaboratoryNpc = npcData.getTemplate(20292);
         NpcTemplate? crasher = npcData.getTemplate(20101);
         NpcTemplate? undineNoble = npcData.getTemplate(20115);
+        NpcTemplate? aggressiveLaboratoryNpc = npcData.getTemplate(20130);
 
         gremlin.Should().NotBeNull();
         gremlin!.getSkills().Should().ContainKey(4408);
@@ -46,6 +48,12 @@ public sealed class NpcDataLoadingTests
         undineNoble.Should().NotBeNull();
         undineNoble!.getAIType().Should().Be(AIType.FIGHTER);
         undineNoble.getAISkills(AISkillScope.ATTACK).Should().Contain(skill => skill.getId() == 4001);
+
+        aggressiveLaboratoryNpc.Should().NotBeNull();
+        Skill aggressiveStun = aggressiveLaboratoryNpc!.getAISkills(AISkillScope.DEBUFF)
+            .Single(skill => skill.getId() == 4072);
+        aggressiveStun.isMagic().Should().BeFalse();
+        aggressiveStun.getCastRange().Should().BeLessThanOrEqualTo(0);
     }
 
     [Fact]

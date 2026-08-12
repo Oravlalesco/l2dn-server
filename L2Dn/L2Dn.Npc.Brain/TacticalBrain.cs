@@ -39,13 +39,17 @@ public sealed class TacticalBrain
         double physicalReach = Math.Max(1, perception.State.Combat.PhysicalAttackRange) +
             perception.State.Physical.CollisionRadius + targetCollisionRadius;
         bool repeatedMeleeCast = state.LastDecision == NpcIntentType.CastSkill && distance <= physicalReach;
+        bool readyPhysicalMeleeSkillInReach = distance <= physicalReach &&
+            HasReadyPhysicalMeleeSkill(perception, perception.State.Combat.PhysicalAttackRange);
         // Legacy FIGHTER templates use ranged skills opportunistically, then close for their physical attack.
-        // MAGE/HEALER templates keep ranged spell preference. Actor movement is observed state, not new memory.
+        // Physical point-blank/melee skills remain legal and compete by score; only ranged/magic repetition
+        // yields to the physical attack. MAGE/HEALER templates keep ranged spell preference. Actor movement
+        // is observed state, not new memory.
         bool continuingPhysicalApproach = state.LastDecision == NpcIntentType.ApproachTarget &&
             perception.State.Physical.Flags.HasFlag(NpcPhysicalFlags.Moving);
         bool fighterPhysicalPreference = perception.State.Identity.LegacyAiType == LegacyNpcAiType.Fighter &&
-            (distance <= physicalReach || continuingPhysicalApproach ||
-                state.LastDecision == NpcIntentType.CastSkill);
+            !readyPhysicalMeleeSkillInReach &&
+            (distance <= physicalReach || continuingPhysicalApproach || state.LastDecision == NpcIntentType.CastSkill);
         NpcStrategyCandidateEligibility? offensiveSkillSuppression = repeatedMeleeCast
             ? NpcStrategyCandidateEligibility.RepeatedActionSuppressed
             : fighterPhysicalPreference
@@ -119,4 +123,11 @@ public sealed class TacticalBrain
 
     private static NpcIntentEnvelope Envelope(NpcPerceptionEnvelope snapshot, long sequence, NpcIntentType type) =>
         new(NpcIntent.CurrentSchemaVersion, snapshot.Npc, snapshot.StateRevision, sequence, type);
+
+    private static bool HasReadyPhysicalMeleeSkill(NpcPerceptionSnapshot perception, int physicalAttackRange) =>
+        perception.State.Skills.Any(skill =>
+            skill.Category is NpcSkillCategory.Offensive or NpcSkillCategory.Debuff or NpcSkillCategory.Control &&
+            skill.Flags.HasFlag(NpcSkillObservationFlags.Ready) &&
+            !skill.Flags.HasFlag(NpcSkillObservationFlags.Magic) &&
+            skill.Range <= Math.Max(1, physicalAttackRange));
 }
