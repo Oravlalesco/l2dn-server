@@ -165,7 +165,7 @@ S1-S7 cover melee/offensive skill, low HP/heal, ranged range, outside all ranges
 | `L2Dn.Npc.Contracts.Tests` | 17/17 passed |
 | `L2Dn.Npc.Brain.Tests` | 91/91 passed |
 | `L2Dn.GameServer.Model.Tests` | 126/126 passed |
-| focused NPC data/Talking Island loading | 2/2 passed |
+| focused NPC data/Talking Island/laboratory loading | 3/3 passed |
 | GameServer Release build | succeeded, 0 errors |
 | `git diff --check` | passed |
 
@@ -201,15 +201,41 @@ Tactical now emits no intent while the perception carries `NpcCombatFlags.Castin
 
 The next live pass exposed a separate range-boundary pause: an intent follow reached its requested range but remained registered without waking Brain, so the NPC retained its target until the next periodic Think. Intent-created follows are now one-shot at the boundary: reaching range removes that follow and emits exactly one `ActionReady`. A new decision then uses current range, MP, cooldown, target, and geodata. Automated coverage includes Crasher's control skill, Undine Noble's direct skill, melee priority, ranged re-use after the player runs, active-cast suppression, and the Gateway request for the one-shot range wakeup.
 
+### Accepted Shadow pass
+
+The corrected Shadow gameplay pass on 2026-08-12 was accepted after retesting the ranged-skill cadence and the one-shot range wakeup. Its service instance produced 31,124 Strategy evaluations/comparisons, all `ExactMatch`, while only the Phase 3 baseline reached the Gateway. It created 323 intents and executed 318; the five rejections were bounded `dead_actor` races. All 14 created `CastSkill` intents executed. There were no cooldown, MP, range, blocked-movement, or `skillunavailable` rejections, and no scheduler drops or execution failures.
+
+This closes the Shadow gameplay gate. It proves that the diagnostic path is safe and that the skill-loading/tactical corrections are a stable baseline. The zero changed-decision rate in that particular pass does not close Enabled validation: the next stage must deliberately exercise states where several legal actions compete.
+
+## Talking Island Strategy validation laboratory
+
+`spawns/TalkingIsland/StrategyValidationLab.xml` defines a dedicated four-lane laboratory around the existing Gatekeeper destination **Talking Island, Eastern Territory**. The normal arrival point remains clear:
+
+`-95336, 240478, -3264`
+
+Each lane contains three fixed-anchor copies with a 20-second respawn. Lanes are separated beyond the templates' normal aggro and clan-help radii so one profile can be tested without activating the complete laboratory.
+
+| Lane | Template | NPC | Profile | Approximate lane centre |
+|---|---:|---|---|---|
+| north | 20016 | Stone Golem | Balanced | `-94450, 242050, -3400` |
+| east | 20130 | Orc | AggressivePressure | `-92867, 240700, -3380` |
+| south | 20115 | Undine Noble | RangedControl | `-94250, 238983, -3450` |
+| west | 20292 | Enku Orc Shaman | Survival | `-96933, 240050, -3400` |
+
+The laboratory is test infrastructure, not part of the normal Talking Island population used to derive the 24-template area rollout. Automated data coverage checks that it contains exactly three unique spawn anchors for each profile, uses only base `Monster` templates, and does not silently alter the production-area template inventory.
+
+Deployment checkpoint on 2026-08-12: the focused data suite passed 3/3, the spawn XML passed schema validation, and the GameServer publish completed with zero errors (the two existing XML serializer-generator warnings remain). Startup loaded 29,151 spawns and completed initialization without rejecting a laboratory entry. The effective container environment contains exactly the four mappings above, while the latest OTLP mode gauges report reactive scheduler `Enabled`, Brain `Intent`, and Strategy `enabled`.
+
 ## Manual rollout gate
 
-The development compose configuration stages `NPC_STRATEGY_MODE=Shadow` with the 28-entry registry: all 24 Talking Island templates plus the four laboratory templates. Phase 4 is not complete yet. The next required evidence is:
+The development compose configuration now stages `NPC_STRATEGY_MODE=Enabled` with only the four laboratory templates. Every other Talking Island mob remains on the Phase 3 pipeline. Crasher therefore remains a useful unmodified control while Undine Noble exercises RangedControl.
 
-1. publish/restart the corrected local GameServer in Shadow;
-2. retest Crasher, Undine Noble, and the observed Orc/skill-capable mobs: one opportunistic ranged skill is acceptable, pursuit must continue to melee, physical attacks must dominate at melee, and reaching either skill or physical range must not cause a periodic-delay pause;
-3. verify Strategy evaluations/comparisons are non-zero, Strategy Gateway executions remain zero, drops/failures remain zero, single-flight remains one, and gameplay remains the Phase 3 baseline plus the data/tactical corrections;
-4. switch to `Enabled`, validate Talking Island coverage and the four dedicated laboratory profiles, and inspect intent rejection ratios and oscillations;
-5. switch Strategy back to `Disabled` and verify Phase 3 rollback;
-6. record live results, then and only then create `npc-brain-phase4-complete`.
+The deployment/startup portion is complete. The remaining required evidence is:
+
+1. validate Balanced, AggressivePressure, RangedControl, and Survival separately, collecting an OTLP delta for each lane;
+2. require zero scheduler drops/failures, single-flight one, no duplicated effects, no pathological oscillation, and a bounded Gateway rejection ratio;
+3. expand `Enabled` to the normal Talking Island templates in the planned Balanced, AggressivePressure, and RangedControl waves;
+4. switch Strategy back to `Disabled` and verify Phase 3 rollback while retaining the `skillList`, fighter-cadence, and range-wakeup corrections;
+5. restore the accepted final mode, record live results, then and only then create `npc-brain-phase4-complete`.
 
 No Phase 5 work, live-result commit, or completion tag is authorized before this gate passes.
