@@ -1,6 +1,7 @@
 using FluentAssertions;
 using L2Dn.GameServer.AI;
 using L2Dn.GameServer.AI.Runtime;
+using L2Dn.GameServer.AI.Scheduling;
 using L2Dn.GameServer.Model;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.GameServer.Model.Actor.Instances;
@@ -9,6 +10,7 @@ using L2Dn.GameServer.Model.InstanceZones;
 using L2Dn.GameServer.Model.Items.Instances;
 using L2Dn.GameServer.Model.Skills;
 using L2Dn.Geometry;
+using L2Dn.NpcBrain;
 using L2Dn.NpcContracts;
 
 namespace L2Dn.GameServer.Model.Tests;
@@ -353,6 +355,56 @@ public class NpcIntentGatewayTests
         configured.ReturnDefense.LeashGraceWorldTicks.Should().Be(35);
         configured.ReturnDefense.MaxLeashExcursions.Should().Be(2);
         configured.ReturnDefense.HardLeashExtension.Should().Be(750);
+    }
+
+    [Fact]
+    public void Strategy_configuration_builds_an_immutable_bounded_template_registry_at_startup()
+    {
+        List<string> warnings = [];
+        NpcStrategyOptions options = NpcStrategyOptions.FromEnvironment(NpcBrainMode.Intent,
+            NpcReactiveSchedulerMode.Enabled, name => name switch
+            {
+                "NPC_STRATEGY_MODE" => "shadow",
+                "NPC_STRATEGY_TEMPLATE_PROFILES" =>
+                    " 20003:Balanced, 20004:AGGRESSIVE_PRESSURE, 21101:ranged-control," +
+                    "20292:survival, 20004:survival, 30000:agressive_pressure, broken ",
+                _ => null
+            }, warnings.Add);
+
+        options.EffectiveMode.Should().Be(NpcStrategyMode.Shadow);
+        options.Registry.Count.Should().Be(4);
+        options.Registry.TryResolve(20003, out NpcStrategyProfile balanced, out _).Should().BeTrue();
+        balanced.Should().BeSameAs(NpcStrategyProfileResolver.Balanced);
+        options.Registry.TryResolve(20004, out NpcStrategyProfile duplicate, out _).Should().BeTrue();
+        duplicate.Should().BeSameAs(NpcStrategyProfileResolver.Survival);
+        options.Registry.TryResolve(30000, out _, out _).Should().BeFalse();
+        warnings.Should().Contain(message => message.Contains("last entry wins", StringComparison.Ordinal));
+        warnings.Should().Contain(message => message.Contains("unknown", StringComparison.Ordinal));
+        warnings.Should().Contain(message => message.Contains("malformed", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(NpcBrainMode.Legacy, NpcReactiveSchedulerMode.Enabled)]
+    [InlineData(NpcBrainMode.Shadow, NpcReactiveSchedulerMode.Enabled)]
+    [InlineData(NpcBrainMode.Intent, NpcReactiveSchedulerMode.Disabled)]
+    [InlineData(NpcBrainMode.Intent, NpcReactiveSchedulerMode.Shadow)]
+    public void Unsupported_strategy_mode_combinations_disable_only_strategy(
+        NpcBrainMode brainMode, NpcReactiveSchedulerMode reactiveMode)
+    {
+        bool registryRead = false;
+        NpcStrategyOptions options = NpcStrategyOptions.FromEnvironment(brainMode, reactiveMode, name =>
+        {
+            if (name == "NPC_STRATEGY_TEMPLATE_PROFILES")
+            {
+                registryRead = true;
+            }
+            return name == "NPC_STRATEGY_MODE" ? "enabled" : "20003:survival";
+        });
+
+        options.ConfiguredMode.Should().Be(NpcStrategyMode.Enabled);
+        options.EffectiveMode.Should().Be(NpcStrategyMode.Disabled);
+        options.Registry.Count.Should().Be(0);
+        registryRead.Should().BeFalse();
     }
 
     [Fact]

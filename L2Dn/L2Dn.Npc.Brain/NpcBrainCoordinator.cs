@@ -63,7 +63,7 @@ public sealed class NpcBrainCoordinator: INpcBrain
             perception.Envelope.StateRevision <= 0)
         {
             NpcBrainDecision empty = new(actor, 0, NpcBrainLayer.None, []);
-            return new NpcStrategyShadowEvaluation(empty, null, false, TimeSpan.Zero);
+            return new NpcStrategyShadowEvaluation(empty, null, false, TimeSpan.Zero, TimeSpan.Zero);
         }
 
         bool accepted = _states.TryUse(actor, state => DecideShadowWithState(
@@ -74,7 +74,8 @@ public sealed class NpcBrainCoordinator: INpcBrain
         }
 
         return new NpcStrategyShadowEvaluation(
-            new NpcBrainDecision(actor, 0, NpcBrainLayer.None, []), null, false, TimeSpan.Zero);
+            new NpcBrainDecision(actor, 0, NpcBrainLayer.None, []), null, false,
+            TimeSpan.Zero, TimeSpan.Zero);
     }
 
     public void Remove(NpcKey npc) => _states.Remove(npc);
@@ -156,21 +157,25 @@ public sealed class NpcBrainCoordinator: INpcBrain
     {
         NpcBrainState baselineState = persistedState.Clone();
         NpcBrainState strategyState = persistedState.Clone();
+        long baselineStartedAt = Stopwatch.GetTimestamp();
         NpcBrainDecision baseline = DecideWithState(
             perception, context, null, null, baselineState).Decision;
+        TimeSpan baselineDuration = Stopwatch.GetElapsedTime(baselineStartedAt);
         persistedState.CopyFrom(baselineState);
 
+        long strategyStartedAt = Stopwatch.GetTimestamp();
         try
         {
-            long strategyStartedAt = Stopwatch.GetTimestamp();
             NpcBrainDecision strategy = DecideWithState(
                 perception, context, strategyProfile, null, strategyState).Decision;
             return new NpcStrategyShadowEvaluation(baseline, strategy, false,
+                baselineDuration,
                 Stopwatch.GetElapsedTime(strategyStartedAt));
         }
         catch
         {
-            return new NpcStrategyShadowEvaluation(baseline, null, true, TimeSpan.Zero);
+            return new NpcStrategyShadowEvaluation(baseline, null, true,
+                baselineDuration, Stopwatch.GetElapsedTime(strategyStartedAt));
         }
     }
 

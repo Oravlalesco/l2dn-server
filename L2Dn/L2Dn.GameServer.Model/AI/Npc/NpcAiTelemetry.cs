@@ -299,7 +299,15 @@ public static class NpcAiTelemetry
         using Activity? activity = Activities.StartActivity("npc.brain.decide", ActivityKind.Internal);
         long startedAt = Stopwatch.GetTimestamp();
         NpcBrainDecision decision = decide();
-        double elapsed = Stopwatch.GetElapsedTime(startedAt).TotalSeconds;
+        RecordBrainDecision(decision, Stopwatch.GetElapsedTime(startedAt));
+        activity?.SetTag("brain.layer", decision.Layer.ToString());
+        activity?.SetTag("intent.count", decision.Intents.Length);
+        return decision;
+    }
+
+    internal static void RecordBrainDecision(NpcBrainDecision decision, TimeSpan duration)
+    {
+        double elapsed = duration.TotalSeconds;
         TagList tags = default;
         tags.Add("layer", decision.Layer.ToString());
         tags.Add("strategy", decision.Strategy.HasValue
@@ -323,9 +331,6 @@ public static class NpcAiTelemetry
             intentTags.Add("intent_policy", GetIntentPolicyTag(intent));
             IntentsCreated.Add(1, intentTags);
         }
-        activity?.SetTag("brain.layer", decision.Layer.ToString());
-        activity?.SetTag("intent.count", decision.Intents.Length);
-        return decision;
     }
 
     internal static NpcIntentExecutionResult ObserveIntentExecution(NpcIntent intent,

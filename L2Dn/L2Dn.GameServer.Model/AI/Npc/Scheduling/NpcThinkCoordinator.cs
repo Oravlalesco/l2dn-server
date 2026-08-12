@@ -3,11 +3,13 @@ using System.Threading.Channels;
 using L2Dn.GameServer.AI.Runtime;
 using L2Dn.GameServer.Model.Actor;
 using L2Dn.NpcContracts;
+using NLog;
 
 namespace L2Dn.GameServer.AI.Scheduling;
 
 internal sealed class NpcThinkCoordinator: IAsyncDisposable
 {
+    private static readonly Logger Logger = LogManager.GetLogger(nameof(NpcThinkCoordinator));
     private readonly NpcReactiveSchedulerOptions _options;
     private readonly INpcThinkExecutor _executor;
     private readonly INpcGenerationValidator _generationValidator;
@@ -32,8 +34,12 @@ internal sealed class NpcThinkCoordinator: IAsyncDisposable
 
     private static NpcThinkCoordinator CreateDefault()
     {
-        INpcThinkExecutor executor = NpcThinkExecutorFactory.Create(NpcBrainOptions.FromEnvironment());
-        return new NpcThinkCoordinator(NpcReactiveSchedulerOptions.FromEnvironment(), executor,
+        NpcReactiveSchedulerOptions scheduler = NpcReactiveSchedulerOptions.FromEnvironment();
+        NpcBrainOptions brain = NpcBrainOptions.FromEnvironment();
+        NpcStrategyOptions strategy = NpcStrategyOptions.FromEnvironment(brain.Mode, scheduler.Mode,
+            warning: message => Logger.Warn(message));
+        INpcThinkExecutor executor = NpcThinkExecutorFactory.Create(brain, strategy);
+        return new NpcThinkCoordinator(scheduler, executor,
             LegacyNpcThinkExecutor.Instance);
     }
 

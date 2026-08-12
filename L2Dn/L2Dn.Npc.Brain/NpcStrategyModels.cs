@@ -120,6 +120,7 @@ public sealed record NpcStrategyShadowEvaluation(
     NpcBrainDecision BaselineDecision,
     NpcBrainDecision? StrategyDecision,
     bool StrategyFailed,
+    TimeSpan BaselineDecisionDuration,
     TimeSpan StrategyDecisionDuration);
 
 internal static class NpcTacticalBaseline

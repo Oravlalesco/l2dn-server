@@ -622,10 +622,21 @@ public class NpcAiRuntimeTests
         NpcAiTelemetry.ObserveCommand("test_command", static () => { });
         NpcAiTelemetry.RecordGuardPursuitReset("return_home");
         NpcAiTelemetry.ObserveBrainDecision(() => new NpcBrainDecision(
-            new NpcKey(1, 1), 1, NpcBrainLayer.Tactical, [], NpcStrategyArchetype.RangedControl));
+            new NpcKey(1, 1), 1, NpcBrainLayer.Tactical, [],
+            new NpcStrategyDecisionSummary(NpcStrategyArchetype.RangedControl,
+                NpcStrategyAction.OffensiveSkill, NpcStrategyDecisionReason.HighestEligibleScore,
+                NpcStrategyModifierFlags.OffensiveSkillScore)));
+        NpcAiTelemetry.RecordStrategyEvaluation(new NpcStrategyDecisionSummary(
+                NpcStrategyArchetype.RangedControl, NpcStrategyAction.OffensiveSkill,
+                NpcStrategyDecisionReason.HighestEligibleScore,
+                NpcStrategyModifierFlags.OffensiveSkillScore),
+            TimeSpan.FromMilliseconds(1), NpcStrategyMode.Shadow);
+        NpcAiTelemetry.RecordStrategyShadowComparison(NpcStrategyArchetype.RangedControl,
+            new StrategyComparisonResult(NpcStrategyComparisonKind.DifferentAction));
         NpcAiTelemetry.SetPerceptionMode(NpcPerceptionMode.CaptureOnly);
         NpcAiTelemetry.SetReactiveSchedulerMode(NpcReactiveSchedulerMode.Enabled);
         NpcAiTelemetry.SetBrainMode(NpcBrainMode.Intent);
+        NpcAiTelemetry.SetStrategyMode(NpcStrategyMode.Shadow);
         listener.RecordObservableInstruments();
 
         measurements.Should().Contain(item => item.Name == "l2dn.npc.think.calls");
@@ -641,13 +652,24 @@ public class NpcAiRuntimeTests
         measurements.Should().Contain(item => item.Name == "l2dn.npc.guard.pursuit_reset" &&
             item.Tags.Any(tag => tag.Key == "outcome" && Equals(tag.Value, "return_home")));
         measurements.Should().Contain(item => item.Name == "l2dn.npc.brain.decision.count" &&
-            item.Tags.Any(tag => tag.Key == "strategy" && Equals(tag.Value, "RangedControl")));
+            item.Tags.Any(tag => tag.Key == "strategy" && Equals(tag.Value, "ranged_control")));
+        measurements.Should().Contain(item => item.Name == "l2dn.npc.strategy.evaluation.total" &&
+            item.Tags.Any(tag => tag.Key == "profile" && Equals(tag.Value, "ranged_control")));
+        measurements.Should().Contain(item => item.Name == "l2dn.npc.strategy.modifier.applied" &&
+            item.Tags.Any(tag => tag.Key == "modifier" && Equals(tag.Value, "offensive_skill_score")));
+        measurements.Should().Contain(item => item.Name == "l2dn.npc.strategy.action.selected" &&
+            item.Tags.Any(tag => tag.Key == "action" && Equals(tag.Value, "offensive_skill")));
+        measurements.Should().Contain(item => item.Name == "l2dn.npc.strategy.shadow.comparison" &&
+            item.Tags.Any(tag => tag.Key == "comparison" && Equals(tag.Value, "different_action")));
+        measurements.Should().Contain(item => item.Name == "l2dn.npc.strategy.shadow.changed_decision");
         measurements.Should().Contain(item => item.Name == "l2dn.npc.perception.mode" &&
             item.Tags.Any(tag => tag.Key == "mode" && Equals(tag.Value, "CaptureOnly")));
         measurements.Should().Contain(item => item.Name == "l2dn.npc.scheduler.reactive.mode" &&
             item.Tags.Any(tag => tag.Key == "mode" && Equals(tag.Value, "Enabled")));
         measurements.Should().Contain(item => item.Name == "l2dn.npc.brain.mode" &&
             item.Tags.Any(tag => tag.Key == "mode" && Equals(tag.Value, "Intent")));
+        measurements.Should().Contain(item => item.Name == "l2dn.npc.strategy.mode" &&
+            item.Tags.Any(tag => tag.Key == "mode" && Equals(tag.Value, "shadow")));
         measurements.SelectMany(item => item.Tags).Should().NotContain(tag =>
             tag.Key == "npc_id" || tag.Key == "object_id" || tag.Key == "template_id" || tag.Key == "npc_name");
     }

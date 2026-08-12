@@ -8,17 +8,19 @@ namespace L2Dn.GameServer.AI.Runtime;
 internal sealed class BrainNpcThinkExecutor: INpcThinkExecutor, INpcThinkLifecycle
 {
     private readonly LegacyNpcThinkExecutor _legacy;
-    private readonly INpcBrain _brain;
+    private readonly NpcBrainCoordinator _brain;
     private readonly NpcIntentGateway _gateway;
     private readonly NpcReturnDefensePolicy _returnDefense;
+    private readonly NpcStrategyOptions _strategy;
 
-    public BrainNpcThinkExecutor(LegacyNpcThinkExecutor legacy, INpcBrain brain, NpcIntentGateway gateway,
-        NpcReturnDefensePolicy returnDefense)
+    public BrainNpcThinkExecutor(LegacyNpcThinkExecutor legacy, NpcBrainCoordinator brain,
+        NpcIntentGateway gateway, NpcReturnDefensePolicy returnDefense, NpcStrategyOptions strategy)
     {
         _legacy = legacy;
         _brain = brain;
         _gateway = gateway;
         _returnDefense = returnDefense;
+        _strategy = strategy;
     }
 
     public ValueTask ExecuteAsync(NpcKey npc, NpcWakeContext context, CancellationToken cancellationToken)
@@ -48,10 +50,9 @@ internal sealed class BrainNpcThinkExecutor: INpcThinkExecutor, INpcThinkLifecyc
                 return;
             }
 
-            NpcBrainDecision decision = NpcAiTelemetry.ObserveBrainDecision(() => _brain.Decide(
-                perception.Snapshot,
-                new NpcBrainContext(NpcBrainStimulusMapper.Map(context.Reasons),
-                    ReturnDefense: _returnDefense)));
+            NpcBrainContext brainContext = new(NpcBrainStimulusMapper.Map(context.Reasons),
+                ReturnDefense: _returnDefense);
+            NpcBrainDecision decision = Decide(actor, perception.Snapshot, brainContext);
             foreach (NpcIntent intent in decision.Intents)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -63,4 +64,50 @@ internal sealed class BrainNpcThinkExecutor: INpcThinkExecutor, INpcThinkLifecyc
     }
 
     public void Remove(NpcKey npc) => _brain.Remove(npc);
+
+    private NpcBrainDecision Decide(Attackable actor, NpcPerceptionSnapshot perception,
+        NpcBrainContext context)
+    {
+        if (_strategy.EffectiveMode == NpcStrategyMode.Disabled ||
+            !_strategy.Registry.TryResolve(actor.getId(), out NpcStrategyProfile profile,
+                out bool runtimeFallback))
+        {
+            return NpcAiTelemetry.ObserveBrainDecision(() => _brain.Decide(perception, context));
+        }
+        if (runtimeFallback)
+        {
+            NpcAiTelemetry.RecordStrategyFallback("runtime_profile");
+        }
+
+        if (_strategy.EffectiveMode == NpcStrategyMode.Shadow)
+        {
+            NpcStrategyShadowEvaluation shadow = _brain.DecideShadow(perception, context, profile);
+            NpcAiTelemetry.RecordBrainDecision(shadow.BaselineDecision, shadow.BaselineDecisionDuration);
+            if (shadow.StrategyDecision?.StrategyDecision is { } strategyDecision)
+            {
+                NpcAiTelemetry.RecordStrategyEvaluation(strategyDecision,
+                    shadow.StrategyDecisionDuration, NpcStrategyMode.Shadow);
+                StrategyComparisonResult comparison = NpcStrategyDecisionComparer.Compare(
+                    shadow.BaselineDecision, shadow.StrategyDecision);
+                NpcAiTelemetry.RecordStrategyShadowComparison(profile.Archetype, comparison);
+            }
+            else
+            {
+                NpcAiTelemetry.RecordStrategyEvaluationFailure(profile.Archetype,
+                    shadow.StrategyDecisionDuration, NpcStrategyMode.Shadow);
+            }
+            return shadow.BaselineDecision;
+        }
+
+        long startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        NpcBrainDecision enabled = _brain.DecideWithStrategy(perception, context, profile);
+        TimeSpan duration = System.Diagnostics.Stopwatch.GetElapsedTime(startedAt);
+        NpcAiTelemetry.RecordBrainDecision(enabled, duration);
+        if (enabled.StrategyDecision is { } strategyDecisionEnabled)
+        {
+            NpcAiTelemetry.RecordStrategyEvaluation(strategyDecisionEnabled,
+                duration, NpcStrategyMode.Enabled);
+        }
+        return enabled;
+    }
 }

@@ -24,6 +24,26 @@ public sealed class NpcStrategyProfileResolver
 
     public static NpcStrategyProfileResolver Instance { get; } = new();
 
+    public static NpcStrategyProfile ResolveArchetype(NpcStrategyArchetype archetype,
+        out bool usedFallback)
+    {
+        usedFallback = false;
+        return archetype switch
+        {
+            NpcStrategyArchetype.Balanced => Balanced,
+            NpcStrategyArchetype.AggressivePressure => AggressivePressure,
+            NpcStrategyArchetype.RangedControl => RangedControl,
+            NpcStrategyArchetype.Survival => Survival,
+            _ => Fallback(out usedFallback)
+        };
+    }
+
+    private static NpcStrategyProfile Fallback(out bool usedFallback)
+    {
+        usedFallback = true;
+        return Balanced;
+    }
+
     public NpcStrategyProfileResolver(IReadOnlyDictionary<int, NpcStrategyProfile>? templateOverrides = null)
     {
         _templateOverrides = templateOverrides == null
