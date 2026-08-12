@@ -964,6 +964,195 @@ public class NpcBrainTests
         state.LastStrategy.Should().Be(NpcStrategyArchetype.Balanced);
     }
 
+    [Fact]
+    public void S1_melee_with_offensive_skill_preserves_profile_score_invariants()
+    {
+        NpcSkillObservation offensive = ReadySkill(107, NpcSkillCategory.Offensive, 600);
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 30)], skills: [offensive]);
+        Dictionary<NpcStrategyArchetype, NpcStrategyBrainEvaluation> results = EvaluateAll(perception);
+
+        Score(results, NpcStrategyArchetype.AggressivePressure, NpcStrategyAction.BasicAttack)
+            .Should().BeGreaterThanOrEqualTo(Score(results, NpcStrategyArchetype.Balanced,
+                NpcStrategyAction.BasicAttack));
+        Score(results, NpcStrategyArchetype.AggressivePressure, NpcStrategyAction.OffensiveSkill)
+            .Should().BeGreaterThanOrEqualTo(Score(results, NpcStrategyArchetype.Balanced,
+                NpcStrategyAction.OffensiveSkill));
+        results.Values.Should().OnlyContain(result =>
+            result.Decision.Intents.Single() is CastSkillIntent);
+    }
+
+    [Fact]
+    public void S2_low_hp_with_heal_makes_survival_at_least_as_conservative_as_balanced()
+    {
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 30)], hp: 20,
+            skills: [ReadySkill(205, NpcSkillCategory.Heal),
+                ReadySkill(107, NpcSkillCategory.Offensive, 600)]);
+        Dictionary<NpcStrategyArchetype, NpcStrategyBrainEvaluation> results = EvaluateAll(perception);
+
+        Score(results, NpcStrategyArchetype.Survival, NpcStrategyAction.Heal)
+            .Should().BeGreaterThanOrEqualTo(Score(results, NpcStrategyArchetype.Balanced,
+                NpcStrategyAction.Heal));
+        results[NpcStrategyArchetype.Survival].Decision.StrategyDecision!.Value.SelectedAction
+            .Should().Be(NpcStrategyAction.Heal);
+    }
+
+    [Fact]
+    public void S3_ranged_target_in_skill_range_favors_ranged_control_utility()
+    {
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 500)], skills: [ReadySkill(107, NpcSkillCategory.Offensive, 600)]);
+        Dictionary<NpcStrategyArchetype, NpcStrategyBrainEvaluation> results = EvaluateAll(perception);
+
+        Score(results, NpcStrategyArchetype.RangedControl, NpcStrategyAction.OffensiveSkill)
+            .Should().BeGreaterThanOrEqualTo(Score(results, NpcStrategyArchetype.Balanced,
+                NpcStrategyAction.OffensiveSkill));
+        results[NpcStrategyArchetype.RangedControl].Decision.Intents.Single()
+            .Should().BeOfType<CastSkillIntent>();
+    }
+
+    [Fact]
+    public void S4_target_outside_every_range_never_becomes_an_executable_skill_intent()
+    {
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 900)], skills: [ReadySkill(107, NpcSkillCategory.Offensive, 600)]);
+
+        EvaluateAll(perception).Values.Should().OnlyContain(result =>
+            result.Decision.Intents.Single() is ApproachTargetIntent &&
+            Candidate(result, NpcStrategyAction.OffensiveSkill).Eligibility ==
+                NpcStrategyCandidateEligibility.OutOfRange);
+    }
+
+    [Fact]
+    public void S5_offensive_skill_on_cooldown_is_ineligible_for_every_profile()
+    {
+        NpcSkillObservation cooldown = new(107, 1, 600, 20, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Cooldown | NpcSkillObservationFlags.Magic);
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 30)], skills: [cooldown]);
+
+        EvaluateAll(perception).Values.Should().OnlyContain(result =>
+            result.Decision.Intents.Single() is BasicAttackIntent &&
+            Candidate(result, NpcStrategyAction.OffensiveSkill).Eligibility ==
+                NpcStrategyCandidateEligibility.SkillUnavailable);
+    }
+
+    [Fact]
+    public void S6_offensive_skill_with_insufficient_mana_is_ineligible_for_every_profile()
+    {
+        NpcSkillObservation noMana = new(107, 1, 600, 20, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.InsufficientMana | NpcSkillObservationFlags.Magic);
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 30)], skills: [noMana]);
+
+        EvaluateAll(perception).Values.Should().OnlyContain(result =>
+            result.Decision.Intents.Single() is BasicAttackIntent &&
+            Candidate(result, NpcStrategyAction.OffensiveSkill).Eligibility ==
+                NpcStrategyCandidateEligibility.SkillUnavailable);
+    }
+
+    [Fact]
+    public void S7_flee_is_strengthened_only_when_the_tactical_profile_allows_it()
+    {
+        NpcIntelligenceProfile canFlee = new(NpcIntelligenceArchetype.BasicMeleeMob,
+            true, true, true, true, 20, 0, 200);
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 30)], hp: 15);
+        Dictionary<NpcStrategyArchetype, NpcStrategyBrainEvaluation> results = EvaluateAll(perception,
+            new NpcBrainContext(NpcBrainStimulus.Attacked, canFlee));
+
+        StrategyBrain strategyBrain = new();
+        TacticalActionEvaluator evaluator = new();
+        int balancedFlee = evaluator.Evaluate(perception, canFlee,
+            strategyBrain.Decide(perception, canFlee, NpcStrategyProfileResolver.Balanced), 30).Score;
+        int survivalFlee = evaluator.Evaluate(perception, canFlee,
+            strategyBrain.Decide(perception, canFlee, NpcStrategyProfileResolver.Survival), 30).Score;
+
+        survivalFlee.Should().BeGreaterThanOrEqualTo(balancedFlee);
+        results[NpcStrategyArchetype.Survival].Decision.Intents.Single().Should().BeOfType<FleeIntent>();
+    }
+
+    [Theory]
+    [InlineData(NpcStrategyArchetype.Balanced)]
+    [InlineData(NpcStrategyArchetype.AggressivePressure)]
+    [InlineData(NpcStrategyArchetype.RangedControl)]
+    [InlineData(NpcStrategyArchetype.Survival)]
+    public void Same_input_profile_and_initial_state_is_exactly_deterministic_for_1000_runs(
+        NpcStrategyArchetype archetype)
+    {
+        NpcStrategyProfile strategy = NpcStrategyProfileResolver.ResolveArchetype(archetype, out _);
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 30)], hp: 20,
+            skills: [ReadySkill(205, NpcSkillCategory.Heal),
+                ReadySkill(107, NpcSkillCategory.Offensive, 600)]);
+        NpcBrainDecision expected = new NpcBrainCoordinator().DecideWithStrategy(
+            perception, Context(), strategy);
+
+        for (int iteration = 0; iteration < 1000; iteration++)
+        {
+            NpcBrainDecision actual = new NpcBrainCoordinator().DecideWithStrategy(
+                perception, Context(), strategy);
+            actual.Actor.Should().Be(expected.Actor);
+            actual.DecisionSequence.Should().Be(expected.DecisionSequence);
+            actual.Layer.Should().Be(expected.Layer);
+            actual.StrategyDecision.Should().Be(expected.StrategyDecision);
+            actual.Intents.Should().Equal(expected.Intents);
+        }
+    }
+
+    [Theory]
+    [InlineData(NpcStrategyArchetype.Balanced)]
+    [InlineData(NpcStrategyArchetype.AggressivePressure)]
+    [InlineData(NpcStrategyArchetype.RangedControl)]
+    [InlineData(NpcStrategyArchetype.Survival)]
+    public void Strategy_replay_sequence_is_exactly_deterministic(NpcStrategyArchetype archetype)
+    {
+        NpcStrategyProfile strategy = NpcStrategyProfileResolver.ResolveArchetype(archetype, out _);
+        NpcPerceptionSnapshot[] replay =
+        [
+            CreatePerception(visible: [Hostile(Player, 80)]),
+            CreatePerception(target: Player, visible: [Hostile(Player, 500)],
+                skills: [ReadySkill(107, NpcSkillCategory.Offensive, 600)], revision: 2),
+            CreatePerception(target: Player, visible: [Hostile(Player, 30)], hp: 20,
+                skills: [ReadySkill(205, NpcSkillCategory.Heal)], revision: 3)
+        ];
+        NpcBrainCoordinator first = new();
+        NpcBrainCoordinator second = new();
+
+        NpcBrainDecision[] firstRun = replay.Select(frame =>
+            first.DecideWithStrategy(frame, Context(), strategy)).ToArray();
+        NpcBrainDecision[] secondRun = replay.Select(frame =>
+            second.DecideWithStrategy(frame, Context(), strategy)).ToArray();
+
+        firstRun.Zip(secondRun).Should().OnlyContain(pair =>
+            pair.First.Actor == pair.Second.Actor &&
+            pair.First.DecisionSequence == pair.Second.DecisionSequence &&
+            pair.First.Layer == pair.Second.Layer &&
+            pair.First.StrategyDecision == pair.Second.StrategyDecision &&
+            pair.First.Intents.SequenceEqual(pair.Second.Intents, EqualityComparer<NpcIntent>.Default));
+    }
+
+    private static Dictionary<NpcStrategyArchetype, NpcStrategyBrainEvaluation> EvaluateAll(
+        NpcPerceptionSnapshot perception, NpcBrainContext? context = null) =>
+        Enum.GetValues<NpcStrategyArchetype>().ToDictionary(archetype => archetype, archetype =>
+            new NpcBrainCoordinator().DecideWithStrategyDiagnostics(perception, context ?? Context(),
+                NpcStrategyProfileResolver.ResolveArchetype(archetype, out _)));
+
+    private static int Score(IReadOnlyDictionary<NpcStrategyArchetype, NpcStrategyBrainEvaluation> results,
+        NpcStrategyArchetype profile, NpcStrategyAction action) =>
+        Candidate(results[profile], action).EffectiveScore;
+
+    private static NpcStrategyCandidateScore Candidate(NpcStrategyBrainEvaluation result,
+        NpcStrategyAction action) => result.Diagnostics.CandidateScores
+        .Where(candidate => candidate.Action == action)
+        .OrderByDescending(candidate => candidate.EffectiveScore)
+        .First();
+
+    private static NpcSkillObservation ReadySkill(int id, NpcSkillCategory category, int range = 0) =>
+        new(id, 1, range, 10, category,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+
     private static NpcBrainContext Context(NpcBrainStimulus stimuli = NpcBrainStimulus.PeriodicDue) => new(stimuli);
 
     private static VisibleEntity Hostile(EntityKey key, double distance, int ordinal = 0) =>
