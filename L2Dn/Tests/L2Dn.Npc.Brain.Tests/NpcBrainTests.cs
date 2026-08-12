@@ -433,6 +433,44 @@ public class NpcBrainTests
     }
 
     [Fact]
+    public void Tactical_brain_emits_no_action_while_an_existing_cast_is_in_progress()
+    {
+        NpcSkillObservation skill = new(4247, 1, 1_000, 13, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcBrainCoordinator brain = new();
+
+        NpcBrainDecision decision = brain.DecideWithStrategy(
+            CreatePerception(target: Player, visible: [Hostile(Player, 500)], skills: [skill],
+                combatFlags: NpcCombatFlags.Casting), Context(),
+            NpcStrategyProfileResolver.RangedControl);
+
+        decision.Intents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Casting_wakeup_preserves_last_valid_decision_for_the_next_melee_choice()
+    {
+        NpcSkillObservation skill = new(4247, 1, 1_000, 13, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcBrainCoordinator brain = new();
+
+        NpcBrainDecision cast = brain.DecideWithStrategy(
+            CreatePerception(target: Player, visible: [Hostile(Player, 30)], skills: [skill]),
+            Context(), NpcStrategyProfileResolver.RangedControl);
+        NpcBrainDecision whileCasting = brain.DecideWithStrategy(
+            CreatePerception(target: Player, visible: [Hostile(Player, 30)], skills: [skill],
+                revision: 2, combatFlags: NpcCombatFlags.Casting), Context(),
+            NpcStrategyProfileResolver.RangedControl);
+        NpcBrainDecision ready = brain.DecideWithStrategy(
+            CreatePerception(target: Player, visible: [Hostile(Player, 30)], skills: [skill],
+                revision: 3), Context(), NpcStrategyProfileResolver.RangedControl);
+
+        cast.Intents.Single().Should().BeOfType<CastSkillIntent>();
+        whileCasting.Intents.Should().BeEmpty();
+        ready.Intents.Single().Should().BeOfType<BasicAttackIntent>();
+    }
+
+    [Fact]
     public void Target_inside_collision_adjusted_skill_reach_is_cast_on_instead_of_stalling()
     {
         NpcSkillObservation skill = new(107, 2, 100, 20, NpcSkillCategory.Offensive,
@@ -1262,13 +1300,14 @@ public class NpcBrainTests
         long revision = 1,
         long? worldTick = null,
         int combatLeashDistance = 1500,
-        LegacyNpcAiType legacyAiType = LegacyNpcAiType.Fighter)
+        LegacyNpcAiType legacyAiType = LegacyNpcAiType.Fighter,
+        NpcCombatFlags combatFlags = NpcCombatFlags.None)
     {
         NpcKey npc = actor ?? Actor;
         NpcIdentity identity = new(100, NpcKind.Monster, legacyAiType, 20, 300, [], capabilities);
         NpcPhysicalState physical = new(position ?? new NpcPosition(0, 0, 0, 0), hp, 100, 50, 50, 8, 16,
             physicalFlags);
-        NpcCombatFacts combat = new(target, 40, 500, NpcCombatFlags.None);
+        NpcCombatFacts combat = new(target, 40, 500, combatFlags);
         NpcEnvironment environment = new(new RegionKey(0, 1, 1), spawn, true, true, false,
             returningToSpawn, true, 300, combatLeashDistance);
         NpcPerceptionState state = new(identity, physical, combat, environment, visible, threats, [], [], skills);

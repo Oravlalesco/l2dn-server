@@ -27,6 +27,7 @@ public sealed class TacticalBrain
         NpcStrategyDiagnosticsCollector? diagnostics)
     {
         if (!profile.TacticalEnabled || !NpcPerceptionFacts.IsActorOperational(perception) ||
+            perception.State.Combat.Flags.HasFlag(NpcCombatFlags.Casting) ||
             perception.State.Combat.CurrentTarget is not { } target ||
             !NpcPerceptionFacts.TryGetValidTarget(perception, target, out VisibleEntity visibleTarget,
                 out double distance))

@@ -163,7 +163,7 @@ S1-S7 cover melee/offensive skill, low HP/heal, ranged range, outside all ranges
 | Gate | Result |
 |---|---:|
 | `L2Dn.Npc.Contracts.Tests` | 17/17 passed |
-| `L2Dn.Npc.Brain.Tests` | 82/82 passed |
+| `L2Dn.Npc.Brain.Tests` | 84/84 passed |
 | `L2Dn.GameServer.Model.Tests` | 125/125 passed |
 | focused NPC data/Talking Island loading | 2/2 passed |
 | GameServer Release build | succeeded, 0 errors |
@@ -190,6 +190,10 @@ The first Talking Island Shadow play pass made NPC skills visible after the `ski
 The cause was the static Phase 3 offensive-skill score winning every evaluation while the skill remained ready. Tactical selection now suppresses only the immediately repeated offensive skill when the same target is already inside physical attack reach. The basic attack can therefore win the next evaluation, producing a deterministic `CastSkill, BasicAttack, CastSkill, BasicAttack` cadence for the canonical melee case. Outside physical reach, repeated ranged casting remains available, so a caster is not forced into an unnecessary approach loop. The rule applies equally to Disabled, Shadow baseline, and Enabled; it adds no RNG, dynamic profile selection, direct execution, or Gateway bypass.
 
 Replay diagnostics expose the condition as `RepeatedActionSuppressed`. Automated coverage proves the four profiles share the melee safety behavior, the exact Phase 3 path receives the same correction, and ranged casts are not suppressed merely for being consecutive.
+
+The follow-up Crasher pass on 2026-08-12 confirmed immediate ranged casting, pursuit beyond Dagger Storm range, and resumed ranged attacks, but also exposed short idle-looking windows. The corresponding service-instance telemetry recorded 186 created casts, 115 executed casts, and 71 `skillunavailable` rejections, with no cast rejection for mana, cooldown, or range. Dagger Storm has a two-second hit time; reactive wakeups were evaluating Tactical again while the prior cast was still active.
+
+Tactical now emits no intent while the perception carries `NpcCombatFlags.Casting`. A no-intent evaluation preserves the previous effective decision and its world tick, so the completion `ActionReady` wakeup still applies deterministic melee alternation. This eliminates speculative cast/attack commands during an active cast without delaying or weakening Gateway validation. Tests cover both the empty in-progress-cast decision and the complete `CastSkill, no intent while casting, BasicAttack` melee trajectory.
 
 ## Manual rollout gate
 

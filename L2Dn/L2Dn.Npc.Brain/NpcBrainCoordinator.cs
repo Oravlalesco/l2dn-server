@@ -134,8 +134,11 @@ public sealed class NpcBrainCoordinator: INpcBrain
         }
 
         state.LastTarget = perception.State.Combat.CurrentTarget;
-        state.LastDecision = intent?.Envelope.IntentType;
-        state.LastDecisionWorldTick = perception.Envelope.WorldTick;
+        if (intent != null)
+        {
+            state.LastDecision = intent.Envelope.IntentType;
+            state.LastDecisionWorldTick = perception.Envelope.WorldTick;
+        }
         state.FleeMode = intent is FleeIntent;
         state.LastStrategy = strategy?.Archetype ?? NpcStrategyArchetype.Balanced;
 
