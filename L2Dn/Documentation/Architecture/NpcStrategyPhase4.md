@@ -240,7 +240,11 @@ Tactical eligibility now distinguishes physical point-blank/melee skills from ra
 
 Automated validation after this correction reports Contracts 17/17, Brain 93/93, GameServer.Model 126/126, and focused data/laboratory 3/3. Enabled R1-R5 at 5,000 NPCs/100,000 mixed events reports zero drops, zero overflow states, and maximum concurrent Think/NPC of one in all five scenarios; worst Strategy P99 was 1.0521 ms.
 
-The focused Orc retest was accepted. The player observed stun attempts whenever reuse permitted, with a visible interval of physical attacks rather than continuous skill execution. The isolated AggressivePressure telemetry recorded 23 `offensive_skill`, 75 `attack`, and 54 `approach` selections. All 23 Orc casts reached execution; there were no skill, cooldown, MP, range, geodata, or blocked-movement rejections. The only two Gateway rejections in the session were bounded `dead_actor` races. No dropped wakeup or scheduler-execution-failure series was emitted.
+The focused Orc retest was accepted for **selection and Gateway execution**. The player observed stun attempts whenever reuse permitted, with a visible interval of physical attacks rather than continuous skill execution. The isolated AggressivePressure telemetry recorded 23 `offensive_skill`, 75 `attack`, and 54 `approach` selections. All 23 Orc casts reached execution; there were no skill, cooldown, MP, range, geodata, or blocked-movement rejections. The only two Gateway rejections in the session were bounded `dead_actor` races. No dropped wakeup or scheduler-execution-failure series was emitted.
+
+That pass did not prove authoritative control. A later live session showed the stun icon while the player could still move. GameServer logged `callSkill() failed: Action blocked event requires a Creature argument` from `BlockActions.onStart` → `startParalyze` → `EVT_ACTION_BLOCKED` with no `Creature`. `SkillCaster.callSkill` swallowed the exception, so the abnormal could display without finishing immobilize. The defect is GameServer effect/AI notify, not Strategy or template 20130.
+
+After passing the caster into control AI events (and skipping root/mute/confuse notify when the caster is missing, so those handlers cannot self-aggro), a live Orc retest on 2026-08-12 applied both the icon and the movement lock. Control skills are therefore accepted only when Gateway executes them **and** the target is actually action-blocked for the abnormal duration, with zero `callSkill() failed` of this family.
 
 The four-profile laboratory gate is therefore PASS. Rollout proceeds to the low-risk Balanced wave while retaining the accepted Orc, Undine Noble, and Enku Orc Shaman templates as controls. The first area wave enables Balanced for templates 20016, 20120, 20121, 20432, 20442, 20481, and 20544; all other normal Talking Island templates remain Phase 3.
 
@@ -251,7 +255,7 @@ The development compose configuration now stages `NPC_STRATEGY_MODE=Enabled` for
 The deployment/startup portion is complete. The remaining required evidence is:
 
 1. validate the normal Balanced templates against Phase 3 control behavior and collect an OTLP delta;
-2. require zero scheduler drops/failures, single-flight one, no duplicated effects, no pathological oscillation, and a bounded Gateway rejection ratio;
+2. require zero scheduler drops/failures, single-flight one, no duplicated effects, no pathological oscillation, a bounded Gateway rejection ratio, and zero `callSkill() failed` from control AI notify;
 3. continue with the planned AggressivePressure and RangedControl area waves;
 4. switch Strategy back to `Disabled` and verify Phase 3 rollback while retaining the `skillList`, fighter-cadence, and range-wakeup corrections;
 5. restore the accepted final mode, record live results, then and only then create `npc-brain-phase4-complete`.

@@ -63,7 +63,7 @@ public sealed class KnockBack: AbstractEffect
 
     public override void continuousInstant(Creature effector, Creature effected, Skill skill, Item? item)
     {
-        effected.startParalyze();
+        effected.startParalyze(effector);
 
         if (_knockDown)
             knockBack(effector, effected);

@@ -33,7 +33,8 @@ public sealed class Root: AbstractEffect
             return;
 
         effected.stopMove(null);
-        effected.getAI().notifyEvent(CtrlEvent.EVT_ROOTED);
+        if (effector != null)
+            effected.getAI().notifyEvent(CtrlEvent.EVT_ROOTED, effector);
     }
 
     public override int GetHashCode() => this.GetSingletonHashCode();

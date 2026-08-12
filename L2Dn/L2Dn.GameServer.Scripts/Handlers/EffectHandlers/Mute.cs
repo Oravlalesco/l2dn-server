@@ -27,7 +27,8 @@ public sealed class Mute: AbstractEffect
             return;
 
         effected.abortCast();
-        effected.getAI().notifyEvent(CtrlEvent.EVT_MUTED);
+        if (effector != null)
+            effected.getAI().notifyEvent(CtrlEvent.EVT_MUTED, effector);
     }
 
     public override int GetHashCode() => this.GetSingletonHashCode();

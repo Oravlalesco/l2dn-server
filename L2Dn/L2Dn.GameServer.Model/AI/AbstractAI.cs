@@ -259,34 +259,29 @@ public abstract class AbstractAI : Ctrl
 			}
 			case CtrlEvent.EVT_ACTION_BLOCKED:
 			{
-                if (arg0 is not Creature creature)
-                    throw new InvalidOperationException("Action blocked event requires a Creature argument.");
-
-                onEvtActionBlocked(creature);
+				// Handler ignores attacker (only stops auto-attack/movement). Fall back to the actor
+				// so a missing caster cannot abort skill application the way Stun 4072 did.
+				Creature creature = arg0 as Creature ?? _actor;
+				onEvtActionBlocked(creature);
 				break;
 			}
 			case CtrlEvent.EVT_ROOTED:
 			{
-                if (arg0 is not Creature creature)
-                    throw new InvalidOperationException("Rooted event requires a Creature argument.");
-
-                onEvtRooted(creature);
+				// Do not fall back to _actor: onEvtRooted calls onEvtAttacked and would self-aggro.
+				if (arg0 is Creature rootedBy)
+					onEvtRooted(rootedBy);
 				break;
 			}
 			case CtrlEvent.EVT_CONFUSED:
 			{
-                if (arg0 is not Creature creature)
-                    throw new InvalidOperationException("Confused event requires a Creature argument.");
-
-                onEvtConfused(creature);
+				if (arg0 is Creature confusedBy)
+					onEvtConfused(confusedBy);
 				break;
 			}
 			case CtrlEvent.EVT_MUTED:
 			{
-                if (arg0 is not Creature creature)
-                    throw new InvalidOperationException("Muted event requires a Creature argument.");
-
-                onEvtMuted(creature);
+				if (arg0 is Creature mutedBy)
+					onEvtMuted(mutedBy);
 				break;
 			}
 			case CtrlEvent.EVT_EVADED:

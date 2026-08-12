@@ -33,7 +33,8 @@ public sealed class Confuse: AbstractEffect
 
     public override void instant(Creature effector, Creature effected, Skill skill, Item? item)
     {
-        effected.getAI().notifyEvent(CtrlEvent.EVT_CONFUSED);
+        if (effector != null)
+            effected.getAI().notifyEvent(CtrlEvent.EVT_CONFUSED, effector);
 
         List<Creature> targetList = [];
         // Getting the possible targets

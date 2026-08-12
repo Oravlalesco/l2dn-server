@@ -21,7 +21,8 @@ public sealed class PhysicalMute: AbstractEffect
 
     public override void onStart(Creature effector, Creature effected, Skill skill, Item? item)
     {
-        effected.getAI().notifyEvent(CtrlEvent.EVT_MUTED);
+        if (effector != null)
+            effected.getAI().notifyEvent(CtrlEvent.EVT_MUTED, effector);
     }
 
     public override int GetHashCode() => this.GetSingletonHashCode();

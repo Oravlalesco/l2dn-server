@@ -38,7 +38,7 @@ public class BlockActions: AbstractEffect
         foreach (int skillId in _allowedSkills)
             effected.addBlockActionsAllowedSkill(skillId);
 
-        effected.startParalyze();
+        effected.startParalyze(effector);
 
         // Cancel running skill casters.
         effected.abortAllSkillCasters();

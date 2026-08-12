@@ -2380,13 +2380,18 @@ public abstract class Creature: WorldObject, ISkillsHolder, IEventContainerProvi
 		}
 	}
 
-	public void startParalyze()
+	/**
+	 * Abort attacks/casts/movement and notify the AI that actions are blocked (stun, sleep, paralyze, knock-down).
+	 * @param caster the creature that applied the block, or {@code null} when unknown (falls back to this creature)
+	 */
+	public void startParalyze(Creature? caster = null)
 	{
 		// Aborts any attacks/casts if paralyzed
 		abortAttack();
 		abortCast();
 		stopMove(null);
-		getAI().notifyEvent(CtrlEvent.EVT_ACTION_BLOCKED);
+		// AbstractAI requires a Creature for EVT_ACTION_BLOCKED; the handler does not use it for aggro.
+		getAI().notifyEvent(CtrlEvent.EVT_ACTION_BLOCKED, caster ?? this);
 	}
 
 	/**
