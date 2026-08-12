@@ -240,15 +240,19 @@ Tactical eligibility now distinguishes physical point-blank/melee skills from ra
 
 Automated validation after this correction reports Contracts 17/17, Brain 93/93, GameServer.Model 126/126, and focused data/laboratory 3/3. Enabled R1-R5 at 5,000 NPCs/100,000 mixed events reports zero drops, zero overflow states, and maximum concurrent Think/NPC of one in all five scenarios; worst Strategy P99 was 1.0521 ms.
 
+The focused Orc retest was accepted. The player observed stun attempts whenever reuse permitted, with a visible interval of physical attacks rather than continuous skill execution. The isolated AggressivePressure telemetry recorded 23 `offensive_skill`, 75 `attack`, and 54 `approach` selections. All 23 Orc casts reached execution; there were no skill, cooldown, MP, range, geodata, or blocked-movement rejections. The only two Gateway rejections in the session were bounded `dead_actor` races. No dropped wakeup or scheduler-execution-failure series was emitted.
+
+The four-profile laboratory gate is therefore PASS. Rollout proceeds to the low-risk Balanced wave while retaining the accepted Orc, Undine Noble, and Enku Orc Shaman templates as controls. The first area wave enables Balanced for templates 20016, 20120, 20121, 20432, 20442, 20481, and 20544; all other normal Talking Island templates remain Phase 3.
+
 ## Manual rollout gate
 
-The development compose configuration now stages `NPC_STRATEGY_MODE=Enabled` with only the four laboratory templates. Every other Talking Island mob remains on the Phase 3 pipeline. Crasher therefore remains a useful unmodified control while Undine Noble exercises RangedControl.
+The development compose configuration now stages `NPC_STRATEGY_MODE=Enabled` for the seven-template Balanced area wave plus the three accepted non-Balanced laboratory controls. Every other Talking Island mob remains on the Phase 3 pipeline. Crasher therefore remains a useful unmodified control while Undine Noble exercises RangedControl.
 
 The deployment/startup portion is complete. The remaining required evidence is:
 
-1. validate Balanced, AggressivePressure, RangedControl, and Survival separately, collecting an OTLP delta for each lane;
+1. validate the normal Balanced templates against Phase 3 control behavior and collect an OTLP delta;
 2. require zero scheduler drops/failures, single-flight one, no duplicated effects, no pathological oscillation, and a bounded Gateway rejection ratio;
-3. expand `Enabled` to the normal Talking Island templates in the planned Balanced, AggressivePressure, and RangedControl waves;
+3. continue with the planned AggressivePressure and RangedControl area waves;
 4. switch Strategy back to `Disabled` and verify Phase 3 rollback while retaining the `skillList`, fighter-cadence, and range-wakeup corrections;
 5. restore the accepted final mode, record live results, then and only then create `npc-brain-phase4-complete`.
 
