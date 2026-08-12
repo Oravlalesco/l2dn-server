@@ -49,6 +49,47 @@ public class ControlEffectAiNotifyTests
     }
 
     [Fact]
+    public void StartParalyze_does_not_lock_movement_until_block_actions_is_set()
+    {
+        Attackable actor = CreateActor();
+
+        actor.startParalyze();
+
+        actor.isMovementDisabled().Should().BeFalse(
+            "startParalyze only stops the current move; the stun lock is the BLOCK_ACTIONS flag");
+
+        actor.setBlockActions(true);
+
+        actor.hasBlockActions().Should().BeTrue();
+        actor.isMovementDisabled().Should().BeTrue();
+        actor.isAllSkillsDisabled().Should().BeTrue();
+    }
+
+    [Fact]
+    public void ActionBlocked_does_not_add_threat_even_when_caster_is_present()
+    {
+        Attackable actor = CreateActor();
+        Attackable caster = CreateActor();
+
+        actor.getAI().notifyEvent(CtrlEvent.EVT_ACTION_BLOCKED, caster);
+
+        actor.getAggroList().IsEmpty.Should().BeTrue(
+            "EVT_ACTION_BLOCKED must not treat the caster as an attacker; fallback to the actor is safe");
+    }
+
+    [Fact]
+    public void Rooted_with_caster_adds_threat_to_caster_not_self()
+    {
+        Attackable actor = CreateActor();
+        Attackable caster = CreateActor();
+
+        actor.getAI().notifyEvent(CtrlEvent.EVT_ROOTED, caster);
+
+        actor.getAggroList().ContainsKey(caster).Should().BeTrue();
+        actor.getAggroList().ContainsKey(actor).Should().BeFalse();
+    }
+
+    [Fact]
     public void Rooted_muted_and_confused_notify_without_caster_does_not_throw_or_self_aggro()
     {
         Attackable actor = CreateActor();
@@ -67,12 +108,12 @@ public class ControlEffectAiNotifyTests
 
         Action withCaster = () =>
         {
-            actor.getAI().notifyEvent(CtrlEvent.EVT_ROOTED, caster);
             actor.getAI().notifyEvent(CtrlEvent.EVT_MUTED, caster);
             actor.getAI().notifyEvent(CtrlEvent.EVT_CONFUSED, caster);
         };
 
         withCaster.Should().NotThrow();
+        actor.getAggroList().ContainsKey(actor).Should().BeFalse();
     }
 
     private static Attackable CreateActor()
