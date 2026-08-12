@@ -173,12 +173,37 @@ public static class NpcAiTelemetry
     private static readonly Counter<long> BrainShadowDiffs =
         Meter.CreateCounter<long>("l2dn.npc.brain.shadow.diff", "{comparison}", "Shadow Brain decisions differing from legacy commands.");
 
+    private static readonly Counter<long> StrategyEvaluations =
+        Meter.CreateCounter<long>("l2dn.npc.strategy.evaluation.total", "{evaluation}", "Strategy evaluations completed.");
+
+    private static readonly Histogram<double> StrategyEvaluationDuration =
+        Meter.CreateHistogram<double>("l2dn.npc.strategy.evaluation.duration", "s", "Strategy decision pipeline duration.");
+
+    private static readonly Counter<long> StrategyProfilesResolved =
+        Meter.CreateCounter<long>("l2dn.npc.strategy.profile.resolved", "{profile}", "Strategy profiles resolved for evaluation.");
+
+    private static readonly Counter<long> StrategyModifiersApplied =
+        Meter.CreateCounter<long>("l2dn.npc.strategy.modifier.applied", "{modifier}", "Strategy modifiers applied to baseline preferences.");
+
+    private static readonly Counter<long> StrategyActionsSelected =
+        Meter.CreateCounter<long>("l2dn.npc.strategy.action.selected", "{action}", "Actions selected by Strategy evaluation.");
+
+    private static readonly Counter<long> StrategyShadowComparisons =
+        Meter.CreateCounter<long>("l2dn.npc.strategy.shadow.comparison", "{comparison}", "Causal Shadow comparisons by semantic outcome.");
+
+    private static readonly Counter<long> StrategyShadowChangedDecisions =
+        Meter.CreateCounter<long>("l2dn.npc.strategy.shadow.changed_decision", "{decision}", "Shadow evaluations whose semantic decision changed.");
+
+    private static readonly Counter<long> StrategyFallbacks =
+        Meter.CreateCounter<long>("l2dn.npc.strategy.fallback", "{fallback}", "Safe Strategy fallbacks by bounded reason.");
+
     private static readonly object SnapshotLock = new();
     private static StateSnapshot _snapshot = StateSnapshot.Empty;
     private static long _snapshotTimestamp;
     private static int _perceptionMode;
     private static int _reactiveSchedulerMode;
     private static int _brainMode;
+    private static int _strategyMode;
     private static long _criticalQueueDepth;
     private static long _combatQueueDepth;
     private static long _normalQueueDepth;
@@ -210,6 +235,10 @@ public static class NpcAiTelemetry
             Meter.CreateObservableGauge("l2dn.npc.brain.mode", () => new Measurement<long>(1,
                 new KeyValuePair<string, object?>("mode", ((NpcBrainMode)Volatile.Read(ref _brainMode)).ToString())),
                 "{mode}", "Configured NPC Brain operating mode."),
+            Meter.CreateObservableGauge("l2dn.npc.strategy.mode", () => new Measurement<long>(1,
+                new KeyValuePair<string, object?>("mode", ToStrategyModeTag(
+                    (NpcStrategyMode)Volatile.Read(ref _strategyMode)))),
+                "{mode}", "Effective NPC Strategy operating mode."),
             Meter.CreateObservableGauge("l2dn.npc.scheduler.queue.depth", ObserveQueueDepth,
                 "{wakeup}", "Current NPC reactive queue depth by priority."),
             Meter.CreateObservableGauge("l2dn.npc.scheduler.active_workers", () => Volatile.Read(ref _activeReactiveWorkers),
@@ -262,6 +291,9 @@ public static class NpcAiTelemetry
 
     internal static void SetBrainMode(NpcBrainMode mode) => Volatile.Write(ref _brainMode, (int)mode);
 
+    internal static void SetStrategyMode(NpcStrategyMode mode) =>
+        Volatile.Write(ref _strategyMode, (int)mode);
+
     internal static NpcBrainDecision ObserveBrainDecision(Func<NpcBrainDecision> decide)
     {
         using Activity? activity = Activities.StartActivity("npc.brain.decide", ActivityKind.Internal);
@@ -270,7 +302,9 @@ public static class NpcAiTelemetry
         double elapsed = Stopwatch.GetElapsedTime(startedAt).TotalSeconds;
         TagList tags = default;
         tags.Add("layer", decision.Layer.ToString());
-        tags.Add("strategy", decision.Strategy.ToString());
+        tags.Add("strategy", decision.Strategy.HasValue
+            ? ToStrategyProfileTag(decision.Strategy.Value)
+            : "disabled");
         tags.Add("outcome", decision.Intents.IsEmpty ? "no_intent" : "intent");
         BrainDecisions.Add(1, tags);
         BrainDecisionDuration.Record(elapsed, tags);
@@ -350,6 +384,119 @@ public static class NpcAiTelemetry
             BrainShadowDiffs.Add(1, tag);
         }
     }
+
+    internal static void RecordStrategyEvaluation(NpcStrategyDecisionSummary decision,
+        TimeSpan duration, NpcStrategyMode mode, bool succeeded = true)
+    {
+        string profile = ToStrategyProfileTag(decision.Profile);
+        TagList tags = default;
+        tags.Add("profile", profile);
+        tags.Add("mode", ToStrategyModeTag(mode));
+        tags.Add("outcome", succeeded ? "success" : "failure");
+        StrategyEvaluations.Add(1, tags);
+        StrategyEvaluationDuration.Record(duration.TotalSeconds, tags);
+        StrategyProfilesResolved.Add(1, new KeyValuePair<string, object?>("profile", profile));
+
+        string? action = ToStrategyActionTag(decision.SelectedAction);
+        if (action != null)
+        {
+            StrategyActionsSelected.Add(1,
+                new KeyValuePair<string, object?>("profile", profile),
+                new KeyValuePair<string, object?>("action", action));
+        }
+        RecordStrategyModifiers(profile, decision.AppliedModifiers);
+    }
+
+    internal static void RecordStrategyEvaluationFailure(NpcStrategyArchetype profile,
+        TimeSpan duration, NpcStrategyMode mode)
+    {
+        NpcStrategyDecisionSummary failed = new(profile, NpcStrategyAction.None,
+            NpcStrategyDecisionReason.None, NpcStrategyModifierFlags.None);
+        RecordStrategyEvaluation(failed, duration, mode, false);
+    }
+
+    internal static void RecordStrategyShadowComparison(NpcStrategyArchetype profile,
+        StrategyComparisonResult comparison)
+    {
+        string profileTag = ToStrategyProfileTag(profile);
+        string comparisonTag = ToStrategyComparisonTag(comparison.Kind);
+        StrategyShadowComparisons.Add(1,
+            new KeyValuePair<string, object?>("profile", profileTag),
+            new KeyValuePair<string, object?>("comparison", comparisonTag));
+        if (comparison.ChangedDecision)
+        {
+            StrategyShadowChangedDecisions.Add(1,
+                new KeyValuePair<string, object?>("profile", profileTag),
+                new KeyValuePair<string, object?>("comparison", comparisonTag));
+        }
+    }
+
+    internal static void RecordStrategyFallback(string reason) => StrategyFallbacks.Add(1,
+        new KeyValuePair<string, object?>("reason", reason));
+
+    private static void RecordStrategyModifiers(string profile, NpcStrategyModifierFlags modifiers)
+    {
+        for (int bit = 0; bit < 8; bit++)
+        {
+            NpcStrategyModifierFlags modifier = (NpcStrategyModifierFlags)(1 << bit);
+            if ((modifiers & modifier) == 0)
+            {
+                continue;
+            }
+            StrategyModifiersApplied.Add(1,
+                new KeyValuePair<string, object?>("profile", profile),
+                new KeyValuePair<string, object?>("modifier", ToStrategyModifierTag(modifier)));
+        }
+    }
+
+    private static string ToStrategyProfileTag(NpcStrategyArchetype profile) => profile switch
+    {
+        NpcStrategyArchetype.AggressivePressure => "aggressive_pressure",
+        NpcStrategyArchetype.RangedControl => "ranged_control",
+        NpcStrategyArchetype.Survival => "survival",
+        _ => "balanced"
+    };
+
+    private static string? ToStrategyActionTag(NpcStrategyAction action) => action switch
+    {
+        NpcStrategyAction.BasicAttack => "attack",
+        NpcStrategyAction.Approach => "approach",
+        NpcStrategyAction.OffensiveSkill => "offensive_skill",
+        NpcStrategyAction.Heal => "heal",
+        NpcStrategyAction.Flee => "flee",
+        _ => null
+    };
+
+    private static string ToStrategyComparisonTag(NpcStrategyComparisonKind comparison) => comparison switch
+    {
+        NpcStrategyComparisonKind.ExactMatch => "exact_match",
+        NpcStrategyComparisonKind.SemanticMatch => "semantic_match",
+        NpcStrategyComparisonKind.DifferentAction => "different_action",
+        NpcStrategyComparisonKind.DifferentTarget => "different_target",
+        NpcStrategyComparisonKind.DifferentSkill => "different_skill",
+        NpcStrategyComparisonKind.DifferentMovement => "different_movement",
+        _ => "not_comparable"
+    };
+
+    private static string ToStrategyModeTag(NpcStrategyMode mode) => mode switch
+    {
+        NpcStrategyMode.Shadow => "shadow",
+        NpcStrategyMode.Enabled => "enabled",
+        _ => "disabled"
+    };
+
+    private static string ToStrategyModifierTag(NpcStrategyModifierFlags modifier) => modifier switch
+    {
+        NpcStrategyModifierFlags.BasicAttackScore => "attack_score",
+        NpcStrategyModifierFlags.ApproachScore => "approach_score",
+        NpcStrategyModifierFlags.OffensiveSkillScore => "offensive_skill_score",
+        NpcStrategyModifierFlags.HealScore => "heal_score",
+        NpcStrategyModifierFlags.FleeScore => "flee_score",
+        NpcStrategyModifierFlags.HealHpPercent => "heal_hp_percent",
+        NpcStrategyModifierFlags.FleeHpPercent => "flee_hp_percent",
+        NpcStrategyModifierFlags.PreferredRange => "preferred_range",
+        _ => "none"
+    };
 
     private static string ToRejectionTag(NpcIntentRejectionReason reason) => reason switch
     {

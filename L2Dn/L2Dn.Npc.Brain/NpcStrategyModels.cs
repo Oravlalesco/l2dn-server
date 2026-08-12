@@ -119,7 +119,8 @@ public sealed record StrategyReplayResult(
 public sealed record NpcStrategyShadowEvaluation(
     NpcBrainDecision BaselineDecision,
     NpcBrainDecision? StrategyDecision,
-    bool StrategyFailed);
+    bool StrategyFailed,
+    TimeSpan StrategyDecisionDuration);
 
 internal static class NpcTacticalBaseline
 {

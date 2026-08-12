@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using L2Dn.NpcContracts;
 
 namespace L2Dn.NpcBrain;
@@ -62,7 +63,7 @@ public sealed class NpcBrainCoordinator: INpcBrain
             perception.Envelope.StateRevision <= 0)
         {
             NpcBrainDecision empty = new(actor, 0, NpcBrainLayer.None, []);
-            return new NpcStrategyShadowEvaluation(empty, null, false);
+            return new NpcStrategyShadowEvaluation(empty, null, false, TimeSpan.Zero);
         }
 
         bool accepted = _states.TryUse(actor, state => DecideShadowWithState(
@@ -73,7 +74,7 @@ public sealed class NpcBrainCoordinator: INpcBrain
         }
 
         return new NpcStrategyShadowEvaluation(
-            new NpcBrainDecision(actor, 0, NpcBrainLayer.None, []), null, false);
+            new NpcBrainDecision(actor, 0, NpcBrainLayer.None, []), null, false, TimeSpan.Zero);
     }
 
     public void Remove(NpcKey npc) => _states.Remove(npc);
@@ -161,13 +162,15 @@ public sealed class NpcBrainCoordinator: INpcBrain
 
         try
         {
+            long strategyStartedAt = Stopwatch.GetTimestamp();
             NpcBrainDecision strategy = DecideWithState(
                 perception, context, strategyProfile, null, strategyState).Decision;
-            return new NpcStrategyShadowEvaluation(baseline, strategy, false);
+            return new NpcStrategyShadowEvaluation(baseline, strategy, false,
+                Stopwatch.GetElapsedTime(strategyStartedAt));
         }
         catch
         {
-            return new NpcStrategyShadowEvaluation(baseline, null, true);
+            return new NpcStrategyShadowEvaluation(baseline, null, true, TimeSpan.Zero);
         }
     }
 
