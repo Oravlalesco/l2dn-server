@@ -84,7 +84,8 @@ public enum NpcStrategyCandidateEligibility
     OutOfRange = 3,
     ActorUnavailable = 4,
     TargetUnavailable = 5,
-    RepeatedActionSuppressed = 6
+    RepeatedActionSuppressed = 6,
+    TacticalPreferenceSuppressed = 7
 }
 
 public readonly record struct NpcStrategyCandidateScore(

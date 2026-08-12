@@ -38,13 +38,24 @@ public sealed class TacticalBrain
         double targetCollisionRadius = visibleTarget.Entity == target ? visibleTarget.CollisionRadius : 0;
         double physicalReach = Math.Max(1, perception.State.Combat.PhysicalAttackRange) +
             perception.State.Physical.CollisionRadius + targetCollisionRadius;
-        bool suppressRepeatedOffensiveSkill = state.LastDecision == NpcIntentType.CastSkill &&
-            distance <= physicalReach;
+        bool repeatedMeleeCast = state.LastDecision == NpcIntentType.CastSkill && distance <= physicalReach;
+        // Legacy FIGHTER templates use ranged skills opportunistically, then close for their physical attack.
+        // MAGE/HEALER templates keep ranged spell preference. Actor movement is observed state, not new memory.
+        bool continuingPhysicalApproach = state.LastDecision == NpcIntentType.ApproachTarget &&
+            perception.State.Physical.Flags.HasFlag(NpcPhysicalFlags.Moving);
+        bool fighterPhysicalPreference = perception.State.Identity.LegacyAiType == LegacyNpcAiType.Fighter &&
+            (distance <= physicalReach || continuingPhysicalApproach ||
+                state.LastDecision == NpcIntentType.CastSkill);
+        NpcStrategyCandidateEligibility? offensiveSkillSuppression = repeatedMeleeCast
+            ? NpcStrategyCandidateEligibility.RepeatedActionSuppressed
+            : fighterPhysicalPreference
+                ? NpcStrategyCandidateEligibility.TacticalPreferenceSuppressed
+                : null;
         NpcTacticalScore score = strategy.HasValue
             ? _evaluator.Evaluate(perception, profile, strategy.Value, distance,
-                targetCollisionRadius, diagnostics, suppressRepeatedOffensiveSkill)
+                targetCollisionRadius, diagnostics, offensiveSkillSuppression)
             : _evaluator.Evaluate(perception, profile, distance, targetCollisionRadius,
-                suppressRepeatedOffensiveSkill);
+                offensiveSkillSuppression);
         NpcPerceptionEnvelope snapshot = perception.Envelope;
         bool defensiveReturn = state.ReturnState == NpcReturnEngagementState.DefensiveReturn;
         if (defensiveReturn && score.Action == NpcTacticalAction.Flee)

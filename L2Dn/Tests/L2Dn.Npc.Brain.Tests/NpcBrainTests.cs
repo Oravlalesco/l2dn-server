@@ -361,7 +361,7 @@ public class NpcBrainTests
     [InlineData(NpcStrategyArchetype.AggressivePressure)]
     [InlineData(NpcStrategyArchetype.RangedControl)]
     [InlineData(NpcStrategyArchetype.Survival)]
-    public void Consecutive_ready_offensive_skills_are_suppressed_when_basic_attack_is_in_range(
+    public void Consecutive_ready_caster_skills_are_suppressed_when_basic_attack_is_in_range(
         NpcStrategyArchetype archetype)
     {
         NpcSkillObservation skill = new(4247, 1, 1_000, 13, NpcSkillCategory.Offensive,
@@ -371,7 +371,8 @@ public class NpcBrainTests
 
         NpcIntent[] sequence = Enumerable.Range(1, 4).Select(revision =>
             brain.DecideWithStrategy(CreatePerception(target: Player,
-                    visible: [Hostile(Player, 30)], skills: [skill], revision: revision),
+                    visible: [Hostile(Player, 30)], skills: [skill], revision: revision,
+                    legacyAiType: LegacyNpcAiType.Mage),
                 Context(), strategy).Intents.Single()).ToArray();
 
         sequence.Select(intent => intent.Envelope.IntentType).Should().Equal(
@@ -380,7 +381,7 @@ public class NpcBrainTests
     }
 
     [Fact]
-    public void Phase3_baseline_also_suppresses_consecutive_offensive_casts_after_skilllist_fix()
+    public void Phase3_fighter_prefers_physical_attacks_when_already_in_melee_range()
     {
         NpcSkillObservation skill = new(4072, 1, 40, 10, NpcSkillCategory.Control,
             NpcSkillObservationFlags.Ready);
@@ -391,8 +392,72 @@ public class NpcBrainTests
         NpcIntent second = brain.Decide(CreatePerception(target: Player,
             visible: [Hostile(Player, 30)], skills: [skill], revision: 2), Context()).Intents.Single();
 
-        first.Should().BeOfType<CastSkillIntent>();
+        first.Should().BeOfType<BasicAttackIntent>();
         second.Should().BeOfType<BasicAttackIntent>();
+    }
+
+    [Theory]
+    [InlineData(4247, NpcSkillCategory.Offensive)]
+    [InlineData(4001, NpcSkillCategory.Offensive)]
+    public void Fighter_uses_one_ranged_skill_then_closes_and_prioritizes_melee(
+        int skillId, NpcSkillCategory category)
+    {
+        NpcSkillObservation skill = new(skillId, 1, 1_000, 13, category,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcBrainCoordinator brain = new();
+
+        NpcIntent opening = brain.Decide(CreatePerception(target: Player,
+            visible: [Hostile(Player, 500)], skills: [skill]), Context()).Intents.Single();
+        NpcIntent close = brain.Decide(CreatePerception(target: Player,
+            visible: [Hostile(Player, 500)], skills: [skill], revision: 2), Context()).Intents.Single();
+        NpcIntent pursuing = brain.Decide(CreatePerception(target: Player,
+            visible: [Hostile(Player, 250)], skills: [skill], revision: 3,
+            physicalFlags: NpcPhysicalFlags.Alive | NpcPhysicalFlags.Spawned | NpcPhysicalFlags.Moving),
+            Context()).Intents.Single();
+        NpcIntent melee = brain.Decide(CreatePerception(target: Player,
+            visible: [Hostile(Player, 30)], skills: [skill], revision: 4), Context()).Intents.Single();
+
+        opening.Should().BeOfType<CastSkillIntent>();
+        close.Should().BeOfType<ApproachTargetIntent>().Which.PreferredRange.Should().Be(40);
+        pursuing.Should().BeOfType<ApproachTargetIntent>().Which.PreferredRange.Should().Be(40);
+        melee.Should().BeOfType<BasicAttackIntent>();
+    }
+
+    [Fact]
+    public void Fighter_can_use_its_ranged_skill_again_when_target_runs_after_melee()
+    {
+        NpcSkillObservation skill = new(4247, 1, 1_000, 13, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcBrainCoordinator brain = new();
+
+        NpcIntent melee = brain.Decide(CreatePerception(target: Player,
+            visible: [Hostile(Player, 30)], skills: [skill]), Context()).Intents.Single();
+        NpcIntent targetRan = brain.Decide(CreatePerception(target: Player,
+            visible: [Hostile(Player, 500, moving: true)], skills: [skill], revision: 2,
+            physicalFlags: NpcPhysicalFlags.Alive | NpcPhysicalFlags.Spawned | NpcPhysicalFlags.Moving),
+            Context()).Intents.Single();
+
+        melee.Should().BeOfType<BasicAttackIntent>();
+        targetRan.Should().BeOfType<CastSkillIntent>();
+    }
+
+    [Theory]
+    [InlineData(NpcStrategyArchetype.Balanced)]
+    [InlineData(NpcStrategyArchetype.AggressivePressure)]
+    [InlineData(NpcStrategyArchetype.RangedControl)]
+    [InlineData(NpcStrategyArchetype.Survival)]
+    public void Strategy_profile_cannot_replace_a_fighter_melee_attack_with_a_ranged_skill(
+        NpcStrategyArchetype archetype)
+    {
+        NpcSkillObservation skill = new(4001, 1, 1_000, 8, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcStrategyProfile strategy = NpcStrategyProfileResolver.ResolveArchetype(archetype, out _);
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().DecideWithStrategy(
+            CreatePerception(target: Player, visible: [Hostile(Player, 30)], skills: [skill]),
+            Context(), strategy);
+
+        decision.Intents.Single().Should().BeOfType<BasicAttackIntent>();
     }
 
     [Fact]
@@ -403,10 +468,12 @@ public class NpcBrainTests
         NpcBrainCoordinator brain = new();
 
         NpcIntent first = brain.DecideWithStrategy(CreatePerception(target: Player,
-                visible: [Hostile(Player, 500)], skills: [skill]), Context(),
+                visible: [Hostile(Player, 500)], skills: [skill],
+                legacyAiType: LegacyNpcAiType.Mage), Context(),
             NpcStrategyProfileResolver.RangedControl).Intents.Single();
         NpcIntent second = brain.DecideWithStrategy(CreatePerception(target: Player,
-                visible: [Hostile(Player, 500)], skills: [skill], revision: 2), Context(),
+                visible: [Hostile(Player, 500)], skills: [skill], revision: 2,
+                legacyAiType: LegacyNpcAiType.Mage), Context(),
             NpcStrategyProfileResolver.RangedControl).Intents.Single();
 
         first.Should().BeOfType<CastSkillIntent>();
@@ -420,12 +487,14 @@ public class NpcBrainTests
             NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
         NpcBrainCoordinator brain = new();
         brain.DecideWithStrategy(CreatePerception(target: Player,
-                visible: [Hostile(Player, 30)], skills: [skill]), Context(),
+                visible: [Hostile(Player, 30)], skills: [skill],
+                legacyAiType: LegacyNpcAiType.Mage), Context(),
             NpcStrategyProfileResolver.RangedControl);
 
         NpcStrategyBrainEvaluation evaluation = brain.DecideWithStrategyDiagnostics(
             CreatePerception(target: Player, visible: [Hostile(Player, 30)],
-                skills: [skill], revision: 2), Context(), NpcStrategyProfileResolver.RangedControl);
+                skills: [skill], revision: 2, legacyAiType: LegacyNpcAiType.Mage), Context(),
+            NpcStrategyProfileResolver.RangedControl);
 
         evaluation.Decision.Intents.Single().Should().BeOfType<BasicAttackIntent>();
         Candidate(evaluation, NpcStrategyAction.OffensiveSkill).Eligibility
@@ -455,15 +524,18 @@ public class NpcBrainTests
         NpcBrainCoordinator brain = new();
 
         NpcBrainDecision cast = brain.DecideWithStrategy(
-            CreatePerception(target: Player, visible: [Hostile(Player, 30)], skills: [skill]),
+            CreatePerception(target: Player, visible: [Hostile(Player, 30)], skills: [skill],
+                legacyAiType: LegacyNpcAiType.Mage),
             Context(), NpcStrategyProfileResolver.RangedControl);
         NpcBrainDecision whileCasting = brain.DecideWithStrategy(
             CreatePerception(target: Player, visible: [Hostile(Player, 30)], skills: [skill],
-                revision: 2, combatFlags: NpcCombatFlags.Casting), Context(),
+                revision: 2, combatFlags: NpcCombatFlags.Casting,
+                legacyAiType: LegacyNpcAiType.Mage), Context(),
             NpcStrategyProfileResolver.RangedControl);
         NpcBrainDecision ready = brain.DecideWithStrategy(
             CreatePerception(target: Player, visible: [Hostile(Player, 30)], skills: [skill],
-                revision: 3), Context(), NpcStrategyProfileResolver.RangedControl);
+                revision: 3, legacyAiType: LegacyNpcAiType.Mage), Context(),
+            NpcStrategyProfileResolver.RangedControl);
 
         cast.Intents.Single().Should().BeOfType<CastSkillIntent>();
         whileCasting.Intents.Should().BeEmpty();
@@ -1083,7 +1155,7 @@ public class NpcBrainTests
     {
         NpcSkillObservation offensive = ReadySkill(107, NpcSkillCategory.Offensive, 600);
         NpcPerceptionSnapshot perception = CreatePerception(target: Player,
-            visible: [Hostile(Player, 30)], skills: [offensive]);
+            visible: [Hostile(Player, 30)], skills: [offensive], legacyAiType: LegacyNpcAiType.Mage);
         Dictionary<NpcStrategyArchetype, NpcStrategyBrainEvaluation> results = EvaluateAll(perception);
 
         Score(results, NpcStrategyArchetype.AggressivePressure, NpcStrategyAction.BasicAttack)
@@ -1279,9 +1351,11 @@ public class NpcBrainTests
 
     private static NpcBrainContext Context(NpcBrainStimulus stimuli = NpcBrainStimulus.PeriodicDue) => new(stimuli);
 
-    private static VisibleEntity Hostile(EntityKey key, double distance, int ordinal = 0) =>
+    private static VisibleEntity Hostile(EntityKey key, double distance, int ordinal = 0,
+        bool moving = false) =>
         new(ordinal, key, new NpcPosition((int)distance, 0, 0, 0), 20, 5, 10, distance,
-            EntityStateFlags.Alive | EntityStateFlags.Spawned,
+            EntityStateFlags.Alive | EntityStateFlags.Spawned |
+                (moving ? EntityStateFlags.Moving : EntityStateFlags.None),
             EntityRelationFlags.Player | EntityRelationFlags.Playable | EntityRelationFlags.SameInstance |
             EntityRelationFlags.AutoAttackable);
 

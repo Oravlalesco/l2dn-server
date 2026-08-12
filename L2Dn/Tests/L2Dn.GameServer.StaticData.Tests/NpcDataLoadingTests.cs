@@ -21,6 +21,8 @@ public sealed class NpcDataLoadingTests
         NpcTemplate? gremlin = npcData.getTemplate(20001);
         NpcTemplate? rangedLaboratoryNpc = npcData.getTemplate(21101);
         NpcTemplate? survivalLaboratoryNpc = npcData.getTemplate(20292);
+        NpcTemplate? crasher = npcData.getTemplate(20101);
+        NpcTemplate? undineNoble = npcData.getTemplate(20115);
 
         gremlin.Should().NotBeNull();
         gremlin!.getSkills().Should().ContainKey(4408);
@@ -36,6 +38,14 @@ public sealed class NpcDataLoadingTests
             .Should().Contain(skill => skill.getId() == 4065);
         survivalLaboratoryNpc.getAISkills(AISkillScope.ATTACK)
             .Should().Contain(skill => skill.getId() == 4151 || skill.getId() == 4160);
+
+        crasher.Should().NotBeNull();
+        crasher!.getAIType().Should().Be(AIType.FIGHTER);
+        crasher.getAISkills(AISkillScope.ATTACK).Should().Contain(skill => skill.getId() == 4247);
+
+        undineNoble.Should().NotBeNull();
+        undineNoble!.getAIType().Should().Be(AIType.FIGHTER);
+        undineNoble.getAISkills(AISkillScope.ATTACK).Should().Contain(skill => skill.getId() == 4001);
     }
 
     [Fact]
