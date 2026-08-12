@@ -264,7 +264,7 @@ public class NpcData: DataReaderBase
 			set.set("fakePlayerTalkable", el.GetAttributeValueAsBooleanOrNull("fakePlayerTalkable"));
 		});
 
-		element.Elements("skilllist").Elements("skill").ForEach(el =>
+		element.Elements("skillList").Elements("skill").ForEach(el =>
 		{
 			int skillId = el.GetAttributeValueAsInt32("id");
 			int skillLevel = el.GetAttributeValueAsInt32("level");
