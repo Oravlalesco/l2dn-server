@@ -10,7 +10,7 @@ internal interface ILegacyNpcCommandExecutor
 {
     void SetIntention(AbstractAI ai, CtrlIntention intention, object? argument = null);
     void MoveTo(AbstractAI ai, Location3D destination);
-    void StartFollow(AbstractAI ai, Creature target, int range = -1);
+    void StartFollow(AbstractAI ai, Creature target, int range = -1, bool wakeWhenInRange = false);
     void StopFollow(AbstractAI ai);
     void StopMovement(AbstractAI ai);
     void SetTarget(Creature actor, WorldObject? target);

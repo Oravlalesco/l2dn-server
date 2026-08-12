@@ -17,6 +17,7 @@ public class CreatureFollowTaskManager
     private static readonly Logger _logger = LogManager.GetLogger(nameof(CreatureFollowTaskManager));
     private static readonly Map<Creature, int> NORMAL_FOLLOW_CREATURES = new();
     private static readonly Map<Creature, int> ATTACK_FOLLOW_CREATURES = new();
+    private static readonly Map<Creature, bool> WAKE_WHEN_IN_RANGE = new();
     private static bool _workingNormal;
     private static bool _workingAttack;
 
@@ -119,6 +120,13 @@ public class CreatureFollowTaskManager
 						}
 						ai.moveToPawn(followTarget, followRange);
 					}
+					else if (WAKE_WHEN_IN_RANGE.TryRemove(creature, out _))
+					{
+						// Intent approaches are single-shot. Re-evaluate immediately at the range boundary
+						// instead of retaining a follow that waits for the next periodic Think.
+						ATTACK_FOLLOW_CREATURES.remove(creature);
+						ai.notifyEvent(CtrlEvent.EVT_THINK);
+					}
 				}
 				else
 				{
@@ -148,8 +156,16 @@ public class CreatureFollowTaskManager
 		follow(creature, range);
 	}
 
-	public void addAttackFollow(Creature creature, int range)
+	public void addAttackFollow(Creature creature, int range, bool wakeWhenInRange = false)
 	{
+		if (wakeWhenInRange)
+		{
+			WAKE_WHEN_IN_RANGE.put(creature, true);
+		}
+		else
+		{
+			WAKE_WHEN_IN_RANGE.remove(creature);
+		}
 		ATTACK_FOLLOW_CREATURES.TryAdd(creature, range);
 		follow(creature, range);
 	}
@@ -158,6 +174,7 @@ public class CreatureFollowTaskManager
 	{
 		NORMAL_FOLLOW_CREATURES.remove(creature);
 		ATTACK_FOLLOW_CREATURES.remove(creature);
+		WAKE_WHEN_IN_RANGE.remove(creature);
 	}
 
 	public static CreatureFollowTaskManager getInstance()

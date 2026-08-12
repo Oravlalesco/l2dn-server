@@ -738,6 +738,12 @@ public abstract class AbstractAI : Ctrl
 	[MethodImpl(MethodImplOptions.Synchronized)]
 	public void startFollow(Creature target, int range)
 	{
+		startFollow(target, range, false);
+	}
+
+	[MethodImpl(MethodImplOptions.Synchronized)]
+	internal void startFollow(Creature target, int range, bool wakeWhenInRange)
+	{
 		stopFollow();
 		setTarget(target);
 		if (range == -1)
@@ -746,7 +752,7 @@ public abstract class AbstractAI : Ctrl
 		}
 		else
 		{
-			CreatureFollowTaskManager.getInstance().addAttackFollow(_actor, range);
+			CreatureFollowTaskManager.getInstance().addAttackFollow(_actor, range, wakeWhenInRange);
 		}
 	}
 

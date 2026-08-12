@@ -296,7 +296,7 @@ internal sealed class NpcIntentGateway
         // Only an active follow registration proves that this target is already approached.
         else if (!ReferenceEquals(actor.getTarget(), liveTarget) || !ai.isFollowing())
         {
-            _commands.StartFollow(ai, liveTarget, stoppingRange);
+            _commands.StartFollow(ai, liveTarget, stoppingRange, true);
         }
         return NpcIntentExecutionResult.Executed();
     }

@@ -151,6 +151,22 @@ public class NpcIntentGatewayTests
     }
 
     [Fact]
+    public void Generic_approach_requests_one_action_ready_wakeup_when_follow_range_is_reached()
+    {
+        Attackable actor = CreateActor();
+        Attackable target = CreateActor();
+        target.setXYZ(500, 0, 0);
+        RecordingCommands commands = new();
+        NpcIntentGateway gateway = CreateGateway(commands, actor, target);
+        ApproachTargetIntent intent = new(Envelope(actor, NpcIntentType.ApproachTarget), Key(target), 40);
+
+        gateway.Execute(intent).IsExecuted.Should().BeTrue();
+
+        commands.StartFollowCalls.Should().Be(1);
+        commands.WakeWhenFollowRangeReached.Should().BeTrue();
+    }
+
+    [Fact]
     public void Movement_blocked_after_decision_is_rejected_by_authoritative_geo()
     {
         Attackable actor = CreateActor();
@@ -626,6 +642,7 @@ public class NpcIntentGatewayTests
         public Creature? AutoAttackTarget { get; private set; }
         public int StopFollowCalls { get; private set; }
         public int StartFollowCalls { get; private set; }
+        public bool WakeWhenFollowRangeReached { get; private set; }
         public int StopMovementCalls { get; private set; }
         public int ClearCombatMemoryCalls { get; private set; }
         public int ReturnHomeCalls { get; private set; }
@@ -641,7 +658,12 @@ public class NpcIntentGatewayTests
             IntentionTarget = argument;
         }
         public void MoveTo(AbstractAI ai, Location3D destination) => MoveDestination = destination;
-        public void StartFollow(AbstractAI ai, Creature target, int range = -1) => StartFollowCalls++;
+        public void StartFollow(AbstractAI ai, Creature target, int range = -1,
+            bool wakeWhenInRange = false)
+        {
+            StartFollowCalls++;
+            WakeWhenFollowRangeReached = wakeWhenInRange;
+        }
         public void StopFollow(AbstractAI ai) => StopFollowCalls++;
         public void StopMovement(AbstractAI ai) => StopMovementCalls++;
         public void SetTarget(Creature actor, WorldObject? target) => actor.setTarget(target);

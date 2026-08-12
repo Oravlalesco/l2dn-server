@@ -841,7 +841,8 @@ public class NpcAiRuntimeTests
 
         public void SetIntention(AbstractAI ai, CtrlIntention intention, object? argument = null) => throw Unexpected();
         public void MoveTo(AbstractAI ai, Location3D destination) => throw Unexpected();
-        public void StartFollow(AbstractAI ai, Creature target, int range = -1) => throw Unexpected();
+        public void StartFollow(AbstractAI ai, Creature target, int range = -1,
+            bool wakeWhenInRange = false) => throw Unexpected();
         public void StopFollow(AbstractAI ai) => throw Unexpected();
         public void StopMovement(AbstractAI ai) => throw Unexpected();
         public void SetRunning(Creature actor) => throw Unexpected();
@@ -867,7 +868,8 @@ public class NpcAiRuntimeTests
         public void SetIntention(AbstractAI ai, CtrlIntention intention, object? argument = null) =>
             Commands.Add($"set_intention:{intention}");
         public void MoveTo(AbstractAI ai, Location3D destination) => throw Unexpected();
-        public void StartFollow(AbstractAI ai, Creature target, int range = -1) => throw Unexpected();
+        public void StartFollow(AbstractAI ai, Creature target, int range = -1,
+            bool wakeWhenInRange = false) => throw Unexpected();
         public void StopFollow(AbstractAI ai) => Commands.Add("stop_follow");
         public void StopMovement(AbstractAI ai) => throw Unexpected();
         public void SetTarget(Creature actor, WorldObject? target)
