@@ -164,7 +164,7 @@ S1-S7 cover melee/offensive skill, low HP/heal, ranged range, outside all ranges
 |---|---:|
 | `L2Dn.Npc.Contracts.Tests` | 17/17 passed |
 | `L2Dn.Npc.Brain.Tests` | 93/93 passed |
-| `L2Dn.GameServer.Model.Tests` | 126/126 passed |
+| `L2Dn.GameServer.Model.Tests` | 133/133 passed |
 | focused NPC data/Talking Island/laboratory loading | 3/3 passed |
 | GameServer Release build | succeeded, 0 errors |
 | `git diff --check` | passed |
@@ -238,7 +238,7 @@ AggressivePressure Orc was not accepted in that pass: it produced 64 `attack` se
 
 Tactical eligibility now distinguishes physical point-blank/melee skills from ranged or magical Fighter skills. A ready physical contact skill may compete by Strategy score once the actor reaches physical range; immediate repetition is still suppressed, so the expected Orc cadence is `Stun -> BasicAttack`, followed by normal attacks until the six-second skill reuse permits another stun. A non-positive offensive cast range now means physical contact rather than unlimited range. Ranged magic still yields to physical attacks in melee, and Gateway cooldown, MP, target, range, geodata, and generation validation is unchanged.
 
-Automated validation after this correction reports Contracts 17/17, Brain 93/93, GameServer.Model 126/126, and focused data/laboratory 3/3. Enabled R1-R5 at 5,000 NPCs/100,000 mixed events reports zero drops, zero overflow states, and maximum concurrent Think/NPC of one in all five scenarios; worst Strategy P99 was 1.0521 ms.
+Automated validation after this correction reports Contracts 17/17, Brain 93/93, GameServer.Model 133/133, and focused data/laboratory 3/3. Enabled R1-R5 at 5,000 NPCs/100,000 mixed events reports zero drops, zero overflow states, and maximum concurrent Think/NPC of one in all five scenarios; worst Strategy P99 was 1.0521 ms.
 
 The focused Orc retest was accepted for **selection and Gateway execution**. The player observed stun attempts whenever reuse permitted, with a visible interval of physical attacks rather than continuous skill execution. The isolated AggressivePressure telemetry recorded 23 `offensive_skill`, 75 `attack`, and 54 `approach` selections. All 23 Orc casts reached execution; there were no skill, cooldown, MP, range, geodata, or blocked-movement rejections. The only two Gateway rejections in the session were bounded `dead_actor` races. No dropped wakeup or scheduler-execution-failure series was emitted.
 
@@ -248,16 +248,21 @@ After passing the caster into control AI events (and skipping root/mute/confuse 
 
 The four-profile laboratory gate is therefore PASS. Rollout proceeds to the low-risk Balanced wave while retaining the accepted Orc, Undine Noble, and Enku Orc Shaman templates as controls. The first area wave enables Balanced for templates 20016, 20120, 20121, 20432, 20442, 20481, and 20544; all other normal Talking Island templates remain Phase 3.
 
+The seven-template Balanced area wave was accepted in the client on 2026-08-12. The observed normal mobs retained the Phase 3 control behavior, with no reported duplicate effects, pathological oscillation, or unexpected strategic action. During this gate, the control-effect implementation was also corrected so stun completes authoritative action blocking after Gateway execution and root/mute/confuse notifications cannot create self-threat when no caster exists. Dedicated contracts cover movement and skill blocking, current-movement cancellation, caster threat, and absence of stun threat. The complete post-fix automated gate remains green at Contracts 17/17, Brain 93/93, GameServer.Model 133/133, and focused data 3/3.
+
+With Balanced accepted, the second area wave enables all 12 `AggressivePressure` templates: 20093, 20096, 20098, 20103, 20106, 20108, 20130, 20131, 20132, 20326, 20342, and 20343. Template 20130 remains the already accepted stun control; the other 11 are the only newly enabled area templates. The four remaining normal ranged templates stay on Phase 3, while 20115 and 20292 remain accepted laboratory controls.
+
 ## Manual rollout gate
 
-The development compose configuration now stages `NPC_STRATEGY_MODE=Enabled` for the seven-template Balanced area wave plus the three accepted non-Balanced laboratory controls. Every other Talking Island mob remains on the Phase 3 pipeline. Crasher therefore remains a useful unmodified control while Undine Noble exercises RangedControl.
+The development compose configuration now stages `NPC_STRATEGY_MODE=Enabled` for the accepted seven-template Balanced wave, all 12 `AggressivePressure` area templates, and the accepted RangedControl/Survival laboratory controls. The only newly enabled templates in this checkpoint are the 11 AggressivePressure templates other than the already accepted Orc 20130. The remaining normal ranged templates stay on the Phase 3 pipeline. Crasher therefore remains a useful unmodified control while Undine Noble exercises RangedControl.
 
-The deployment/startup portion is complete. The remaining required evidence is:
+The Balanced deployment and manual gate are complete. The remaining required evidence is:
 
-1. validate the normal Balanced templates against Phase 3 control behavior and collect an OTLP delta;
+1. validate the AggressivePressure area wave and collect its OTLP delta, including physical-skill cadence and control-effect completion where applicable;
 2. require zero scheduler drops/failures, single-flight one, no duplicated effects, no pathological oscillation, a bounded Gateway rejection ratio, and zero `callSkill() failed` from control AI notify;
-3. continue with the planned AggressivePressure and RangedControl area waves;
-4. switch Strategy back to `Disabled` and verify Phase 3 rollback while retaining the `skillList`, fighter-cadence, and range-wakeup corrections;
-5. restore the accepted final mode, record live results, then and only then create `npc-brain-phase4-complete`.
+3. enable and validate the four remaining RangedControl area templates;
+4. observe the complete Talking Island cohort under the same safety gates;
+5. switch Strategy back to `Disabled` and verify Phase 3 rollback while retaining the `skillList`, fighter-cadence, range-wakeup, and control-effect corrections;
+6. restore the accepted final mode, repeat final Release/tests and R1-R5 evidence, record live results, clean the worktree, then and only then create `npc-brain-phase4-complete`.
 
 No Phase 5 work, live-result commit, or completion tag is authorized before this gate passes.
