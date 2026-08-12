@@ -30,7 +30,8 @@ services:
         20103:aggressive_pressure,20106:aggressive_pressure,20108:aggressive_pressure,
         20130:aggressive_pressure,20131:aggressive_pressure,20132:aggressive_pressure,
         20326:aggressive_pressure,20342:aggressive_pressure,20343:aggressive_pressure,
-        20115:ranged_control,
+        20006:ranged_control,20101:ranged_control,20110:ranged_control,
+        20113:ranged_control,20115:ranged_control,
         20292:survival
       NPC_PERCEPTION_MODE: CaptureOnly
       NPC_RETURN_DEFENSE_ENABLED: "true"

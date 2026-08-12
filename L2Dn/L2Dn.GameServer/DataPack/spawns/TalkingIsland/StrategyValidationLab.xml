@@ -7,9 +7,9 @@
 		Arrival: -95336, 240478, -3264
 
 		The four profile groups form separated lanes around the arrival point.
-		The AggressivePressure area-wave groups sit further east. Each lane
-		keeps its copies outside the other groups' aggro/clan-help radius so a
-		case can be exercised without activating the complete laboratory.
+		AggressivePressure and RangedControl area-wave groups sit further out.
+		Each lane keeps its copies outside the other groups' aggro/clan-help
+		radius so a case can be exercised without activating the complete laboratory.
 	-->
 	<spawn name="Talking Island Strategy Validation Lab">
 		<group name="Strategy Lab - Balanced">
@@ -45,6 +45,23 @@
 			<npc id="20115" x="-93600" y="239250" z="-3450" heading="16384" respawnTime="20sec" /> <!-- Undine Noble -->
 			<npc id="20115" x="-94250" y="238900" z="-3450" heading="16384" respawnTime="20sec" /> <!-- Undine Noble -->
 			<npc id="20115" x="-94900" y="238800" z="-3450" heading="16384" respawnTime="20sec" /> <!-- Undine Noble -->
+		</group>
+		<!--
+			RangedControl area-wave cohort. Undine copies sit south of the accepted
+			Noble lane beyond ELEMENTAL4 clan-help. Crasher is isolated because it
+			clans ALL. Orc Archer stays north of the Golems, away from ORC lanes.
+		-->
+		<group name="Strategy Lab - Ranged Wave Undines">
+			<npc id="20110" x="-94900" y="237200" z="-3450" heading="16384" respawnTime="20sec" /> <!-- Undine -->
+			<npc id="20113" x="-94100" y="237200" z="-3450" heading="16384" respawnTime="20sec" /> <!-- Undine Elder -->
+		</group>
+		<group name="Strategy Lab - Ranged Wave Crasher">
+			<npc id="20101" x="-98000" y="238000" z="-3450" heading="0" respawnTime="20sec" /> <!-- Crasher -->
+			<npc id="20101" x="-98000" y="237200" z="-3450" heading="0" respawnTime="20sec" /> <!-- Crasher -->
+		</group>
+		<group name="Strategy Lab - Ranged Wave Archer">
+			<npc id="20006" x="-95800" y="243200" z="-3400" heading="49152" respawnTime="20sec" /> <!-- Orc Archer -->
+			<npc id="20006" x="-95200" y="243200" z="-3400" heading="49152" respawnTime="20sec" /> <!-- Orc Archer -->
 		</group>
 		<group name="Strategy Lab - Survival">
 			<npc id="20292" x="-96600" y="239450" z="-3400" heading="0" respawnTime="20sec" /> <!-- Enku Orc Shaman -->

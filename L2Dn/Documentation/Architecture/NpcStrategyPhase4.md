@@ -269,13 +269,23 @@ The AggressivePressure area wave was accepted in the client on 2026-08-12 after 
 
 The restored service instance recorded 37,943 Strategy evaluations, all `success`, with no fallback series. Selected actions included AggressivePressure 26 `offensive_skill` / 188 `attack` / 526 `approach`; RangedControl 1 `offensive_skill` / 34 `attack` / 1 `approach`; Survival 3 `offensive_skill` / 2 `heal` / 2 `attack`. Gateway created 801 intents and executed 800. All 31 of 32 `CastSkill` intents executed; the single rejection was bounded `skillunavailable`. There were no cooldown, MP, range, geodata, or blocked-movement rejections, no `callSkill() failed`, no dropped wakeups, and no scheduler-execution-failure series. Single-flight collisions were 99 coalesced wakes, not concurrent Think. One `ReturnHome(PreserveThreat)` executed. Mean Strategy evaluation was 20.7 µs for AggressivePressure.
 
+With AggressivePressure accepted, the third area wave enables the four remaining Talking Island `RangedControl` templates: 20006 Orc Archer, 20101 Crasher, 20110 Undine, and 20113 Undine Elder. Template 20115 remains the already accepted RangedControl laboratory control. The laboratory adds isolated wave anchors south of Undine Noble (Undine / Undine Elder), southwest (Crasher, clan `ALL`), and north of the Golems (Orc Archer, away from ORC lanes).
+
+| Wave lane | Templates | NPCs | Approximate lane centre |
+|---|---|---|---|
+| south+ | 20110, 20113 | Undine, Undine Elder | `-94500, 237200, -3450` |
+| southwest | 20101 | Crasher | `-98000, 237600, -3450` |
+| north+ | 20006 | Orc Archer | `-95500, 243200, -3400` |
+
+Orc Archer is a data-defined `ARCHER` with no active offensive skill; the gate is kiting and ranged physical pressure, not a cast. Crasher remains the FIGHTER ranged-magic control (skill 4247). Undine and Undine Elder share Undine Noble's Windstrike (4001) cadence: opener or after the player opens range, then physical attacks at contact.
+
 ## Manual rollout gate
 
-The development compose configuration now stages `NPC_STRATEGY_MODE=Enabled` for the accepted seven-template Balanced wave, the accepted 12 `AggressivePressure` area templates, and the accepted RangedControl/Survival laboratory controls. The remaining normal ranged templates stay on the Phase 3 pipeline. Crasher therefore remains a useful unmodified control while Undine Noble already exercises RangedControl.
+The development compose configuration now stages `NPC_STRATEGY_MODE=Enabled` for every Talking Island area template (7 Balanced, 12 AggressivePressure, 5 RangedControl) plus the Survival laboratory control 20292. The only newly enabled templates in this checkpoint are 20006, 20101, 20110, and 20113.
 
 The Balanced and AggressivePressure deployment gates are complete. The remaining required evidence is:
 
-1. enable and validate the four remaining RangedControl area templates (20006 Orc Archer, 20101 Crasher, 20110 Undine, 20113 Undine Elder);
+1. validate the four remaining RangedControl area templates and collect the OTLP delta, including Crasher's 4247 cadence, Undine/Elder Windstrike, and Orc Archer ranged pressure without skill spam;
 2. observe the complete Talking Island cohort under the same safety gates;
 3. switch Strategy back to `Disabled` and verify Phase 3 rollback while retaining the `skillList`, fighter-cadence, range-wakeup, and control-effect corrections;
 4. restore the accepted final mode, repeat final Release/tests and R1-R5 evidence, record live results, clean the worktree, then and only then create `npc-brain-phase4-complete`.

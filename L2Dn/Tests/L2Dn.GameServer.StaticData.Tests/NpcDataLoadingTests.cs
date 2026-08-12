@@ -109,6 +109,9 @@ public sealed class NpcDataLoadingTests
             ["Strategy Lab - Aggressive Wave Captain"] = [20098, 20098],
             ["Strategy Lab - Aggressive Wave Spiders"] = [20103, 20106, 20108],
             ["Strategy Lab - Aggressive Wave Melee"] = [20132, 20326, 20131],
+            ["Strategy Lab - Ranged Wave Undines"] = [20110, 20113],
+            ["Strategy Lab - Ranged Wave Crasher"] = [20101, 20101],
+            ["Strategy Lab - Ranged Wave Archer"] = [20006, 20006],
         };
         (string dataPackPath, string configPath) = LocateGameServerData();
         ServerConfig.Instance.DataPack.Path = dataPackPath;
@@ -129,7 +132,7 @@ public sealed class NpcDataLoadingTests
                 .Should().Equal(expectedGroups[name]);
         }
 
-        npcs.Should().HaveCount(20);
+        npcs.Should().HaveCount(26);
         npcs.Select(npc => ((int)npc.Attribute("x")!, (int)npc.Attribute("y")!))
             .Should().OnlyHaveUniqueItems("laboratory mobs must not overlap at their declared anchors");
         npcs.Should().OnlyContain(npc => (string)npc.Attribute("respawnTime")! == "20sec");
