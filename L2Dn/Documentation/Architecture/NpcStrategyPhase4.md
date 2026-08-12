@@ -222,7 +222,15 @@ Each lane contains three fixed-anchor copies with a 20-second respawn. Lanes are
 | south | 20115 | Undine Noble | RangedControl | `-94250, 238983, -3450` |
 | west | 20292 | Enku Orc Shaman | Survival | `-96933, 240050, -3400` |
 
-The laboratory is test infrastructure, not part of the normal Talking Island population used to derive the 24-template area rollout. Automated data coverage checks that it contains exactly three unique spawn anchors for each profile, uses only base `Monster` templates, and does not silently alter the production-area template inventory.
+The AggressivePressure area-wave cohort occupies additional fixed anchors further east of the accepted Orc lane. Those copies stay outside the four-profile aggro and clan-help radii, including Orc Captain's 1000 aggro range:
+
+| Wave lane | Templates | NPCs | Approximate lane centre |
+|---|---|---|---|
+| east+ | 20098 | Orc Captain | `-91200, 240700, -3380` |
+| northeast | 20103, 20106, 20108 | Giant Spider / Fang / Blade | `-91000, 242500, -3380` |
+| southeast | 20132, 20326, 20131 | Werewolf, Goblin Scout, Orc Soldier | `-91000, 239000, -3380` |
+
+The laboratory is test infrastructure, not part of the normal Talking Island population used to derive the 24-template area rollout. Automated data coverage checks that the four profile lanes still contain exactly three unique spawn anchors each, that the AggressivePressure wave cohort uses only the listed templates, that every laboratory NPC is a base `Monster`, and that the file does not silently alter the production-area template inventory.
 
 Deployment checkpoint on 2026-08-12: the focused data suite passed 3/3, the spawn XML passed schema validation, and the GameServer publish completed with zero errors (the two existing XML serializer-generator warnings remain). Startup loaded 29,151 spawns and completed initialization without rejecting a laboratory entry. The effective container environment contains exactly the four mappings above, while the latest OTLP mode gauges report reactive scheduler `Enabled`, Brain `Intent`, and Strategy `enabled`.
 

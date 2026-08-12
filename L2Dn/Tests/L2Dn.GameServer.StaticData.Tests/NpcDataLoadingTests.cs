@@ -100,12 +100,15 @@ public sealed class NpcDataLoadingTests
     [Fact]
     public void Strategy_validation_lab_stages_three_base_monsters_per_profile()
     {
-        Dictionary<string, int> expectedGroups = new()
+        Dictionary<string, int[]> expectedGroups = new()
         {
-            ["Strategy Lab - Balanced"] = 20016,
-            ["Strategy Lab - Aggressive Pressure"] = 20130,
-            ["Strategy Lab - Ranged Control"] = 20115,
-            ["Strategy Lab - Survival"] = 20292,
+            ["Strategy Lab - Balanced"] = [20016, 20016, 20016],
+            ["Strategy Lab - Aggressive Pressure"] = [20130, 20130, 20130],
+            ["Strategy Lab - Ranged Control"] = [20115, 20115, 20115],
+            ["Strategy Lab - Survival"] = [20292, 20292, 20292],
+            ["Strategy Lab - Aggressive Wave Captain"] = [20098, 20098],
+            ["Strategy Lab - Aggressive Wave Spiders"] = [20103, 20106, 20108],
+            ["Strategy Lab - Aggressive Wave Melee"] = [20132, 20326, 20131],
         };
         (string dataPackPath, string configPath) = LocateGameServerData();
         ServerConfig.Instance.DataPack.Path = dataPackPath;
@@ -122,17 +125,17 @@ public sealed class NpcDataLoadingTests
         {
             string name = (string)group.Attribute("name")!;
             expectedGroups.Should().ContainKey(name);
-            group.Elements("npc").Should().HaveCount(3)
-                .And.OnlyContain(npc => (int)npc.Attribute("id")! == expectedGroups[name]);
+            group.Elements("npc").Select(npc => (int)npc.Attribute("id")!)
+                .Should().Equal(expectedGroups[name]);
         }
 
-        npcs.Should().HaveCount(12);
+        npcs.Should().HaveCount(20);
         npcs.Select(npc => ((int)npc.Attribute("x")!, (int)npc.Attribute("y")!))
             .Should().OnlyHaveUniqueItems("laboratory mobs must not overlap at their declared anchors");
         npcs.Should().OnlyContain(npc => (string)npc.Attribute("respawnTime")! == "20sec");
 
         NpcData npcData = NpcData.getInstance();
-        expectedGroups.Values.Select(id => npcData.getTemplate(id))
+        expectedGroups.Values.SelectMany(ids => ids).Distinct().Select(id => npcData.getTemplate(id))
             .Should().OnlyContain(template => template != null && template.getType() == "Monster");
     }
 

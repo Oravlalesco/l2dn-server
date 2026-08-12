@@ -6,9 +6,10 @@
 		Access: Gatekeeper -> Talking Island, Eastern Territory
 		Arrival: -95336, 240478, -3264
 
-		The four groups form separated lanes around the arrival point. Each lane
-		keeps its copies outside the other profiles' aggro/clan-help radius so a
-		profile can be exercised without activating the complete laboratory.
+		The four profile groups form separated lanes around the arrival point.
+		The AggressivePressure area-wave groups sit further east. Each lane
+		keeps its copies outside the other groups' aggro/clan-help radius so a
+		case can be exercised without activating the complete laboratory.
 	-->
 	<spawn name="Talking Island Strategy Validation Lab">
 		<group name="Strategy Lab - Balanced">
@@ -20,6 +21,25 @@
 			<npc id="20130" x="-93200" y="241200" z="-3380" heading="32768" respawnTime="20sec" /> <!-- Orc -->
 			<npc id="20130" x="-92600" y="240800" z="-3380" heading="32768" respawnTime="20sec" /> <!-- Orc -->
 			<npc id="20130" x="-92800" y="240100" z="-3380" heading="32768" respawnTime="20sec" /> <!-- Orc -->
+		</group>
+		<!--
+			AggressivePressure area-wave cohort. Anchors sit east of the accepted
+			Orc lane, beyond the 1000 aggro of Orc Captain and the 300 clan-help
+			of ORC / ALL, so each case can be fought without pulling the four-profile lab.
+		-->
+		<group name="Strategy Lab - Aggressive Wave Captain">
+			<npc id="20098" x="-91200" y="241200" z="-3380" heading="32768" respawnTime="20sec" /> <!-- Orc Captain -->
+			<npc id="20098" x="-91200" y="240200" z="-3380" heading="32768" respawnTime="20sec" /> <!-- Orc Captain -->
+		</group>
+		<group name="Strategy Lab - Aggressive Wave Spiders">
+			<npc id="20103" x="-91800" y="242500" z="-3380" heading="32768" respawnTime="20sec" /> <!-- Giant Spider -->
+			<npc id="20106" x="-91000" y="242500" z="-3380" heading="32768" respawnTime="20sec" /> <!-- Giant Fang Spider -->
+			<npc id="20108" x="-90200" y="242500" z="-3380" heading="32768" respawnTime="20sec" /> <!-- Giant Blade Spider -->
+		</group>
+		<group name="Strategy Lab - Aggressive Wave Melee">
+			<npc id="20132" x="-91800" y="239000" z="-3380" heading="32768" respawnTime="20sec" /> <!-- Werewolf -->
+			<npc id="20326" x="-91000" y="239000" z="-3380" heading="32768" respawnTime="20sec" /> <!-- Goblin Scout -->
+			<npc id="20131" x="-90200" y="239000" z="-3380" heading="32768" respawnTime="20sec" /> <!-- Orc Soldier -->
 		</group>
 		<group name="Strategy Lab - Ranged Control">
 			<npc id="20115" x="-93600" y="239250" z="-3450" heading="16384" respawnTime="20sec" /> <!-- Undine Noble -->
