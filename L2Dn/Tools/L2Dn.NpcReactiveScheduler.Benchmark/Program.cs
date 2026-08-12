@@ -12,10 +12,10 @@ using L2Dn.NpcContracts;
 int npcCount = GetArgument("--npc-count", 5_000);
 int eventCount = GetArgument("--events", 100_000);
 int workerCount = GetArgument("--workers", 0);
-string pipelineName = GetStringArgument("--pipeline", "Legacy");
+string pipelineName = GetStringArgument("--pipeline", "IntentStrategyDisabled");
 if (!Enum.TryParse(pipelineName, true, out BenchmarkPipeline pipeline))
 {
-    throw new ArgumentException("--pipeline must be Legacy, Shadow, or Intent.");
+    throw new ArgumentException("--pipeline must be IntentStrategyDisabled, IntentStrategyShadow, or IntentStrategyEnabled.");
 }
 if (npcCount <= 0 || eventCount <= 0 || workerCount < 0)
 {
@@ -167,6 +167,7 @@ static async Task<ScenarioReport> RunScenarioAsync(string name, Attackable[] act
     double[] normalReaction = ReactionFor(executor.Contexts, NpcThinkPriority.Normal);
     int executions = executor.Contexts.Count;
     double[] pipelineDuration = executor.PipelineDurations.ToArray();
+    double[] strategyDuration = executor.StrategyDurations.ToArray();
     return new ScenarioReport(
         name,
         actors.Length,
@@ -196,6 +197,9 @@ static async Task<ScenarioReport> RunScenarioAsync(string name, Attackable[] act
         Percentile(pipelineDuration, 0.50),
         Percentile(pipelineDuration, 0.95),
         Percentile(pipelineDuration, 0.99),
+        Percentile(strategyDuration, 0.50),
+        Percentile(strategyDuration, 0.95),
+        Percentile(strategyDuration, 0.99),
         executor.DroppedWakeups);
 }
 
@@ -243,9 +247,9 @@ internal sealed class AlwaysCurrentValidator: INpcGenerationValidator
 
 internal enum BenchmarkPipeline
 {
-    Legacy,
-    Shadow,
-    Intent
+    IntentStrategyDisabled,
+    IntentStrategyShadow,
+    IntentStrategyEnabled
 }
 
 internal sealed class BenchmarkExecutor: INpcThinkExecutor
@@ -260,6 +264,7 @@ internal sealed class BenchmarkExecutor: INpcThinkExecutor
     private long _droppedWakeups;
     public ConcurrentQueue<NpcWakeContext> Contexts { get; } = new();
     public ConcurrentQueue<double> PipelineDurations { get; } = new();
+    public ConcurrentQueue<double> StrategyDurations { get; } = new();
     public int MaximumConcurrentPerNpc => Volatile.Read(ref _maximumConcurrentPerNpc);
     public long DroppedWakeups => Volatile.Read(ref _droppedWakeups);
 
@@ -307,17 +312,30 @@ internal sealed class BenchmarkExecutor: INpcThinkExecutor
 
     private void ExecutePipeline(NpcKey npc, NpcWakeContext context)
     {
-        if (_pipeline == BenchmarkPipeline.Legacy)
+        NpcPerceptionSnapshot perception = _perceptions[npc.ObjectId];
+        NpcBrainContext brainContext = new((NpcBrainStimulus)(int)context.Reasons);
+        NpcBrainDecision decision;
+        if (_pipeline == BenchmarkPipeline.IntentStrategyDisabled)
         {
-            return;
+            decision = _brain.Decide(perception, brainContext);
         }
-
-        NpcBrainDecision decision = _brain.Decide(_perceptions[npc.ObjectId],
-            new NpcBrainContext((NpcBrainStimulus)(int)context.Reasons));
-        if (_pipeline == BenchmarkPipeline.Shadow)
+        else if (_pipeline == BenchmarkPipeline.IntentStrategyShadow)
         {
-            _ = decision.Intents.FirstOrDefault(); // semantic comparison input, with no world mutation.
-            return;
+            NpcStrategyShadowEvaluation shadow = _brain.DecideShadow(perception, brainContext,
+                NpcStrategyProfileResolver.AggressivePressure);
+            decision = shadow.BaselineDecision;
+            StrategyDurations.Enqueue(shadow.StrategyDecisionDuration.TotalMilliseconds);
+            if (shadow.StrategyDecision != null)
+            {
+                _ = NpcStrategyDecisionComparer.Compare(decision, shadow.StrategyDecision);
+            }
+        }
+        else
+        {
+            long strategyStartedAt = Stopwatch.GetTimestamp();
+            decision = _brain.DecideWithStrategy(perception, brainContext,
+                NpcStrategyProfileResolver.AggressivePressure);
+            StrategyDurations.Enqueue(Stopwatch.GetElapsedTime(strategyStartedAt).TotalMilliseconds);
         }
 
         foreach (NpcIntent intent in decision.Intents)
@@ -390,6 +408,9 @@ internal sealed record ScenarioReport(
     double PipelineP50Milliseconds,
     double PipelineP95Milliseconds,
     double PipelineP99Milliseconds,
+    double StrategyP50Milliseconds,
+    double StrategyP95Milliseconds,
+    double StrategyP99Milliseconds,
     long DroppedWakeups);
 
 internal sealed record BenchmarkReport(
