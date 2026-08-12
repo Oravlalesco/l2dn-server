@@ -163,8 +163,8 @@ S1-S7 cover melee/offensive skill, low HP/heal, ranged range, outside all ranges
 | Gate | Result |
 |---|---:|
 | `L2Dn.Npc.Contracts.Tests` | 17/17 passed |
-| `L2Dn.Npc.Brain.Tests` | 84/84 passed |
-| `L2Dn.GameServer.Model.Tests` | 125/125 passed |
+| `L2Dn.Npc.Brain.Tests` | 91/91 passed |
+| `L2Dn.GameServer.Model.Tests` | 126/126 passed |
 | focused NPC data/Talking Island loading | 2/2 passed |
 | GameServer Release build | succeeded, 0 errors |
 | `git diff --check` | passed |
@@ -183,24 +183,30 @@ R1-R5 ran with 5,000 NPCs, 100,000 mixed/storm events, 16 workers, and identical
 
 All 15 scenarios reported zero dropped wakeups, zero overflow states, and exactly one maximum concurrent Think per NPC. Enabled Critical P95 stayed within 20.8% of Disabled in the worst comparable scenario, below the 25% regression budget. Enabled allocations/event were close to Disabled in every scenario; Shadow allocations were higher but bounded because it performs two decisions and comparison. The benchmark performs no network, database, or disk I/O in the decision pipeline.
 
+R1-R5 were repeated after the fighter-pursuit and one-shot range-wakeup corrections. All 15 scenarios again reported zero drops, zero overflow, and maximum concurrent Think/NPC of one. Worst Strategy P99 was 0.3546 ms in Shadow and 0.8802 ms in Enabled.
+
 ### Shadow gameplay observation: repeated melee skill selection
 
 The first Talking Island Shadow play pass made NPC skills visible after the `skillList` data correction, but exposed a Phase 3 tactical baseline issue: Crasher, another observed skill-capable mob, and Orc repeatedly selected their ready offensive/control skill, including at melee distance. This was not Strategy execution. Shadow executes only the baseline intent; Strategy remained hypothetical and never reached the Gateway.
 
-The cause was the static Phase 3 offensive-skill score winning every evaluation while the skill remained ready. Tactical selection now suppresses only the immediately repeated offensive skill when the same target is already inside physical attack reach. The basic attack can therefore win the next evaluation, producing a deterministic `CastSkill, BasicAttack, CastSkill, BasicAttack` cadence for the canonical melee case. Outside physical reach, repeated ranged casting remains available, so a caster is not forced into an unnecessary approach loop. The rule applies equally to Disabled, Shadow baseline, and Enabled; it adds no RNG, dynamic profile selection, direct execution, or Gateway bypass.
+The cause was the static Phase 3 offensive-skill score winning every evaluation while the skill remained ready. Tactical selection first suppressed an immediately repeated offensive skill at physical range. Further live validation with Crasher and Undine Noble established that both templates are data-defined `FIGHTER` NPCs despite their ranged magic: Crasher uses skill 4247 (`DDMagicSlow`/Dagger Storm), while Undine Noble uses skill 4001 (`DDMagic`/Windstrike). Both are loaded into the effective `ATTACK` AI scope because they deal magic damage. The shared visual did not mean they were the same skill or `MAGE` templates.
+
+The final deterministic rule preserves that distinction. A `FIGHTER` may use a ready ranged skill as an opener or after its target runs out of melee, but then yields to physical pursuit; while continuing that approach it does not repeatedly choose the ranged skill, and inside physical reach it prioritizes `BasicAttack`. A data-defined `MAGE` or `HEALER` retains ranged spell preference and only suppresses an immediately repeated melee cast. This restores the legacy tactical intent without reintroducing its random skill-chance roll. The rule applies equally to Disabled, Shadow baseline, and Enabled; it adds no RNG, dynamic profile selection, direct execution, or Gateway bypass.
 
 Replay diagnostics expose the condition as `RepeatedActionSuppressed`. Automated coverage proves the four profiles share the melee safety behavior, the exact Phase 3 path receives the same correction, and ranged casts are not suppressed merely for being consecutive.
 
 The follow-up Crasher pass on 2026-08-12 confirmed immediate ranged casting, pursuit beyond Dagger Storm range, and resumed ranged attacks, but also exposed short idle-looking windows. The corresponding service-instance telemetry recorded 186 created casts, 115 executed casts, and 71 `skillunavailable` rejections, with no cast rejection for mana, cooldown, or range. Dagger Storm has a two-second hit time; reactive wakeups were evaluating Tactical again while the prior cast was still active.
 
-Tactical now emits no intent while the perception carries `NpcCombatFlags.Casting`. A no-intent evaluation preserves the previous effective decision and its world tick, so the completion `ActionReady` wakeup still applies deterministic melee alternation. This eliminates speculative cast/attack commands during an active cast without delaying or weakening Gateway validation. Tests cover both the empty in-progress-cast decision and the complete `CastSkill, no intent while casting, BasicAttack` melee trajectory.
+Tactical now emits no intent while the perception carries `NpcCombatFlags.Casting`. A no-intent evaluation preserves the previous effective decision and its world tick, so the completion `ActionReady` wakeup still applies deterministic tactical continuity. This eliminates speculative cast/attack commands during an active cast without delaying or weakening Gateway validation.
+
+The next live pass exposed a separate range-boundary pause: an intent follow reached its requested range but remained registered without waking Brain, so the NPC retained its target until the next periodic Think. Intent-created follows are now one-shot at the boundary: reaching range removes that follow and emits exactly one `ActionReady`. A new decision then uses current range, MP, cooldown, target, and geodata. Automated coverage includes Crasher's control skill, Undine Noble's direct skill, melee priority, ranged re-use after the player runs, active-cast suppression, and the Gateway request for the one-shot range wakeup.
 
 ## Manual rollout gate
 
 The development compose configuration stages `NPC_STRATEGY_MODE=Shadow` with the 28-entry registry: all 24 Talking Island templates plus the four laboratory templates. Phase 4 is not complete yet. The next required evidence is:
 
 1. publish/restart the corrected local GameServer in Shadow;
-2. retest Crasher and the observed Orc/skill-capable mobs at melee and ranged distances, checking that melee skill spam is gone without suppressing legitimate ranged casting;
+2. retest Crasher, Undine Noble, and the observed Orc/skill-capable mobs: one opportunistic ranged skill is acceptable, pursuit must continue to melee, physical attacks must dominate at melee, and reaching either skill or physical range must not cause a periodic-delay pause;
 3. verify Strategy evaluations/comparisons are non-zero, Strategy Gateway executions remain zero, drops/failures remain zero, single-flight remains one, and gameplay remains the Phase 3 baseline plus the data/tactical corrections;
 4. switch to `Enabled`, validate Talking Island coverage and the four dedicated laboratory profiles, and inspect intent rejection ratios and oscillations;
 5. switch Strategy back to `Disabled` and verify Phase 3 rollback;
