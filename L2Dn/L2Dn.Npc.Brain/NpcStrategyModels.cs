@@ -116,6 +116,11 @@ public sealed record StrategyReplayResult(
     NpcStrategyDecisionReason DecisionReason,
     TimeSpan DecisionDuration);
 
+public sealed record NpcStrategyShadowEvaluation(
+    NpcBrainDecision BaselineDecision,
+    NpcBrainDecision? StrategyDecision,
+    bool StrategyFailed);
+
 internal static class NpcTacticalBaseline
 {
     public const int BasicAttackScore = 60;

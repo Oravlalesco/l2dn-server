@@ -926,6 +926,44 @@ public class NpcBrainTests
         }
     }
 
+    [Fact]
+    public void Online_shadow_uses_the_same_predecision_state_and_persists_only_baseline_state()
+    {
+        NpcBrainStateStore states = new();
+        NpcBrainCoordinator shadowBrain = new(states, NpcIntelligenceProfileResolver.Instance,
+            new StrategyBrain(), new ReflexBrain(), new TacticalBrain());
+        NpcBrainCoordinator baselineBrain = new();
+        NpcSkillObservation heal = new(205, 1, 0, 10, NpcSkillCategory.Heal,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcSkillObservation offensive = new(107, 2, 600, 20, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcPerceptionSnapshot[] replay =
+        [
+            CreatePerception(target: Player, visible: [Hostile(Player, 30)],
+                skills: [offensive, heal], hp: 40),
+            CreatePerception(target: Player, visible: [Hostile(Player, 30)],
+                skills: [offensive, heal], hp: 40, revision: 2)
+        ];
+
+        foreach (NpcPerceptionSnapshot perception in replay)
+        {
+            NpcStrategyShadowEvaluation shadow = shadowBrain.DecideShadow(perception, Context(),
+                NpcStrategyProfileResolver.Survival);
+            NpcBrainDecision baseline = baselineBrain.Decide(perception, Context());
+
+            shadow.StrategyFailed.Should().BeFalse();
+            shadow.StrategyDecision.Should().NotBeNull();
+            shadow.BaselineDecision.DecisionSequence.Should().Be(baseline.DecisionSequence);
+            shadow.StrategyDecision!.DecisionSequence.Should().Be(baseline.DecisionSequence);
+            shadow.BaselineDecision.Intents.Zip(baseline.Intents).Should().OnlyContain(pair =>
+                NpcIntentSemanticComparer.Instance.Equals(pair.First, pair.Second));
+        }
+
+        NpcBrainStateSnapshot state = states.GetSnapshot(Actor.ObjectId)!.Value;
+        state.DecisionSequence.Should().Be(2);
+        state.LastStrategy.Should().Be(NpcStrategyArchetype.Balanced);
+    }
+
     private static NpcBrainContext Context(NpcBrainStimulus stimuli = NpcBrainStimulus.PeriodicDue) => new(stimuli);
 
     private static VisibleEntity Hostile(EntityKey key, double distance, int ordinal = 0) =>

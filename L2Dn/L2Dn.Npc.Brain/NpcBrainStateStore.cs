@@ -15,6 +15,12 @@ internal sealed class NpcBrainState
 {
     public NpcBrainState(NpcKey npc) => Npc = npc;
 
+    private NpcBrainState(NpcBrainState source)
+    {
+        Npc = source.Npc;
+        CopyFrom(source);
+    }
+
     public object SyncRoot { get; } = new();
     public NpcKey Npc { get; }
     public long DecisionSequence { get; set; }
@@ -29,6 +35,30 @@ internal sealed class NpcBrainState
     public long LeashGraceExpiresAtWorldTick { get; set; }
     public int LeashExcursionCount { get; set; }
     public bool ReturnMovementIssued { get; set; }
+
+    public NpcBrainState Clone() => new(this);
+
+    public void CopyFrom(NpcBrainState source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (Npc != source.Npc)
+        {
+            throw new ArgumentException("Brain state belongs to a different NPC generation.", nameof(source));
+        }
+
+        DecisionSequence = source.DecisionSequence;
+        LastTarget = source.LastTarget;
+        LastDecision = source.LastDecision;
+        LastDecisionWorldTick = source.LastDecisionWorldTick;
+        LastStrategy = source.LastStrategy;
+        ReturnState = source.ReturnState;
+        FleeMode = source.FleeMode;
+        ReturnDefenseTarget = source.ReturnDefenseTarget;
+        ReturnDefenseExpiresAtWorldTick = source.ReturnDefenseExpiresAtWorldTick;
+        LeashGraceExpiresAtWorldTick = source.LeashGraceExpiresAtWorldTick;
+        LeashExcursionCount = source.LeashExcursionCount;
+        ReturnMovementIssued = source.ReturnMovementIssued;
+    }
 }
 
 internal readonly record struct NpcBrainStateSnapshot(

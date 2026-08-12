@@ -47,6 +47,35 @@ public sealed class NpcBrainCoordinator: INpcBrain
         return DecideCore(perception, context, strategyProfile, new NpcStrategyDiagnosticsCollector());
     }
 
+    /// <summary>
+    /// Evaluates Phase 3 and Strategy from identical pre-decision state. Only the
+    /// baseline state transition is retained and only its intents may be executed.
+    /// </summary>
+    public NpcStrategyShadowEvaluation DecideShadow(NpcPerceptionSnapshot perception,
+        NpcBrainContext context, NpcStrategyProfile strategyProfile)
+    {
+        ArgumentNullException.ThrowIfNull(perception);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(strategyProfile);
+        NpcKey actor = perception.Envelope.Npc;
+        if (perception.Envelope.SchemaVersion != NpcPerceptionSnapshot.CurrentSchemaVersion ||
+            perception.Envelope.StateRevision <= 0)
+        {
+            NpcBrainDecision empty = new(actor, 0, NpcBrainLayer.None, []);
+            return new NpcStrategyShadowEvaluation(empty, null, false);
+        }
+
+        bool accepted = _states.TryUse(actor, state => DecideShadowWithState(
+            perception, context, strategyProfile, state), out NpcStrategyShadowEvaluation? evaluation);
+        if (accepted && evaluation != null)
+        {
+            return evaluation;
+        }
+
+        return new NpcStrategyShadowEvaluation(
+            new NpcBrainDecision(actor, 0, NpcBrainLayer.None, []), null, false);
+    }
+
     public void Remove(NpcKey npc) => _states.Remove(npc);
 
     private NpcStrategyBrainEvaluation DecideCore(NpcPerceptionSnapshot perception, NpcBrainContext context,
@@ -119,6 +148,27 @@ public sealed class NpcBrainCoordinator: INpcBrain
             ? diagnostics.Build(profile, strategy.Value)
             : NpcStrategyDecisionDiagnostics.Empty;
         return new NpcStrategyBrainEvaluation(decision, detail);
+    }
+
+    private NpcStrategyShadowEvaluation DecideShadowWithState(NpcPerceptionSnapshot perception,
+        NpcBrainContext context, NpcStrategyProfile strategyProfile, NpcBrainState persistedState)
+    {
+        NpcBrainState baselineState = persistedState.Clone();
+        NpcBrainState strategyState = persistedState.Clone();
+        NpcBrainDecision baseline = DecideWithState(
+            perception, context, null, null, baselineState).Decision;
+        persistedState.CopyFrom(baselineState);
+
+        try
+        {
+            NpcBrainDecision strategy = DecideWithState(
+                perception, context, strategyProfile, null, strategyState).Decision;
+            return new NpcStrategyShadowEvaluation(baseline, strategy, false);
+        }
+        catch
+        {
+            return new NpcStrategyShadowEvaluation(baseline, null, true);
+        }
     }
 
     private static NpcStrategyAction MapStrategyAction(NpcIntent? intent,
