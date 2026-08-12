@@ -284,7 +284,8 @@ public class NpcBrainTests
         NpcPerceptionSnapshot perception = CreatePerception(target: Player,
             visible: [Hostile(Player, 1_000)], skills: [skill], legacyAiType: LegacyNpcAiType.Mage);
 
-        NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception, Context());
+        NpcBrainDecision decision = new NpcBrainCoordinator().DecideWithStrategy(perception, Context(),
+            NpcStrategyProfileResolver.RangedControl);
 
         decision.Strategy.Should().Be(NpcStrategyArchetype.RangedControl);
         decision.Intents.Should().ContainSingle().Which.Should().BeOfType<ApproachTargetIntent>()
@@ -301,9 +302,9 @@ public class NpcBrainTests
         NpcPerceptionSnapshot perception = CreatePerception(target: Player,
             visible: [Hostile(Player, 30)], skills: [offensive, heal], hp: 40);
 
-        CastSkillIntent intent = (CastSkillIntent)new NpcBrainCoordinator().Decide(perception,
-            new NpcBrainContext(NpcBrainStimulus.PeriodicDue, StrategyProfile:
-                NpcStrategyProfileResolver.Survival)).Intents.Single();
+        CastSkillIntent intent = (CastSkillIntent)new NpcBrainCoordinator().DecideWithStrategy(perception,
+            new NpcBrainContext(NpcBrainStimulus.PeriodicDue),
+            NpcStrategyProfileResolver.Survival).Intents.Single();
 
         intent.SkillId.Should().Be(205);
         intent.Target.Should().Be(new EntityKey(Actor.ObjectId, Actor.Generation, EntityKind.Npc));
@@ -317,9 +318,9 @@ public class NpcBrainTests
         NpcPerceptionSnapshot perception = CreatePerception(target: Player,
             visible: [Hostile(Player, 30)], hp: 10);
 
-        NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception,
-            new NpcBrainContext(NpcBrainStimulus.Attacked, intelligence,
-                StrategyProfile: NpcStrategyProfileResolver.AggressivePressure));
+        NpcBrainDecision decision = new NpcBrainCoordinator().DecideWithStrategy(perception,
+            new NpcBrainContext(NpcBrainStimulus.Attacked, intelligence),
+            NpcStrategyProfileResolver.AggressivePressure);
 
         decision.Strategy.Should().Be(NpcStrategyArchetype.AggressivePressure);
         decision.Intents.Should().ContainSingle().Which.Should().BeOfType<BasicAttackIntent>();
@@ -869,6 +870,60 @@ public class NpcBrainTests
         first.Should().HaveCount(2);
         first.Zip(second).Should().OnlyContain(pair =>
             NpcIntentSemanticComparer.Instance.Equals(pair.First, pair.Second));
+    }
+
+    [Fact]
+    public void Comparative_replay_evaluates_every_profile_against_each_revision_with_opt_in_diagnostics()
+    {
+        NpcSkillObservation heal = new(205, 1, 0, 10, NpcSkillCategory.Heal,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcSkillObservation offensive = new(107, 2, 600, 20, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcPerceptionSnapshot perception = CreatePerception(target: Player,
+            visible: [Hostile(Player, 30)], skills: [offensive, heal], hp: 40, revision: 812);
+
+        StrategyReplayResult[] results = new NpcBrainReplayRunner().RunComparative([perception]).ToArray();
+
+        results.Should().HaveCount(4);
+        results.Should().OnlyContain(result => result.SnapshotRevision == 812 &&
+            result.DecisionDuration >= TimeSpan.Zero && !result.CandidateScores.IsEmpty);
+        results.Select(result => result.Profile).Should().BeEquivalentTo(
+            Enum.GetValues<NpcStrategyArchetype>());
+        results.Single(result => result.Profile == NpcStrategyArchetype.Balanced)
+            .AppliedModifiers.Should().BeEmpty();
+        results.Single(result => result.Profile == NpcStrategyArchetype.Survival)
+            .SelectedAction.Should().Be(NpcStrategyAction.Heal);
+        results.Single(result => result.Profile == NpcStrategyArchetype.Survival)
+            .SelectedIntent.Should().BeOfType<CastSkillIntent>().Which.SkillId.Should().Be(205);
+    }
+
+    [Fact]
+    public void Balanced_strategy_is_an_identity_profile_against_the_phase3_pipeline()
+    {
+        NpcSkillObservation offensive = new(107, 2, 600, 20, NpcSkillCategory.Offensive,
+            NpcSkillObservationFlags.Ready | NpcSkillObservationFlags.Magic);
+        NpcPerceptionSnapshot[] replay =
+        [
+            CreatePerception(visible: [Hostile(Player, 80)], skills: [offensive]),
+            CreatePerception(target: Player, visible: [Hostile(Player, 300)], skills: [offensive], revision: 2),
+            CreatePerception(target: Player, visible: [Hostile(Player, 30)], skills: [offensive], revision: 3)
+        ];
+        NpcBrainCoordinator baseline = new();
+        NpcBrainCoordinator balanced = new();
+
+        foreach (NpcPerceptionSnapshot perception in replay)
+        {
+            NpcBrainDecision baselineDecision = baseline.Decide(perception, Context());
+            NpcBrainDecision balancedDecision = balanced.DecideWithStrategy(perception, Context(),
+                NpcStrategyProfileResolver.Balanced);
+
+            baselineDecision.Intents.Should().HaveSameCount(balancedDecision.Intents);
+            baselineDecision.Intents.Zip(balancedDecision.Intents).Should().OnlyContain(pair =>
+                NpcIntentSemanticComparer.Instance.Equals(pair.First, pair.Second));
+            balancedDecision.StrategyDecision.Should().NotBeNull();
+            balancedDecision.StrategyDecision!.Value.AppliedModifiers
+                .Should().Be(NpcStrategyModifierFlags.None);
+        }
     }
 
     private static NpcBrainContext Context(NpcBrainStimulus stimuli = NpcBrainStimulus.PeriodicDue) => new(stimuli);

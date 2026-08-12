@@ -5,7 +5,16 @@ namespace L2Dn.NpcBrain;
 public sealed class ReflexBrain
 {
     internal NpcIntent? Decide(NpcPerceptionSnapshot perception, NpcBrainContext context,
+        NpcIntelligenceProfile profile, NpcBrainState state, long decisionSequence) =>
+        DecideCore(perception, context, profile, profile.FleeHpPercent, state, decisionSequence);
+
+    internal NpcIntent? Decide(NpcPerceptionSnapshot perception, NpcBrainContext context,
         NpcIntelligenceProfile profile, NpcStrategyDecision strategy,
+        NpcBrainState state, long decisionSequence) =>
+        DecideCore(perception, context, profile, strategy.EffectiveFleeHpPercent, state, decisionSequence);
+
+    private static NpcIntent? DecideCore(NpcPerceptionSnapshot perception, NpcBrainContext context,
+        NpcIntelligenceProfile profile, double fleeHpPercent,
         NpcBrainState state, long decisionSequence)
     {
         if (!profile.ReflexEnabled || !NpcPerceptionFacts.IsActorOperational(perception))
@@ -222,7 +231,7 @@ public sealed class ReflexBrain
             }
 
             if (profile.FleeAllowed &&
-                NpcPerceptionFacts.HpPercent(perception.State.Physical) <= strategy.EffectiveFleeHpPercent)
+                NpcPerceptionFacts.HpPercent(perception.State.Physical) <= fleeHpPercent)
             {
                 return new FleeIntent(Envelope(snapshot, decisionSequence, NpcIntentType.Flee), currentTarget);
             }

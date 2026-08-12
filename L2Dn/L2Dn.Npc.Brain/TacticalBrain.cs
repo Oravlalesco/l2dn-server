@@ -10,7 +10,21 @@ public sealed class TacticalBrain
         _evaluator = evaluator ?? new TacticalActionEvaluator();
 
     internal NpcIntent? Decide(NpcPerceptionSnapshot perception, NpcIntelligenceProfile profile,
-        NpcStrategyDecision strategy, NpcBrainState state, long decisionSequence)
+        NpcBrainState state, long decisionSequence) =>
+        DecideCore(perception, profile, null, state, decisionSequence, null);
+
+    internal NpcIntent? Decide(NpcPerceptionSnapshot perception, NpcIntelligenceProfile profile,
+        NpcStrategyDecision strategy, NpcBrainState state, long decisionSequence) =>
+        DecideCore(perception, profile, strategy, state, decisionSequence, null);
+
+    internal NpcIntent? Decide(NpcPerceptionSnapshot perception, NpcIntelligenceProfile profile,
+        NpcStrategyDecision strategy, NpcBrainState state, long decisionSequence,
+        NpcStrategyDiagnosticsCollector diagnostics) =>
+        DecideCore(perception, profile, strategy, state, decisionSequence, diagnostics);
+
+    private NpcIntent? DecideCore(NpcPerceptionSnapshot perception, NpcIntelligenceProfile profile,
+        NpcStrategyDecision? strategy, NpcBrainState state, long decisionSequence,
+        NpcStrategyDiagnosticsCollector? diagnostics)
     {
         if (!profile.TacticalEnabled || !NpcPerceptionFacts.IsActorOperational(perception) ||
             perception.State.Combat.CurrentTarget is not { } target ||
@@ -21,8 +35,10 @@ public sealed class TacticalBrain
         }
 
         double targetCollisionRadius = visibleTarget.Entity == target ? visibleTarget.CollisionRadius : 0;
-        NpcTacticalScore score = _evaluator.Evaluate(perception, profile, strategy, distance,
-            targetCollisionRadius);
+        NpcTacticalScore score = strategy.HasValue
+            ? _evaluator.Evaluate(perception, profile, strategy.Value, distance,
+                targetCollisionRadius, diagnostics)
+            : _evaluator.Evaluate(perception, profile, distance, targetCollisionRadius);
         NpcPerceptionEnvelope snapshot = perception.Envelope;
         bool defensiveReturn = state.ReturnState == NpcReturnEngagementState.DefensiveReturn;
         if (defensiveReturn && score.Action == NpcTacticalAction.Flee)
