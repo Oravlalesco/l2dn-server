@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../xsd/spawns.xsd">
+	<!--
+		Phase 4 Strategy validation laboratory.
+
+		Access: Gatekeeper -> Talking Island, Eastern Territory
+		Arrival: -95336, 240478, -3264
+
+		The four groups form separated lanes around the arrival point. Each lane
+		keeps its copies outside the other profiles' aggro/clan-help radius so a
+		profile can be exercised without activating the complete laboratory.
+	-->
+	<spawn name="Talking Island Strategy Validation Lab">
+		<group name="Strategy Lab - Balanced">
+			<npc id="20016" x="-95100" y="242000" z="-3400" heading="49152" respawnTime="20sec" /> <!-- Stone Golem -->
+			<npc id="20016" x="-94450" y="242050" z="-3400" heading="49152" respawnTime="20sec" /> <!-- Stone Golem -->
+			<npc id="20016" x="-93800" y="242100" z="-3400" heading="49152" respawnTime="20sec" /> <!-- Stone Golem -->
+		</group>
+		<group name="Strategy Lab - Aggressive Pressure">
+			<npc id="20130" x="-93200" y="241200" z="-3380" heading="32768" respawnTime="20sec" /> <!-- Orc -->
+			<npc id="20130" x="-92600" y="240800" z="-3380" heading="32768" respawnTime="20sec" /> <!-- Orc -->
+			<npc id="20130" x="-92800" y="240100" z="-3380" heading="32768" respawnTime="20sec" /> <!-- Orc -->
+		</group>
+		<group name="Strategy Lab - Ranged Control">
+			<npc id="20115" x="-93600" y="239250" z="-3450" heading="16384" respawnTime="20sec" /> <!-- Undine Noble -->
+			<npc id="20115" x="-94250" y="238900" z="-3450" heading="16384" respawnTime="20sec" /> <!-- Undine Noble -->
+			<npc id="20115" x="-94900" y="238800" z="-3450" heading="16384" respawnTime="20sec" /> <!-- Undine Noble -->
+		</group>
+		<group name="Strategy Lab - Survival">
+			<npc id="20292" x="-96600" y="239450" z="-3400" heading="0" respawnTime="20sec" /> <!-- Enku Orc Shaman -->
+			<npc id="20292" x="-97200" y="240000" z="-3400" heading="0" respawnTime="20sec" /> <!-- Enku Orc Shaman -->
+			<npc id="20292" x="-97000" y="240700" z="-3400" heading="0" respawnTime="20sec" /> <!-- Enku Orc Shaman -->
+		</group>
+	</spawn>
+</list>

@@ -64,6 +64,7 @@ public sealed class NpcDataLoadingTests
 
         string spawnDirectory = Path.Combine(dataPackPath, "spawns", "TalkingIsland");
         int[] spawnedTemplateIds = Directory.GetFiles(spawnDirectory, "*.xml", SearchOption.AllDirectories)
+            .Where(path => !Path.GetFileName(path).Equals("StrategyValidationLab.xml", StringComparison.OrdinalIgnoreCase))
             .Select(XDocument.Load)
             .SelectMany(document => document.Descendants("npc"))
             .Select(element => (int)element.Attribute("id")!)
@@ -86,6 +87,45 @@ public sealed class NpcDataLoadingTests
             .Should().BeEmpty("every RangedControl assignment needs Archer or long-range AI capability");
         templates.SelectMany(template => template.getAISkills(AISkillScope.HEAL))
             .Should().BeEmpty("Talking Island has no heal-capable base mob for the Survival profile");
+    }
+
+    [Fact]
+    public void Strategy_validation_lab_stages_three_base_monsters_per_profile()
+    {
+        Dictionary<string, int> expectedGroups = new()
+        {
+            ["Strategy Lab - Balanced"] = 20016,
+            ["Strategy Lab - Aggressive Pressure"] = 20130,
+            ["Strategy Lab - Ranged Control"] = 20115,
+            ["Strategy Lab - Survival"] = 20292,
+        };
+        (string dataPackPath, string configPath) = LocateGameServerData();
+        ServerConfig.Instance.DataPack.Path = dataPackPath;
+        ServerConfig.Instance.DataPack.ConfigPath = configPath;
+        Scripts.Scripts.RegisterHandlers();
+
+        string labPath = Path.Combine(dataPackPath, "spawns", "TalkingIsland", "StrategyValidationLab.xml");
+        XDocument document = XDocument.Load(labPath);
+        XElement[] groups = document.Descendants("group").ToArray();
+        XElement[] npcs = groups.SelectMany(group => group.Elements("npc")).ToArray();
+
+        groups.Should().HaveCount(expectedGroups.Count);
+        foreach (XElement group in groups)
+        {
+            string name = (string)group.Attribute("name")!;
+            expectedGroups.Should().ContainKey(name);
+            group.Elements("npc").Should().HaveCount(3)
+                .And.OnlyContain(npc => (int)npc.Attribute("id")! == expectedGroups[name]);
+        }
+
+        npcs.Should().HaveCount(12);
+        npcs.Select(npc => ((int)npc.Attribute("x")!, (int)npc.Attribute("y")!))
+            .Should().OnlyHaveUniqueItems("laboratory mobs must not overlap at their declared anchors");
+        npcs.Should().OnlyContain(npc => (string)npc.Attribute("respawnTime")! == "20sec");
+
+        NpcData npcData = NpcData.getInstance();
+        expectedGroups.Values.Select(id => npcData.getTemplate(id))
+            .Should().OnlyContain(template => template != null && template.getType() == "Monster");
     }
 
     private static (string DataPackPath, string ConfigPath) LocateGameServerData()
