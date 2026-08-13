@@ -83,7 +83,6 @@ Contiene la abstracción del entorno estructurada. Su tamaño se define por `Fea
 - **Intelligence:** Style, Role, FleeAllowed, PreferredRange.
 - **CurrentTarget:**
   - `HasTarget` (bool)
-  - `HpRatio` (float, 0-1)
   - `DistanceNormalized` (float, >= 0)
   - `IsCasting` (bool)
   - `IsMoving` (bool)
@@ -91,6 +90,8 @@ Contiene la abstracción del entorno estructurada. Su tamaño se define por `Fea
   - `RelativeAngle` (float, 0-360)
   - `ThreatRatio` (float, 0-1)
   - `WithinPhysicalRange` (bool)
+
+> **V1 no incluye `TargetHpRatio`.** Perception actual no contiene HP del target dentro de `VisibleEntity`, y el experto determinista (Tactical) que BC clonará no lo utiliza. `NpcPolicyObservationV2` lo incorporará cuando Perception lo exponga explícitamente, junto con `TargetCasting`, `TargetClassHint`, etc.
 
 ### NpcPolicyAdvice y Causalidad
 El `NpcPolicyAdvice` incluye campos estrictos de causalidad para garantizar que un consejo estocástico no se aplique a un estado inválido:
@@ -179,7 +180,7 @@ En startup, modelo y manifest se validan de forma conjunta. Si no coinciden, la 
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
 | `CandidateSet_IsImmutable` | Inmutabilidad | Instancia creada → campos de solo lectura, sin setters |
-| `Advice_CausalityFieldsRequired` | Contrato estricto | Creación sin Generation o Revision → fallo |
+| `Advice_CausalityFieldsRequired` | Contrato estricto | Creación sin NpcKey o BasedOnStateRevision → fallo |
 | `ObservationV1_NoObjectIds` | Aislamiento | Reflection sobre campos → ningún PlayerId/ObjectId |
 
 ### Brain

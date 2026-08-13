@@ -92,11 +92,13 @@ Mob:
 
 ### Composición Completa
 ```text
-effectivePosturePrior    = Style.Prior + Role.PriorDelta
-effectiveSwitchMargin    = baseSwitchMargin + Role.SwitchMarginDelta
-effectiveMinDuration     = baseMinDuration + Role.MinDurationDelta
-effectiveTacticalScore   = Style.TacticalBase + Role.TacticalDelta + Directive.Bias
+effectivePosturePrior    = Clamp(Style.Prior + Role.PriorDelta, 0, 1000)
+effectiveSwitchMargin    = Max(0, baseSwitchMargin + Role.SwitchMarginDelta)
+effectiveMinDuration     = Max(0, baseMinDuration + Role.MinDurationDelta)
+effectiveTacticalScore   = Clamp(Style.TacticalBase + Role.TacticalDelta + Directive.Bias, 0, 1000)
 ```
+
+> **Invariante**: `effectivePosturePrior ∈ [0, 1000]`, `effectiveSwitchMargin ≥ 0`, `effectiveMinDuration ≥ 0`. Sin el clamp, combinaciones como `Raid.DisengagePriorDelta = -200` sobre `AggressivePressure.DisengagePrior = 100` producirían -100, rompiendo la garantía del weighted average.
 
 ### Deltas de Rol Propuestos
 | Rol | BasicAttack | Approach | OffensiveSkill | Heal | Flee | Heal HP% |
@@ -108,10 +110,10 @@ effectiveTacticalScore   = Style.TacticalBase + Role.TacticalDelta + Directive.B
 | Raid | 0 | +5 | +20 | +10 | -40 | 0 |
 
 ### Tabla de Composición de Ejemplo
-*Ejemplo para Elite + AggressivePressure (asumiendo AggressivePressure base PosturePriors: PressurePrior: 50, RecoverPrior: -20, DisengagePrior: -50, baseSwitchMargin: 100, baseMinDuration: 0):*
-- **AggressivePressure base:** BasicAttack: 75, Approach: 90, OffensiveSkill: 105, Heal: 85, Flee: 70, Heal HP%: 25 | PressurePrior: 50, RecoverPrior: -20, DisengagePrior: -50, SwitchMargin: 100, MinDuration: 0
-- **Elite delta:** BasicAttack: +10, Approach: +5, OffensiveSkill: +15, Heal: 0, Flee: -20, Heal HP%: -10 | PressurePriorDelta: +100, RecoverPriorDelta: -50, DisengagePriorDelta: -100, SwitchMarginDelta: +50, MinDurationDelta: +100
-- **Effective Profile:** BasicAttack: 85, Approach: 95, OffensiveSkill: 120, Heal: 85, Flee: 50, Heal HP%: 15 | PressurePrior: 150, RecoverPrior: -70, DisengagePrior: -150, SwitchMargin: 150, MinDuration: 100
+*Ejemplo para Elite + AggressivePressure (PosturePriors de 4B.5: Pressure=650, ControlRange=350, Recover=250, Disengage=100; baseSwitchMargin=100, baseMinDuration=TBD):*
+- **AggressivePressure base:** BasicAttack: 75, Approach: 90, OffensiveSkill: 105, Heal: 85, Flee: 70, Heal HP%: 25 | PressurePrior: 650, ControlRangePrior: 350, RecoverPrior: 250, DisengagePrior: 100, SwitchMargin: 100, MinDuration: TBD
+- **Elite delta:** BasicAttack: +10, Approach: +5, OffensiveSkill: +15, Heal: 0, Flee: -20, Heal HP%: -10 | PressurePriorDelta: +100, ControlRangePriorDelta: +50, RecoverPriorDelta: -50, DisengagePriorDelta: -100, SwitchMarginDelta: +50, MinDurationDelta: +100
+- **Effective Profile (con Clamp/Max):** BasicAttack: 85, Approach: 95, OffensiveSkill: 120, Heal: 85, Flee: 50, Heal HP%: 15 | PressurePrior: Clamp(750,0,1000)=750, ControlRangePrior: Clamp(400,0,1000)=400, RecoverPrior: Clamp(200,0,1000)=200, DisengagePrior: Clamp(0,0,1000)=0, SwitchMargin: Max(0,150)=150, MinDuration: Max(0,TBD+100)
 
 ## 6. Ownership
 
@@ -141,7 +143,8 @@ effectiveTacticalScore   = Style.TacticalBase + Role.TacticalDelta + Directive.B
 | 4C-A8 | Release build sin errores nuevos | Arquitectura | Que no se introdujeron dependencias prohibidas |
 | 4C-A10 | Role.PosturePriorDelta de Mob es cero para todas las posturas y SwitchMarginDelta=0 y MinDurationDelta=0 (identidad completa) | Comportamiento | Que el rol Mob no altera los priors base |
 | 4C-A11 | Elite.SwitchMarginDelta > 0 AND Elite.MinDurationDelta > 0 (Elite es más persistente en postura) | Comportamiento | Que Elite es más persistente en su postura |
-| 4C-A12 | `effectivePosturePrior = Style.Prior + Role.PriorDelta` produce posturas correctas | Comportamiento | Que la suma matemática produce los priors efectivos |
+| 4C-A12 | `effectivePosturePrior = Clamp(Style.Prior + Role.PriorDelta, 0, 1000)` — siempre en [0,1000] | Contrato | Que la composición preserva la invariante del weighted average |
+| 4C-A13 | `effectiveSwitchMargin = Max(0, ...)` y `effectiveMinDuration = Max(0, ...)` — nunca negativos | Contrato | Que deltas negativos (Minion) no producen valores inválidos |
 
 > Especificación completa de tests: [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md)
 

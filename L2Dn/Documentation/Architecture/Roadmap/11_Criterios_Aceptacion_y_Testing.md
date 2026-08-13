@@ -52,7 +52,8 @@ Las categorías de test son:
 | 4B5-A13 | Critical P95 no > +25% vs V1 | Rendimiento | SLO preservado |
 | 4B5-A14 | Utility: media ponderada normalizada, resultado 0-1000 sin saturación artificial | Contrato | Información relativa preservada |
 | 4B5-A15 | Weights son int 0-1000, cálculo con long accumulator | Contrato | Fixed-point real |
-| 4B5-A16 | Reflex Emergency Flee usa SOLO `EmergencyFleeHpThreshold` de IntelligenceProfile | Integración | Reflex no depende de Strategy |
+| 4B5-A16 | Reflex Emergency Flee usa SOLO `NpcReflexPolicy.EmergencyFleeHpPercent` (inmutable, resuelta al spawn). No depende de Strategy adaptativa, Neural ni Squad durante Think | Integración | Reflex inmutable durante encarnación |
+| 4B5-A16b | `Adaptive Disabled` + `AggressivePressure` produce `NpcReflexPolicy.EmergencyFleeHpPercent = 5%` (idéntico a Phase 4B) | Backward compat | Phase 4B exacta |
 | 4B5-A17 | `Neutral` solo fuera de combate; no compite en utility | Contrato | Semántica clara |
 | 4B5-A18 | Postura ineligible nunca seleccionada (Disengage con FleeNotAllowed) | Contrato | Hard constraints |
 | 4B5-A19 | Shadow V2 mantiene estado longitudinal durante toda la sesión | Comportamiento | Valida hysteresis/commitment en Shadow |
@@ -93,7 +94,9 @@ Las categorías de test son:
 | `Utility_NeverSaturates` | Normalización | 1000 evaluaciones aleatorias → ningún utility = 1000 por saturación aritmética |
 | `Utility_WeightedAverage_CorrectResult` | Cálculo | Input conocido → resultado exacto verificable |
 | `Weights_AreIntegers` | Fixed-point | Reflection → todos los weights son int, no double/float |
-| `ReflexFlee_UsesOnlyEmergencyThreshold` | Separación | ReflexBrain no accede a strategy.EffectiveFleeHpPercent |
+| `ReflexFlee_UsesOnlyNpcReflexPolicy` | Separación | ReflexBrain consume NpcReflexPolicy, no strategy.EffectiveFleeHpPercent |
+| `ReflexPolicy_AggressivePressure_FleeFivePercent` | Backward compat | AggressivePressure → NpcReflexPolicy.EmergencyFleeHpPercent = 5% (idéntico Phase 4B) |
+| `ReflexPolicy_Survival_FleeThirtyPercent` | Backward compat | Survival → NpcReflexPolicy.EmergencyFleeHpPercent = 30% (idéntico Phase 4B) |
 | `MaintainRange_TooClose_Retreats` | Movement | Range=300, target a 100 → NPC retrocede |
 | `MaintainRange_TooFar_Approaches` | Movement | Range=300, target a 500 → NPC avanza |
 | `MaintainRange_InBand_NoMovement` | Tolerance | Range=300±60, target a 310 → no se mueve |
@@ -140,6 +143,8 @@ Las categorías de test son:
 | 4C-A7 | R1-R5 con Strategy Enabled y roles configurados mantiene zero drops, zero overflow, max concurrent 1 | Rendimiento | Que la composición no degrada el scheduler |
 | 4C-A8 | Release build sin errores nuevos | Arquitectura | Que no se introdujeron dependencias prohibidas |
 | 4C-A9 | Registry es inmutable al startup; NO existe hot override de deltas de rol | Contrato | Que la reproducibilidad no se compromete por live tuning prematuro |
+| 4C-A12 | `effectivePosturePrior = Clamp(Style.Prior + Role.PriorDelta, 0, 1000)` — siempre en [0,1000] | Contrato | Que la composición preserva la invariante del weighted average |
+| 4C-A13 | `effectiveSwitchMargin = Max(0, ...)` y `effectiveMinDuration = Max(0, ...)` — nunca negativos | Contrato | Que deltas negativos no producen valores inválidos |
 
 ### Tests concretos
 
@@ -150,6 +155,11 @@ Las categorías de test son:
 | `RoleDelta_Mob_IsIdentityZero` | Delta Mob no modifica ningún score | `RoleDelta.Mob` → todos los campos == 0 |
 | `RoleDelta_AllRoles_AreImmutable` | Deltas no mutan post-construcción | Crear delta, intentar modificar → compilación falla (readonly struct) |
 | `RoleEnum_HasExactlyFiveValues` | Cardinalidad acotada para telemetría | `Enum.GetValues<NpcStrategyRole>()` → exactamente {Mob, Elite, Minion, Commander, Raid} |
+| `RoleComposition_PriorNeverBelowZero` | Invariante prior | ∀ style × role × posture: effectivePosturePrior ≥ 0 |
+| `RoleComposition_PriorNeverAbove1000` | Invariante prior | ∀ style × role × posture: effectivePosturePrior ≤ 1000 |
+| `RoleComposition_DurationAndMarginNeverNegative` | Invariante commitment | ∀ role: effectiveSwitchMargin ≥ 0 AND effectiveMinDuration ≥ 0 |
+| `TacticalScore_AlwaysInRange_0_1000` | Invariante tactical | ∀ style × role × posture × action: effectiveTacticalScore ∈ [0, 1000] |
+| `TacticalScore_NegativeBias_ClampsToZero` | Clamp inferior | Attack base=60 + directiveBias=-150 → effectiveScore = 0, no -90 |
 
 **Brain (`L2Dn.Npc.Brain.Tests`):**
 
@@ -206,7 +216,7 @@ Las categorías de test son:
 |---|---|---|
 | `ObservationV1_NoObjectIds` | Sin identidad técnica | Reflection sobre campos → ningún ObjectId |
 | `ObservationV1_IsImmutable` | Sin mutación | Modificar campo → fallo de compilación (readonly struct) |
-| `ObservationV1_HasCurrentTargetState` | Target info suficiente | Campos: HasTarget, HpRatio, DistanceNormalized, IsCasting, IsMoving, IsDisabled, RelativeAngle, ThreatRatio, WithinPhysicalRange |
+| `ObservationV1_HasCurrentTargetState` | Target info suficiente | Campos: HasTarget, DistanceNormalized, IsCasting, IsMoving, IsDisabled, RelativeAngle, ThreatRatio, WithinPhysicalRange (sin HpRatio en V1) |
 | `CandidateSet_ContainsEligibilityAndReason` | Información completa | Cada candidato tiene score, eligible, ineligibilityReason |
 | `Advice_NpcKeyMismatch_Rejected` | Causalidad | Advice con NpcKey.ObjectId=100/Gen=5, NPC con NpcKey.ObjectId=100/Gen=6 → rechazado (NpcKey incluye Generation) |
 | `Advice_StateRevisionMismatch_Rejected` | Causalidad V1 estricta | Advice con StateRevision=100, NPC en StateRevision=101 → rechazado (exacto, no delta) |

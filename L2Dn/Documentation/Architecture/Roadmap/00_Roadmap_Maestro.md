@@ -329,7 +329,7 @@ Comparación: `123 vs 123`. No contra el Think actual (que puede estar en otra r
 | 2 | Neural Policy produce recomendaciones, no intents | ADR-012 |
 | 3 | Action Mask tiene una sola fuente: TacticalActionEvaluator (no duplicar) | ADR-013 rev |
 | 4 | Fallback a determinístico es INVARIANTE, no configurable | ADR-014 rev |
-| 5 | Reflex NUNCA depende de inferencia neural NI de Strategy | ADR-006 ext |
+| 5 | Reflex nunca depende de Strategy adaptativa, Neural Policy ni Squad durante Think. Su política de emergencia (`NpcReflexPolicy`) es inmutable durante la encarnación del NPC | ADR-006 ext |
 | 6 | Sin I/O en Think (modelo precargado) | ADR-004 ext |
 | 7 | Single-flight por NPC y por Squad | — |
 | 8 | Brain solo referencia Contracts | ADR-008 |
@@ -342,7 +342,7 @@ Comparación: `123 vs 123`. No contra el Think actual (que puede estar en otra r
 | 15 | PolicyArbitrator: Neural elige directamente entre candidatos elegibles (Opción A) | ADR-017 |
 | 16 | Brain NUNCA invoca INpcPolicy; solo consume NpcPolicyAdvice? inyectado | — |
 | 17 | Reflex Intent != null → no generar policy evaluation | — |
-| 18 | Reflex Emergency Flee usa SOLO EmergencyFleeHpThreshold de IntelligenceProfile (no de Strategy) | — |
+| 18 | Reflex Emergency Flee usa SOLO `NpcReflexPolicy.EmergencyFleeHpPercent` (inmutable, resuelta al spawn desde IntelligenceProfile + Static Strategy V1) | — |
 | 19 | Utility internals (Considerations, Curves, PriorTable) son Brain internal, no Contracts | — |
 | 20 | Utility scores: media ponderada normalizada (0-1000), weights int, long accumulator | — |
 
@@ -354,8 +354,8 @@ Comparación: `123 vs 123`. No contra el Think actual (que puede estar en otra r
 |---|---|
 | Autoridad | Neural Network nunca modifica GameServer |
 | Gateway | Todo cambio físico pasa por Gateway |
-| Reflex | Nunca depende obligatoriamente de inferencia ni de Strategy |
-| Reflex Flee | Emergency Flee usa SOLO EmergencyFleeHpThreshold de IntelligenceProfile |
+| Reflex | Nunca depende de Strategy adaptativa, Neural ni Squad durante Think. `NpcReflexPolicy` inmutable al spawn |
+| Reflex Flee | Emergency Flee usa SOLO `NpcReflexPolicy.EmergencyFleeHpPercent` (preserva Phase 4B style overrides) |
 | ActionMask | Una sola fuente (TacticalActionEvaluator), no dos |
 | Causalidad | Advice rechazado si NpcKey o BasedOnStateRevision no coinciden (exacto en V1) |
 | Reflex → no evaluation | Si Reflex produce Intent, no se genera policy evaluation |

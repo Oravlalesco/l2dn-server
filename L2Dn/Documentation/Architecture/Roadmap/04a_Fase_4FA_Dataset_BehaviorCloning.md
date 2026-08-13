@@ -33,11 +33,15 @@ flowchart TD
 
 | Nombre | Ensamblado | Archivo propuesto | Propósito |
 |---|---|---|---|
-| `ReplayCaptureService` | `L2Dn.Npc.Brain` | `Training/ReplayCaptureService.cs` | Captura hechos crudos (HP delta, outcomes) al disco. |
+| `ReplayCaptureService` | `L2Dn.Npc.Training.Capture` | `ReplayCaptureService.cs` | Orquesta captura de hechos crudos. Brain emite resultado estructurado; este servicio gestiona buffer, serialización, disco y backpressure. |
+| `ReplayBuffer` | `L2Dn.Npc.Training.Capture` | `ReplayBuffer.cs` | Buffer bounded en memoria. Backpressure: si lleno, descarta oldest. |
+| `ReplayWriter` | `L2Dn.Npc.Training.Capture` | `ReplayWriter.cs` | Serializa buffer a disco. Async, no en hot path. |
 | `DatasetBuilder` | `L2Dn.Npc.Training.Export` | `DatasetBuilder.cs` | Herramienta offline. Lee replays y aplica `RewardFunction`. |
 | `NpcTrainingReward` | `L2Dn.Npc.Training.Contracts` | `NpcTrainingReward.cs` | Calcula recompensa de manera offline, sin acoplar al GameServer. |
 | `FeatureSchemaV1` | `L2Dn.Npc.Contracts` | `Models/FeatureSchemaV1.cs` | Define dinámicamente N dimensiones del input vector. |
 | `PolicyObservationV1` | `L2Dn.Npc.Contracts` | `Models/PolicyObservationV1.cs` | Vector normalizado para enviar a Python. |
+
+> **Frontera**: `L2Dn.Npc.Brain` NO contiene código de captura, buffer ni serialización. Brain emite un resultado estructurado (readonly record struct) que `Training.Capture` consume. Esto cumple el principio del Roadmap Maestro: "training NO entra a Brain".
 
 ## 5. Especificación detallada
 

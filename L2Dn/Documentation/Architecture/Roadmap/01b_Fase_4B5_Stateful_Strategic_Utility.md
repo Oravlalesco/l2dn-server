@@ -97,7 +97,7 @@ flowchart TD
 
     GATE --> DIR["STRATEGY DIRECTIVE\nPosture + Biases + PreferredRange + Reason"]
 
-    DIR --> REFLEX["Reflex Brain\n(autoridad inmediata:\nsolo Emergency Flee, NOT strategic)"]
+    DIR --> REFLEX["Reflex Brain\n(NpcReflexPolicy inmutable al spawn:\nEmergency Flee, leash, invalid target)"]
     REFLEX -->|"si no Reflex Intent"| TACT["Tactical Brain\n(CandidateSet → Selection)"]
     REFLEX -->|"Reflex Intent"| GW["IntentGateway"]
     TACT --> GW
@@ -120,6 +120,7 @@ Strategy produce una **directiva** (biases + postura + rango preferido). Tactica
 | `NpcStrategyDirective` | Resultado: postura + biases + rango preferido + razón (readonly record struct) |
 | `NpcPostureTransitionReason` | Enum: `Initial`, `CombatStarted`, `CombatEnded`, `LowHealth`, `HealthRecovered`, `TargetInsideRange`, `TargetOutsideRange`, `HealAvailable`, `NoHealAvailable`, `FleeCondition`, `SkillReady`, `Timeout` |
 | `NpcPostureUtilities` | `readonly record struct(int Pressure, int ControlRange, int Recover, int Disengage)` — snapshot diagnóstico para replay/telemetría |
+| `NpcReflexPolicy` | `readonly record struct(int EmergencyFleeHpPercent, bool FleeAllowed, int LeashRange)` — inmutable, resuelto al spawn desde IntelligenceProfile + Static Strategy V1 |
 
 ### En `L2Dn.Npc.Brain` (internal — algoritmo y estado privado)
 
@@ -338,7 +339,64 @@ La postura ganadora debe ser **elegible**. Si la postura con mayor utility es in
 
 ### Hallazgo
 
-El código actual de `ReflexBrain` recibe `strategy.EffectiveFleeHpPercent` para decidir Flee. Eso contradice "Reflex nunca depende de Strategy".
+El código actual de `ReflexBrain` recibe `strategy.EffectiveFleeHpPercent` para decidir Flee. Los perfiles existentes realmente tienen overrides diferentes:
+
+```text
+AggressivePressure → FleeHp override = 5%
+Survival           → FleeHp override = 30%
+Balanced           → default (IntelligenceProfile)
+RangedControl      → default (IntelligenceProfile)
+```
+
+Decir "Reflex nunca depende de Strategy" rompe backward compatibility, porque Phase 4B **sí** usa ese override.
+
+### Solución: NpcReflexPolicy
+
+Se introduce `NpcReflexPolicy`: resuelta **una sola vez** al crear/configurar el NPC (spawn-time), a partir de datos estáticos.
+
+```text
+NpcIntelligenceProfile
++
+Static Strategy V1 (Style overrides)
+        ↓
+NpcReflexPolicy (inmutable durante la encarnación)
+        ↓
+EmergencyFleeHpPercent    (resuelto al spawn, no en Think)
+FleeAllowed               (del IntelligenceProfile)
+LeashRange                (del IntelligenceProfile)
+```
+
+`ReflexBrain` solo consume `NpcReflexPolicy`. Nunca:
+
+- Dynamic Posture (Strategy V2)
+- Neural Policy / PolicyAdvice
+- Squad Directive / CombatAssignment
+
+### Invariant corregido
+
+> **Reflex nunca depende de Strategy adaptativa, Neural Policy ni Squad durante Think.** Su política de emergencia es **inmutable durante la encarnación del NPC**.
+
+Esto preserva:
+
+```text
+Adaptive Disabled = Phase 4B exacta
+  → NpcReflexPolicy.EmergencyFleeHpPercent
+    = strategy.FleeHpPercentOverride ?? intelligence.FleeHpPercent
+  → idéntico a lo que Phase 4B produce hoy
+
+Adaptive Enabled = Strategy V2
+  → NpcReflexPolicy sigue siendo la misma (resuelta al spawn)
+  → la postura dinámica NO modifica el threshold de emergency flee
+  → Strategic Disengage es un bias táctico, no una regla de Reflex
+```
+
+### Ubicación
+
+```text
+NpcReflexPolicy → L2Dn.Npc.Contracts (readonly record struct)
+```
+
+Es un contrato inmutable que Reflex consume. No contiene lógica de evaluación.
 
 ### Separación limpia
 
@@ -347,10 +405,10 @@ REFLEX EMERGENCY FLEE
 ────────────────────
 "debo escapar AHORA por seguridad"
 
-Fuente: NpcIntelligenceProfile.EmergencyFleeHpThreshold (inmutable, no strategy)
+Fuente: NpcReflexPolicy.EmergencyFleeHpPercent (inmutable, resuelto al spawn)
 Condición: HP < threshold AND FleeAllowed
 Autoridad: ABSOLUTA, ignora postura/commitment/squad
-No depende de: Strategy, Neural, Squad, Posture
+No depende de: Strategy adaptativa, Neural, Squad, Posture dinámica
 
 vs
 
@@ -363,21 +421,10 @@ Mecanismo: StrategyDirective → Tactical → Retreat/MaintainRange candidates
 Autoridad: Sujeta a Tactical evaluation y Gateway
 ```
 
-### Cambio requerido en ReflexBrain
-
-```text
-ANTES: ReflexBrain lee strategy.EffectiveFleeHpPercent
-AHORA: ReflexBrain lee SOLO NpcIntelligenceProfile.EmergencyFleeHpThreshold
-```
-
-`EmergencyFleeHpThreshold` es un dato **estático del template**, no de strategy. Reflex no depende de Strategy.
-
-La postura `Disengage` expresa "quiero retirarme" como Tactical bias (Flee +30, Retreat +25, MaintainRange +20), que pasa por TacticalActionEvaluator y Gateway normalmente.
-
 ### Jerarquía resultante
 
 ```text
-1. Reflex Emergency Flee     → HP < EmergencyThreshold     → inmediato
+1. Reflex Emergency Flee     → HP < NpcReflexPolicy.EmergencyFleeHpPercent → inmediato
 2. Strategy Disengage        → Posture=Disengage          → via Tactical candidates
 3. Strategy Recover/Retreat  → Posture=Recover, Range↑    → via Tactical candidates
 ```
@@ -477,6 +524,28 @@ Posture: ControlRange
 ```
 
 Los biases son `int` (escala ±1000). Sin floats.
+
+### Rango de Tactical Scores
+
+```text
+TACTICAL_SCORE_MIN = 0
+TACTICAL_SCORE_MAX = 1000
+
+effectiveScore = Clamp(
+    baseScore + roleDelta + directiveBias,
+    0,
+    1000)
+```
+
+Ejemplo con Recover directive:
+
+```text
+Attack:  baseScore=60, roleDelta=+10, directiveBias=-150  →  Clamp(-80, 0, 1000) = 0
+Heal:    baseScore=100, roleDelta=0, directiveBias=+350   →  Clamp(450, 0, 1000) = 450
+Flee:    baseScore=100, roleDelta=-20, directiveBias=+250 →  Clamp(330, 0, 1000) = 330
+```
+
+Scores negativos no existen. Un score clamped a 0 significa "no considerar esta acción" sin necesidad de eliminarla del CandidateSet (eligibility hace eso). El rango estable `[0, 1000]` garantiza que el expert label para Behavior Cloning (4F-A) opera sobre una escala normalizada y predecible.
 
 ---
 
@@ -642,8 +711,10 @@ Escala: `int 0..1000`. Estos son **fuente de verdad** para la escala.
 En Phase 4C, Role aplica **deltas signed** sobre estos priors:
 
 ```text
-effectivePosturePrior = Style.PosturePrior + Role.PosturePriorDelta
+effectivePosturePrior = Clamp(Style.PosturePrior + Role.PosturePriorDelta, 0, 1000)
 ```
+
+Sin el clamp, `Raid.DisengagePriorDelta = -200` sobre `AggressivePressure.DisengagePrior = 100` produce -100, rompiendo la invariante `[0,1000]` del weighted average.
 
 ---
 
@@ -669,11 +740,13 @@ Mob:
 ### Composición
 
 ```text
-effectivePosturePrior    = Style.Prior + Role.PriorDelta
-effectiveSwitchMargin    = baseSwitchMargin + Role.SwitchMarginDelta
-effectiveMinDuration     = baseMinDuration + Role.MinDurationDelta
-effectiveTacticalScore   = Style.TacticalBase + Role.TacticalDelta + Directive.Bias
+effectivePosturePrior    = Clamp(Style.Prior + Role.PriorDelta, 0, 1000)
+effectiveSwitchMargin    = Max(0, baseSwitchMargin + Role.SwitchMarginDelta)
+effectiveMinDuration     = Max(0, baseMinDuration + Role.MinDurationDelta)
+effectiveTacticalScore   = Clamp(Style.TacticalBase + Role.TacticalDelta + Directive.Bias, 0, 1000)
 ```
+
+> **Invariante**: `effectivePosturePrior ∈ [0, 1000]`, `effectiveSwitchMargin ≥ 0`, `effectiveMinDuration ≥ 0`. El weighted average solo produce resultados correctos si todos sus inputs están en `[0, 1000]`.
 
 `CommitmentDelta` de rev 1 se reemplaza por `SwitchMarginDelta` + `MinDurationDelta` (conceptos diferentes, no ambiguos).
 
@@ -684,7 +757,7 @@ effectiveTacticalScore   = Style.TacticalBase + Role.TacticalDelta + Directive.B
 | Subfase | Implementación | Dependencia |
 |---|---|---|
 | 4B.5.0 | Congelar Static Strategy V1 como baseline | — |
-| 4B.5.1 | Separar `ReflexBrain` Flee: `EmergencyFleeHpThreshold` de `IntelligenceProfile`, no de Strategy | 4B.5.0 |
+| 4B.5.1 | `NpcReflexPolicy` (readonly record struct en Contracts) + resolver al spawn desde IntelligenceProfile + Static Strategy V1. ReflexBrain consume NpcReflexPolicy en lugar de strategy.EffectiveFleeHpPercent | 4B.5.0 |
 | 4B.5.2 | `MaintainRange` + `Retreat` como Tactical candidates (movimiento mínimo) | 4B.5.1 |
 | 4B.5.3 | `NpcStrategicPosture` + `NpcPostureTransitionReason` + `NpcStrategyDirective` en Contracts | 4B.5.2 |
 | 4B.5.4 | `NpcStrategyEvaluationContext` + `StrategyContextBuilder` (internal Brain) | 4B.5.3 |
@@ -832,7 +905,8 @@ Solo: **un NPC individual capaz de cambiar racionalmente su postura durante un c
 | 4B5-A13 | Critical P95 no > +25% vs V1 | Rendimiento | SLO preservado |
 | 4B5-A14 | Utility scores son enteros 0-1000 (media ponderada normalizada, sin saturación) | Contrato | Determinismo + información preservada |
 | 4B5-A15 | Weights son int 0-1000, cálculo con long accumulator | Contrato | Fixed-point real |
-| 4B5-A16 | Reflex Emergency Flee usa SOLO `EmergencyFleeHpThreshold` de IntelligenceProfile | Integración | Reflex no depende de Strategy |
+| 4B5-A16 | Reflex Emergency Flee usa SOLO `NpcReflexPolicy.EmergencyFleeHpPercent` (inmutable, resuelta al spawn desde IntelligenceProfile + Static Strategy V1). No depende de Strategy adaptativa, Neural ni Squad durante Think | Integración | Reflex inmutable durante encarnación |
+| 4B5-A16b | `Adaptive Disabled` + `AggressivePressure` produce `NpcReflexPolicy.EmergencyFleeHpPercent = 5%` (idéntico a Phase 4B `strategy.FleeHpPercentOverride`) | Backward compat | Phase 4B exacta |
 | 4B5-A17 | `Neutral` solo existe fuera de combate; no compite en utility evaluation | Contrato | Semántica clara |
 | 4B5-A18 | Postura ineligible nunca es seleccionada (e.g. Disengage con FleeNotAllowed) | Contrato | Hard constraints |
 | 4B5-A19 | Shadow mode mantiene estado V2 longitudinal durante toda la sesión | Comportamiento | Valida hysteresis/commitment en Shadow |

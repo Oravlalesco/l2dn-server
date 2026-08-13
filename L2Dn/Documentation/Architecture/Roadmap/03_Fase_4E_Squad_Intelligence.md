@@ -101,6 +101,46 @@ flowchart TD
 - Integración con LLMs en combate.
 - World Director (control de zona total).
 
+## 8b. Issues conocidos — resolver ANTES de implementar 4E
+
+> [!WARNING]
+> Estos problemas fueron identificados en auditoría. No bloquean 4B.5 ni 4C pero deben resolverse antes de comenzar 4E.
+
+### P1-1: SquadSnapshot vs SquadContext — unificar
+
+El documento usa simultáneamente `SquadSnapshot` y `SquadContext` para referirse al mismo concepto. Elegir uno y eliminar el otro. Recomendación: **`SquadContext`** (inmutable, construido por `SquadPerceptionBuilder`).
+
+### P1-2: FreeAgent es Assignment, no Objective
+
+Actualmente el documento dice:
+
+```text
+Commander dies → Objective ∈ {Retreat, FreeAgent}
+```
+
+Pero `FreeAgent` es una **asignación individual** (`NpcCombatAssignment.FreeAgent`), no un objetivo del escuadrón. Corrección:
+
+```text
+Squad Objective:  Retreat / Regroup / HoldPosition  (qué hace el grupo)
+NPC Assignment:   FreeAgent                          (qué hace el individuo)
+```
+
+Cuando el Commander muere, el **Objective** del squad debe ser `Retreat` o `Regroup`. Cada NPC individual puede recibir **Assignment** `FreeAgent` si el squad se disuelve.
+
+### P1-3: Ownership Leader Follow vs Squad Movement
+
+El Legacy tiene `Monster.master` con follow behavior. Squad puede emitir directivas de movimiento táctico (flanquear, rodear). Sin resolver quién gana:
+
+```text
+Squad: "ve al flanco izquierdo"
+Legacy: "vuelve a seguir al master"
+Squad: "ve al flanco izquierdo"
+Legacy: "vuelve..."
+```
+
+Resolver con ownership explícito: cuando un NPC tiene `CombatAssignment != FreeAgent`, Squad Movement tiene prioridad sobre Leader Follow. Fuera de combate, Leader Follow se restaura.
+
+
 ## 9. Criterios de aceptación
 
 | ID | Criterio | Tipo | Qué demuestra |
@@ -108,7 +148,7 @@ flowchart TD
 | 4E-A1 | Escuadrón desde Master + MinionList contiene exactamente los miembros que `MinionList` reporta | Integración | Que SquadFactory no inventa ni pierde miembros |
 | 4E-A2 | `SquadContext` refleja correctamente: HP promedio, composición viva/muerta, estado del commander, centroide | Contrato | Que el snapshot de escuadrón es correcto |
 | 4E-A3 | `SquadThinkCoordinator` garantiza `MaxConcurrent = 1` bajo carga concurrente | Comportamiento | Que single-flight aplica a escuadrones |
-| 4E-A4 | Muerte del Commander produce cambio de directiva observable (Retreat o FreeAgent) | Comportamiento | Que el SquadBrain reacciona a eventos críticos |
+| 4E-A4 | Muerte del Commander produce cambio de Objective observable (Retreat o Regroup); NPCs individuales pueden recibir Assignment=FreeAgent si squad se disuelve | Comportamiento | Que el SquadBrain reacciona a eventos críticos |
 | 4E-A5 | NPC sin SquadDirective se comporta exactamente como Phase 4C | Integración | Que ausencia de squad = fallback limpio |
 | 4E-A6 | `NpcCombatAssignment` modifica scores de `StrategyBrain` de forma consistente | Comportamiento | Que Frontline/RangedPressure/ProtectSupport producen diferencias observables |
 | 4E-A7 | SquadBrain no modifica directamente ningún estado del GameServer | Arquitectura | Que solo produce directivas |
