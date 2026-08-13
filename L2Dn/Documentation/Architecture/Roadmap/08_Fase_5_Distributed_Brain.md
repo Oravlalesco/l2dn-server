@@ -9,9 +9,8 @@ Distribuir las partes más pesadas del razonamiento (como inferencias de redes n
 
 ## 2. Prerequisitos
 
-- Fase 4E (Neural Brain) completada y analizada en producción.
-- Fase 4F (Squad Intelligence) probada en laboratorio.
-- Recolección de datos sobre número de NPCs activos, inferencias por segundo y latencias.
+- Fase 4I-B (Learned Squad Policy) completada.
+- Recolección de datos sobre número de NPCs activos, inferencias por segundo y latencias del pipeline local.
 
 ## 3. Diagrama de arquitectura
 
@@ -55,8 +54,14 @@ flowchart TD
 ## 5. Especificación detallada
 
 - **Distribución Selectiva:** Solamente el razonamiento de alto nivel (Estrategia, Squad, Neural) se envía por la red.
-- **Batch Inference:** En lugar de inferencias 1 a 1, `BrainBatchDispatcher` acumula estados (`NpcPerceptionSnapshot`) en una ventana muy corta de tiempo y los envía para predicción masiva.
-- **Tolerancia a fallos:** El cliente `GrpcBrainClient` debe tener timeouts estrictos y usar el fallback local (`BalancedStrategy`, etc.) definido en el ADR-006 si el worker remoto no responde.
+- **Vectorización:** NO transmitir `NpcPerceptionSnapshot` crudo por red. El GameServer serializa y transmite `NpcPolicyObservationV1` (vectorizado/normalizado) directo al backend.
+- **Worker Devuelve Advice (ADR-016):** Los workers externos calculan la política pero devuelven un `NpcPolicyAdvice` (o `SquadDirective`), NUNCA un `NpcIntent`. El Intent solo puede ser emitido localmente para ser validado por el GameServer.
+- **Batch Inference & Coalescing:** `BrainBatchDispatcher` acumula estados en una ventana muy corta de tiempo y los envía para predicción masiva. Se aplica coalescing (agrupamiento por modelo).
+- **Resiliencia & Control de Flujo:**
+  - **Backpressure & Bounded Inference Queue:** Límite estricto de solicitudes en vuelo.
+  - **Drop Stale Observations:** Descartar observaciones antiguas si la red se congestiona.
+  - **Circuit Breaker & Bulkhead Isolation:** Proteger al GameServer aislando fallos del backend remoto.
+- **Tolerancia a fallos:** El cliente `GrpcBrainClient` debe usar el fallback local definido en el ADR-006 si el worker remoto no responde.
 
 ## 6. Ownership
 
@@ -69,7 +74,7 @@ flowchart TD
 ## 7. Lo que NO incluye
 
 - **Reflex remoto:** Los reflejos (ej. *attack range*, *basic attack*) NUNCA cruzan la red.
-- **Autoridad:** El worker no puede aplicar daño ni mover personajes. Solo devuelve directivas o intents sugeridos.
+- **Autoridad:** El worker no puede aplicar daño ni mover personajes. Solo devuelve directivas o advice (NpcPolicyAdvice). NUNCA devuelve un Intent (ADR-016).
 - **Critical path dependency:** El loop del GameServer nunca se bloquea esperando a la red.
 
 ## Criterios de aceptación
@@ -111,7 +116,7 @@ flowchart TD
 
 ## 12. Relación con fases adyacentes
 
-- **Consume:** Toda la carga procesal expuesta en Fase 4E y 4F.
+- **Consume:** Toda la carga procesal acumulada hasta la Fase 4I-B (incluyendo MARL y Learned Squad).
 - **Provee a:** Fase 6 y Fase 7, donde el coste computacional será masivo y el worker distribuido será el único medio viable.
 
 ## 13. Experimentos / laboratorio

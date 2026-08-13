@@ -60,8 +60,10 @@ flowchart TD
 ## 5. Especificación detallada
 
 - **EncounterBrain:** Mantiene un registro de actores del encuentro. Emite directivas globales (ej. "Todos los esbirros enfoquen al curandero", "Esparcirse para evitar AoE").
-- **RaidBrain:** A diferencia del `TacticalBrain`, el RaidBrain basa sus Intents en `PhaseState`. Gestiona sus propios Enrage Timers, transiciones basadas en % de HP, y eventos cinemáticos.
-- **NpcBrainEligibility:** Hasta ahora, solo se permitía a `Monster` usar el nuevo pipeline. Esta fase modificará el puente del IntentGateway para que clases como `RaidBoss` e instancias similares puedan generar Intents.
+- **Separación de Mechanics e Intelligence:**
+  - **Mecánicas (Scripts deterministas):** Siguen controlando phase triggers, puertas, spawns, cinemáticas, rewards, quest flags, curses y ciclo de vida de la instancia. Estos NO se eliminan, son correctos.
+  - **Inteligencia (RaidBrain):** Controla exclusivamente la toma de decisiones: qué escuadrón presiona, qué objetivo priorizar, qué formación usar, cuándo reagruparse.
+- **NpcBrainEligibility:** Esta fase modificará el puente del IntentGateway para que `RaidBoss` pueda generar Intents para sus decisiones tácticas, mientras escucha a sus scripts para mecánicas puras.
 
 ## 6. Ownership
 
@@ -73,7 +75,8 @@ flowchart TD
 
 ## 7. Lo que NO incluye
 
-- **Legacy Scripts (Python/Java-style):** Esta fase busca abolir o absorber el comportamiento "scripted" hardcodeado antiguo de ciertos bosses, pero no promete migrar los 500+ quests inmediatamente, sino proveer el framework.
+- **Abolir Legacy Scripts de Raid:** Los scripts deterministas de mecánicas son correctos y deben permanecer. Solo la inteligencia de decisión de combate se moderniza.
+- **Hot-switch a Legacy mid-encounter:** Si el `EncounterBrain` falla en medio de la pelea, el fallback es `DeterministicEncounterPolicy` (del nuevo sistema), NO el script Legacy. El rollback a Legacy puro solo debe hacerse antes del próximo encounter o en un restart.
 
 ## 8. Criterios de aceptación
 
@@ -83,7 +86,7 @@ flowchart TD
 | 6-A2 | `EncounterBrain` produce `EncounterDirective` que coordina múltiples squads, pero NUNCA modifica estado del GameServer directamente | Arquitectura | Que la jerarquía de dirección respeta las mismas fronteras que el Brain individual |
 | 6-A3 | Transición de fase del boss (ej: HP < 50% → phase 2) produce cambio de directiva observable sin congelar al boss | Comportamiento | Que las fases de raid no crean ventanas de inacción |
 | 6-A4 | Certificación vertical completa de un boss sencillo (ej: Ant Queen) con el nuevo pipeline: spawn → engage → phase transitions → adds → death | Integración | Que el pipeline completo funciona end-to-end para un encuentro real |
-| 6-A5 | Fallback: si `EncounterBrain` falla, el RaidBoss usa su Legacy script sin interrupción | Integración | Que la tolerancia a fallos aplica a nivel de encuentro |
+| 6-A5 | Fallback: si `EncounterBrain` falla mid-fight, usa `DeterministicEncounterPolicy`, no Legacy script | Integración | Que la tolerancia a fallos en combate mantiene el nuevo pipeline activo |
 
 > Especificación completa de tests: [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md)
 
@@ -95,7 +98,7 @@ flowchart TD
 | `EncounterBrain_NeverModifiesWorldState` | Solo directivas | EncounterBrain evaluation → cero llamadas a mutación de GameServer |
 | `PhaseTransition_HP50_ChangesDirective` | Transición reactiva | Boss HP < 50% → EncounterDirective.Phase cambia → squads reciben nuevos objetivos |
 | `PhaseTransition_NoFreeze` | Sin ventana muerta | Durante transición → boss continúa produciendo intents válidos (no idle) |
-| `EncounterBrain_Failure_FallbackToLegacy` | Tolerancia | EncounterBrain throws → RaidBoss usa Legacy AI script → combate continúa |
+| `EncounterBrain_Failure_FallbackToDeterministicPolicy` | Tolerancia | EncounterBrain throws → usa DeterministicEncounterPolicy → combate continúa en pipeline nuevo |
 | `AntQueen_VerticalCertification_FullEncounter` | End-to-end | Spawn → engage → phases → adds → death → todo vía Intent pipeline |
 
 ## 9. Telemetría

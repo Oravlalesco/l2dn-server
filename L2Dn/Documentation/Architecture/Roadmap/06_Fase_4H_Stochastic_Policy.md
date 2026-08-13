@@ -4,9 +4,10 @@
 **Fecha:** 12/08/2026
 
 ## Objetivo
-Activar la ejecución real de la política neuronal e introducir un comportamiento estocástico (probabilístico) en la toma de decisiones. En esta fase, el NPC dejará de tomar siempre la decisión "óptima matemática" y utilizará muestreo probabilístico desde la distribución que genera el modelo ONNX, añadiendo variabilidad, naturalidad y un parámetro de *SkillLevel* sin modificar estadísticas de combate puras.
+Activar la ejecución real de la política neuronal e introducir un comportamiento estocástico (probabilístico) en la toma de decisiones. En esta fase, el NPC dejará de tomar siempre la decisión "óptima matemática" y utilizará muestreo probabilístico desde la distribución que genera el modelo ONNX, añadiendo variabilidad, naturalidad y un parámetro de *NpcAiDifficultyTier* sin modificar estadísticas de combate puras.
 
 ## Prerequisitos
+- Fase 4F-A completada (Dataset y Behavior Cloning).
 - Fase 4G completada (ONNX integrado, pipeline Shadow validado y telemetría funcionando).
 - Acuerdo semántico en Phase 4G consistentemente por encima del 90%.
 
@@ -49,8 +50,8 @@ Flee        0.05
 |---|---|---|---|
 | `StochasticSampler` | `L2Dn.Npc.Brain` | `Policies/StochasticSampler.cs` | Aplica temperature y hace sampling sobre la distribución de acciones. |
 | `ActionMasker` | `L2Dn.Npc.Brain` | `Policies/ActionMasker.cs` | Evita que la red elija acciones imposibles (ej. curarse sin MP). |
-| `SkillLevel` | `L2Dn.Npc.Contracts` | `Models/SkillLevel.cs` | Enum: `Novice`, `Normal`, `Veteran`, `Elite`, `Legendary`. |
-| `SkillLevelModifiers` | `L2Dn.Npc.Brain` | `Models/SkillLevelModifiers.cs` | Tabla de mapeo de SkillLevel a Temperature, Precision, y Reaction Time. |
+| `NpcAiDifficultyTier` | `L2Dn.Npc.Contracts` | `Models/NpcAiDifficultyTier.cs` | Enum: `Novice`, `Normal`, `Veteran`, `Elite`, `Legendary`. |
+| `DifficultyTierModifiers` | `L2Dn.Npc.Brain` | `Models/DifficultyTierModifiers.cs` | Tabla de mapeo de NpcAiDifficultyTier a Temperature, Neural Influence, Advice Refresh Interval, y Action Variability. |
 | `AbTestCoordinator` | `L2Dn.Npc.Brain` | `Policies/AbTestCoordinator.cs` | Asigna templates a control (determinista) o experimental (neural) en runtime. |
 
 ## Especificación detallada
@@ -61,18 +62,20 @@ El sistema ya no elige simplemente `max(acciones)`. Aplica *Temperature Scaling*
 - **Temperatura alta (ej. 0.8)**: La red explora más, tomando acciones subóptimas pero posibles, aumentando la variabilidad y simulando "errores" humanos.
 
 ### 2. Reproducibilidad
-- **Entorno de Producción**: Se usa una semilla (seed) dinámica para inyectar entropía real. El gameplay se siente vivo y variable.
-- **Entorno de Testing**: Se utiliza una semilla fija (e.g. `12345`). Una secuencia de eventos exacta reproducirá siempre el mismo muestreo, permitiendo debuggar el comportamiento y escribir unit tests deterministas sobre una política estocástica.
+La aleatoriedad debe ser recuperable. NO usar aleatoriedad irrecuperable.
+- **Seed determinista**: Se usa `NpcDecisionSeed = Hash(NpcKey, Generation, DecisionSequence, PolicyVersion)`.
+- **Entorno de Producción**: Los jugadores perciben variabilidad y naturalidad; nosotros reproducimos la toma de decisiones en un replay.
+- **Entorno de Testing**: Al ser determinista basado en el hash, una secuencia exacta reproducirá siempre el mismo muestreo, permitiendo debuggar el comportamiento y escribir unit tests deterministas sobre una política estocástica.
 
-### 3. Skill Level
+### 3. NpcAiDifficultyTier
 Se introduce un nuevo concepto de dificultad sin "inflar" stats (HP/P.Atk):
-| SkillLevel | Temperature | Lookahead | Coordinación | Retirada/Flee |
+| NpcAiDifficultyTier | Temperature | Neural Influence | Advice Refresh Interval | Action Variability |
 |---|---|---|---|---|
-| Novice | 0.80 | Bajo | Pobre | Lenta |
-| Normal | 0.50 | Medio | Base | Media |
-| Veteran | 0.30 | Alto | Buena | Rápida |
-| Elite | 0.15 | Muy Alto | Excelente | Perfecta |
-| Legendary | 0.05 | Perfecto | Impecable | Calculada |
+| Novice | 0.80 | Baja | Lento | Alta |
+| Normal | 0.50 | Media | Normal | Media |
+| Veteran | 0.30 | Alta | Rápido | Baja |
+| Elite | 0.15 | Muy Alta | Muy Rápido | Muy Baja |
+| Legendary | 0.05 | Máxima | Instantáneo | Mínima |
 
 ## Ownership
 
@@ -95,7 +98,7 @@ Se introduce un nuevo concepto de dificultad sin "inflar" stats (HP/P.Atk):
 | 4H-A2 | Con seed dinámica, NPC exhibe variabilidad observable | Comportamiento | Sampling produce diversidad |
 | 4H-A3 | Acción enmascarada NUNCA seleccionada por sampler, independientemente de temperature | Contrato | Mask es barrera hard |
 | 4H-A4 | Temperature 0.01 produce >98% decisiones = argmax | Comportamiento | Temperature baja converge a determinismo |
-| 4H-A5 | Temperature 1.0 produce distribución cercana a la original | Comportamiento | Temperature alta no distorsiona |
+| 4H-A5 | Temperature 1.0 produce distribución igual a softmax(logits original) | Comportamiento | Temperature = 1.0 conserva softmax(logits original) |
 | 4H-A6 | Gateway rejection ratio con Neural Enabled < 5% diferencia absoluta vs Deterministic | Integración | Policy neural no genera intent storms |
 | 4H-A7 | A/B: grupo control y experimental producen métricas comparables salvo variabilidad esperada | Gameplay | Policy neural no rompe balance |
 
@@ -109,15 +112,15 @@ Se introduce un nuevo concepto de dificultad sin "inflar" stats (HP/P.Atk):
 | `Sampler_DynamicSeed_VariableOutput` | Variabilidad | Seeds distintas × 100 → al menos 2 acciones distintas |
 | `Sampler_MaskedAction_NeverSelected` | Mask inviolable | Heal=false + Heal logit máximo + 10,000 samples → cero Heal |
 | `Sampler_Temperature001_AlmostDeterministic` | Control temp | T=0.01 × 1,000 → >98% argmax |
-| `Sampler_Temperature10_HighEntropy` | Control temp | T=1.0 × 1,000 → entropía cercana a máxima |
-| `SkillLevel_Novice_HighTemperature` | Mapeo correcto | Novice → temperature ≥ 0.7 |
-| `SkillLevel_Legendary_LowTemperature` | Mapeo correcto | Legendary → temperature ≤ 0.1 |
+| `Sampler_Temperature10_HighEntropy` | Control temp | T=1.0 × 1,000 → distribución igual a softmax(logits original) |
+| `DifficultyTier_Novice_HighTemperature` | Mapeo correcto | Novice → temperature ≥ 0.7 |
+| `DifficultyTier_Legendary_LowTemperature` | Mapeo correcto | Legendary → temperature ≤ 0.1 |
 | `GatewayRejections_NeuralVsDeterministic_Comparable` | Sin intent storms | 1000 ciclos cada → rejection delta < 5% |
 
 ## Telemetría
 
 - Reutiliza telemetría de 4G.
-- `l2dn.npc.policy.sampler.temperature`: Temperatura aplicada en la inferencia (Histograma segmentado por SkillLevel).
+- `l2dn.npc.policy.sampler.temperature`: Temperatura aplicada en la inferencia (Histograma segmentado por NpcAiDifficultyTier).
 - `l2dn.npc.policy.abtest.assignment`: Asignación del NPC en el A/B test (Counter - Control vs Experimental).
 - `l2dn.npc.combat.ttk`: Time-to-kill de NPCs (Histograma, para comparar A/B).
 

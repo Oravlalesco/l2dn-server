@@ -2,6 +2,7 @@
 
 **Estado:** Diseño aceptado, código pendiente de implementación.
 **Fecha:** Agosto 2026
+**Revisión:** 2 (2026-08-13)
 
 ## 1. Objetivo
 Implementar el eje de **rol** compuesto con el eje de **estilo** ya certificado en la Fase 4A/4B. Esta fase añade una dimensión estructural a los NPCs (qué son en el mundo: Mob, Elite, Minion, Commander, Raid) que, combinada con su estilo de combate, permite una diferenciación más rica del comportamiento táctico.
@@ -129,15 +130,15 @@ No deben mezclarse. Por ejemplo, un Minion con estilo `AggressivePressure` puede
 
 ## 10. Configuración
 - `NPC_STRATEGY_ROLE_ENABLED` (booleano, default: `true` en el futuro)
-- `NPC_STRATEGY_ROLE_OVERRIDES` (diccionario JSON opcional para sobreescribir deltas en caliente para experimentación).
+- El registry debe ser inmutable al startup. Live tuning sería una fase independiente futura con ProfileVersion, atomic snapshot y telemetría.
 
 ## 11. Rollback
 - Si se detecta inestabilidad, revertir el registro `templateId:style:role` a `templateId:style` en la configuración (la opción por defecto asume `Mob` con delta 0).
-- Deshabilitar variable de entorno si se implementó un switch global.
+- Deshabilitar variable de entorno si se implementó un switch global. Se mantiene solo el rollback de formato de registro, sin hot override.
 
 ## 12. Relación con fases adyacentes
 - **Consume de:** Fase 4A/4B (Perfiles base inmutables de estilo).
-- **Provee a:** Fase 4E (La identidad estática servirá de input, junto a otras cosas, para que el Combat Assignment decida las misiones dinámicas).
+- **Provee a:** Fase 4D (Policy Foundation), que luego servirá para construir hacia la Fase 4E.
 
 ## 13. Experimentos / laboratorio
 - Configurar en `StrategyValidationLab.xml` un "lane" de combate con:

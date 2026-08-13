@@ -1,8 +1,10 @@
-# Criterios de Aceptación y Estrategia de Testing
+# Criterios de Aceptación y Estrategia de Testing — Revisión 2
 
 Estado: diseño. Fecha: 2026-08-13.
 
 Este documento define qué debe demostrarse en cada fase para considerarla completa, y qué tests lo demuestran. No lista "cosas que pasan"; lista **qué propiedades prueban y por qué cada test es necesario**.
+
+**Revisión 2**: incorpora correcciones arquitectónicas — CandidateSet como Action Mask, causalidad en Advice/Directive, Pipeline correcto (Strategy→Reflex→Tactical→PolicyArbitrator), splits de fases, seed determinista, correcciones de tests incorrectos.
 
 ---
 
@@ -43,38 +45,40 @@ Las categorías de test son:
 | 4C-A6 | `NpcBrainEligibility` rechaza todo actor que no sea exacto `Monster` + exacto `AttackableAI`, independientemente del rol configurado | Integración | Que un Guard con rol Commander sigue en Legacy |
 | 4C-A7 | R1-R5 con Strategy Enabled y roles configurados mantiene zero drops, zero overflow, max concurrent 1 | Rendimiento | Que la composición no degrada el scheduler |
 | 4C-A8 | Release build sin errores nuevos | Arquitectura | Que no se introdujeron dependencias prohibidas |
+| 4C-A9 | Registry es inmutable al startup; NO existe hot override de deltas de rol | Contrato | Que la reproducibilidad no se compromete por live tuning prematuro |
 
 ### Tests concretos
 
 **Contracts (`L2Dn.Npc.Contracts.Tests`):**
 
-| Test | Propiedad | Input | Output esperado |
-|---|---|---|---|
-| `RoleDelta_Mob_IsIdentityZero` | El delta Mob no modifica ningún score | `RoleDelta.Mob` | Todos los campos == 0 |
-| `RoleDelta_AllRoles_AreImmutable` | Los deltas no pueden mutar después de construcción | Crear delta, intentar modificar | Compilación falla o excepción |
-| `RoleEnum_HasExactlyFiveValues` | Cardinalidad acotada para telemetría | `Enum.GetValues<NpcStrategyRole>()` | Exactamente {Mob, Elite, Minion, Commander, Raid} |
+| Test | Propiedad | Input → Output esperado |
+|---|---|---|
+| `RoleDelta_Mob_IsIdentityZero` | Delta Mob no modifica ningún score | `RoleDelta.Mob` → todos los campos == 0 |
+| `RoleDelta_AllRoles_AreImmutable` | Deltas no mutan post-construcción | Crear delta, intentar modificar → compilación falla (readonly struct) |
+| `RoleEnum_HasExactlyFiveValues` | Cardinalidad acotada para telemetría | `Enum.GetValues<NpcStrategyRole>()` → exactamente {Mob, Elite, Minion, Commander, Raid} |
 
 **Brain (`L2Dn.Npc.Brain.Tests`):**
 
-| Test | Propiedad | Input | Output esperado |
-|---|---|---|---|
-| `Compose_Balanced_Mob_EqualsPhase4Balanced` | Identity: rol Mob no altera baseline | Perception + Balanced + Mob | Decisión idéntica a Phase 4 Balanced sin rol |
-| `Compose_AggressivePressure_Elite_ProducesExpectedScores` | La suma aritmética es correcta | AP base + Elite delta | BasicAttack=85, Approach=95, OffensiveSkill=120, Heal=85, Flee=50 |
-| `Compose_Survival_Commander_FleeScoreNeverNegative` | Scores negativos no rompen Tactical | Survival(Flee=115) + Commander(Flee=−25) + edge case | Flee score ≥ 0, decisión válida |
-| `Compose_AllStyles_AllRoles_Deterministic_1000x` | Determinismo | Cada combinación × 1000 evaluaciones idénticas | Output bit-a-bit idéntico las 1000 veces |
-| `Compose_ExplicitLegacyProfile_DefaultsToBalancedMob` | No herencia implícita | Intelligence profile legacy sin registro de Strategy | Usa Balanced scores, no hereda un rol |
-| `Registry_MalformedEntry_WarnsAndRejects` | Configuración inválida no se esconde | `"20130:invalid:mob"` | Warning emitido, template NO aparece en registro |
-| `Registry_UnknownRole_WarnsAndRejects` | Rol desconocido no habilita Balanced | `"20130:aggressive_pressure:tank"` | Warning emitido, template NO aparece |
-| `Registry_DuplicateTemplate_LastWinsWithWarning` | Comportamiento explícito para duplicados | Dos entradas para template 20130 | Último gana, warning emitido |
+| Test | Propiedad | Input → Output esperado |
+|---|---|---|
+| `Compose_Balanced_Mob_EqualsPhase4Balanced` | Identity: rol Mob no altera baseline | Perception + Balanced + Mob → decisión idéntica a Phase 4 Balanced sin rol |
+| `Compose_AggressivePressure_Elite_ProducesExpectedScores` | Suma aritmética correcta | AP base + Elite delta → scores esperados verificables |
+| `Compose_Survival_Commander_FleeScoreNeverNegative` | Scores negativos no rompen Tactical | Survival(Flee=115) + Commander(Flee=−25) + edge → Flee score ≥ 0 |
+| `Compose_AllStyles_AllRoles_Deterministic_1000x` | Determinismo | Cada combinación × 1000 evaluaciones idénticas → output bit-a-bit idéntico |
+| `Compose_ExplicitLegacyProfile_DefaultsToBalancedMob` | No herencia implícita | Intelligence profile legacy sin registro de Strategy → usa Balanced scores |
+| `Registry_MalformedEntry_WarnsAndRejects` | Config inválida no se esconde | `"20130:invalid:mob"` → warning, template NO en registro |
+| `Registry_UnknownRole_WarnsAndRejects` | Rol desconocido no habilita Balanced | `"20130:aggressive_pressure:tank"` → warning, template NO aparece |
+| `Registry_DuplicateTemplate_LastWinsWithWarning` | Duplicados explícitos | Dos entradas para template 20130 → último gana, warning emitido |
+| `Registry_IsImmutableAfterStartup` | Sin hot override | Intentar modificar registry post-startup → excepción o no-op |
 
 **GameServer.Model (`L2Dn.GameServer.Model.Tests`):**
 
-| Test | Propiedad | Input | Output esperado |
-|---|---|---|---|
-| `Eligibility_Guard_WithCommanderRole_StaysLegacy` | Actor boundary no se expande | Guard actor + registro `"guard_id:balanced:commander"` | `UsesIntentBrain == false` |
-| `Eligibility_RaidBoss_WithRaidRole_StaysLegacy` | RaidBoss no entra en Intent | RaidBoss actor + registro con rol Raid | `UsesIntentBrain == false` |
-| `Eligibility_BaseMonster_WithEliteRole_UsesIntent` | Monster base sí puede tener rol | Monster base + registro con rol Elite | `UsesIntentBrain == true` |
-| `RoleTelemetry_EmitsExactlyFiveCardinalityValues` | Cardinalidad acotada | Evaluaciones con todos los roles | Tags OTLP contienen solo los 5 valores del enum |
+| Test | Propiedad | Input → Output esperado |
+|---|---|---|
+| `Eligibility_Guard_WithCommanderRole_StaysLegacy` | Actor boundary no se expande | Guard + registro commander → `UsesIntentBrain == false` |
+| `Eligibility_RaidBoss_WithRaidRole_StaysLegacy` | RaidBoss no entra en Intent | RaidBoss + rol Raid → `UsesIntentBrain == false` |
+| `Eligibility_BaseMonster_WithEliteRole_UsesIntent` | Monster base sí puede tener rol | Monster + rol Elite → `UsesIntentBrain == true` |
+| `RoleTelemetry_EmitsExactlyFiveCardinalityValues` | Cardinalidad acotada | Evaluaciones con todos los roles → tags solo contienen 5 valores |
 
 ---
 
@@ -84,16 +88,16 @@ Las categorías de test son:
 
 | ID | Criterio | Tipo | Qué demuestra |
 |---|---|---|---|
-| 4D-A1 | `DeterministicNpcPolicy` produce un `NpcPolicyAdvice` cuyo efecto sobre `StrategyBrain` resulta en la misma decisión que Strategy sin policy, para TODOS los scenarios de Phase 4 | Comportamiento | Que la policy determinista es semánticamente transparente — no cambia nada |
-| 4D-A2 | `NoOpNpcPolicy` produce un advice que el cache reconoce como vencido inmediatamente, causando fallback | Comportamiento | Que el mecanismo de fallback funciona sin una policy real |
-| 4D-A3 | Un `NpcPolicyAdvice` con `ExpiresAt < tick_actual` es ignorado por `StrategyBrain` y se usa Strategy determinista | Comportamiento | Que advice vencido = fallback, no NPC congelado |
-| 4D-A4 | `NpcPolicyObservationV1` NUNCA contiene ObjectId, PlayerId, ni ningún identificador técnico de entidad | Contrato | Que la red nunca puede aprender identidad técnica |
-| 4D-A5 | `NpcPolicyObservationV1` es construible desde un `NpcPerceptionSnapshot` en tiempo O(n) donde n = entidades visibles, sin allocations en el heap más allá del struct resultado | Rendimiento | Que la extracción de features no degrada el hot path |
-| 4D-A6 | `NpcPolicyActionMask` enmascara correctamente: skill en cooldown, heal con HP > umbral, flee deshabilitado, skill sin MP, actor en casting/stunned | Comportamiento | Que la primera barrera funciona — acciones imposibles se filtran antes de la policy |
-| 4D-A7 | El cache de advice es bounded: no crece más allá de NPCs registrados, limpia entries de generaciones obsoletas | Contrato | Que no hay memory leak de advice |
-| 4D-A8 | `NpcPolicyVersion` con schema incompatible o checksum incorrecto causa rechazo + fallback + telemetría | Integración | Que un modelo corrupto no puede activarse silenciosamente |
-| 4D-A9 | El Reflex Brain produce la misma decisión con policy Disabled, Enabled, o error de policy | Comportamiento | Que Reflex NUNCA depende de la policy |
-| 4D-A10 | `L2Dn.Npc.Brain` sigue referenciando SOLO `L2Dn.Npc.Contracts` entre ensamblados L2Dn | Arquitectura | Que la frontera de dependencia no se viola |
+| 4D-A1 | `TacticalActionEvaluator` refactorizado: `BuildCandidates()` produce `NpcTacticalCandidateSet` y `SelectCandidate()` es separado | Arquitectura | Que existe una sola fuente de verdad para eligibilidad de acciones |
+| 4D-A2 | `NpcTacticalCandidateSet` con candidatos Disabled produce misma decisión que Phase 4C directamente | Comportamiento | Que la refactorización no altera comportamiento |
+| 4D-A3 | `PolicyArbitrator` con mode=Disabled ignora advice y selecciona candidato por score determinista | Comportamiento | Que Disabled = transparente |
+| 4D-A4 | `NpcPolicyAdvice` con causal metadata (NpcKey + Generation + StateRevision) es rechazado si Generation no coincide | Contrato | Que un NPC respawneado no ejecuta advice de su encarnación anterior |
+| 4D-A5 | `NpcPolicyAdvice` con `BasedOnStateRevision` anterior a la revisión actual menos delta es descartado | Contrato | Que advice de estado muy obsoleto no se aplica |
+| 4D-A6 | `NpcPolicyObservationV1` NUNCA contiene ObjectId, PlayerId, ni ningún identificador técnico | Contrato | Que la red nunca puede aprender identidad técnica |
+| 4D-A7 | V1 NO incluye target selection neural. Target selection continúa determinista | Contrato | Que no se abre el agujero de PreferredTarget sin slots |
+| 4D-A8 | Reflex Brain produce la misma decisión con policy Disabled, Enabled, o error de policy | Comportamiento | Que Reflex NUNCA depende de la policy |
+| 4D-A9 | `L2Dn.Npc.Brain` sigue referenciando SOLO `L2Dn.Npc.Contracts` | Arquitectura | Que la frontera no se viola |
+| 4D-A10 | Fallback determinista es invariante: no existe config que lo desactive | Arquitectura | ADR-014 rev 2 |
 
 ### Tests concretos
 
@@ -101,27 +105,53 @@ Las categorías de test son:
 
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
-| `ObservationV1_NoObjectIds` | Sin identidad técnica | Inspeccionar todos los campos de `NpcPolicyObservationV1` via reflection → ningún campo de tipo `int` que represente un ObjectId |
-| `ObservationV1_AllFieldsNormalized` | Inputs numéricos para la red | HP ratio ∈ [0,1], MP ratio ∈ [0,1], distancias ≥ 0, counts ≥ 0 |
-| `ObservationV1_IsImmutable` | Sin mutación post-construcción | Intentar modificar cualquier campo → fallo de compilación (readonly struct) |
-| `ActionMask_SkillOnCooldown_IsMasked` | Primera barrera funcional | Skill con cooldown > 0 → bit de skill = false en mask |
-| `ActionMask_HealWithHighHP_IsMasked` | Heal innecesario filtrado | HP > heal threshold → bit de heal = false |
-| `ActionMask_FleeDisabledByIntelligence_IsMasked` | Respeta intelligence profile | FleeAllowed = false → bit de flee = false |
-| `ActionMask_AllActionsValid_NothingMasked` | Mask no filtra sin razón | Todas las precondiciones cumplidas → mask all-true |
-| `PolicyAdvice_Expired_IsRecognizedAsStale` | Fallback correcto | Advice con ExpiresAt = 100, tick actual = 101 → `IsStale == true` |
-| `PolicyVersion_ChecksumMismatch_RejectedWithReason` | Modelo corrupto rechazado | Version con checksum alterado → `Rejected(ChecksumMismatch)` |
+| `ObservationV1_NoObjectIds` | Sin identidad técnica | Reflection sobre campos → ningún ObjectId |
+| `ObservationV1_IsImmutable` | Sin mutación | Modificar campo → fallo de compilación (readonly struct) |
+| `CandidateSet_ContainsEligibilityAndReason` | Información completa | Cada candidato tiene score, eligible, ineligibilityReason |
+| `Advice_GenerationMismatch_Rejected` | Causalidad | Advice con Generation=5, NPC en Generation=6 → rechazado |
+| `Advice_StateRevisionTooOld_Rejected` | Causalidad | Advice con StateRevision=100, NPC en StateRevision=115 → rechazado |
+| `Advice_ExpiresAtPast_IsStale` | Expiración | ExpiresAt=100, tick=101 → `IsStale == true` |
+| `PolicyVersion_ChecksumMismatch_Rejected` | Modelo corrupto | Checksum alterado → `Rejected(ChecksumMismatch)` |
+| `AdviceV1_NoPreferredTarget` | V1 sin target selection | NpcPolicyAdvice V1 no contiene campo PreferredTarget/Slot |
 
 **Brain:**
 
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
-| `DeterministicPolicy_Phase4Parity_AllScenarios` | Transparencia semántica | Para CADA scenario S1-S9 de Phase 4: Policy Disabled vs DeterministicPolicy → misma decisión |
-| `StaleAdvice_FallsBackToStrategy` | Fallback funcional | Advice con ExpiresAt pasado + tick actual → Strategy sin modificar scores → misma decisión que sin policy |
-| `PolicyError_FallsBackToStrategy` | Tolerancia a fallos | Policy que lanza excepción → fallback → decisión válida sin interrupción |
-| `ReflexBrain_IgnoresPolicy_TargetDead` | Reflex independiente | Target muerto + advice que dice "Attack" → Reflex emite ClearTarget, ignora advice |
-| `ReflexBrain_IgnoresPolicy_OutsideLeash` | Reflex independiente | Fuera de leash + advice que dice "Approach" → Reflex emite ReturnHome |
-| `ObservationExtraction_NoHeapAllocation` | Performance hot path | Extraer observation desde perception → cero allocations (verificar con benchmark) |
-| `AdviceCache_BoundedSize_CleansStaleGenerations` | Sin memory leak | Registrar 1000 NPCs, avanzar generación de 500 → cache ≤ 500 entries activas |
+| `CandidateSet_Phase4Parity_AllScenarios` | Transparencia | S1-S9: BuildCandidates + SelectCandidate == TacticalActionEvaluator original |
+| `PolicyArbitrator_Disabled_UsesDeterministic` | Disabled transparente | Mode=Disabled → PolicyArbitrator ignora advice → misma decisión que sin policy |
+| `PolicyArbitrator_NeuralBias_ModifiesEligibleOnly` | Neural solo toca elegibles | Advice con bias para Heal, pero Heal ineligible → Heal ignorado |
+| `StaleAdvice_FallsBackToDeterministic` | Fallback funcional | Advice vencido → PolicyArbitrator usa scores deterministas |
+| `PolicyError_FallsBackToDeterministic` | Tolerancia a fallos | Policy con excepción → fallback → decisión válida |
+| `ReflexBrain_IgnoresPolicy_TargetDead` | Reflex independiente | Target muerto + advice "Attack" → Reflex emite ClearTarget, ignora advice |
+| `ReflexBrain_IgnoresPolicy_OutsideLeash` | Reflex independiente | Fuera de leash + advice "Approach" → Reflex emite ReturnHome |
+| `ObservationExtraction_NoHeapAllocation` | Performance | Extraer observation → cero allocations (benchmark) |
+
+---
+
+## Fase 4D.5 — Tactical Movement Primitives
+
+### Criterios de aceptación
+
+| ID | Criterio | Tipo | Qué demuestra |
+|---|---|---|---|
+| 4D5-A1 | `FlankTarget(Left)` produce movimiento al lado izquierdo del target, validado por GeoEngine | Comportamiento | Que el intent semántico se materializa en movimiento real |
+| 4D5-A2 | Si GeoEngine rechaza TODAS las posiciones, el NPC mantiene su posición sin congelarse | Integración | Que el fallback de movimiento funciona |
+| 4D5-A3 | `MaintainRange(300)` con target a 100 → NPC retrocede; con target a 500 → NPC avanza | Comportamiento | Que MaintainRange funciona bidireccional |
+| 4D5-A4 | `FormationSlot` con slot asignado por SquadDirective produce movimiento correcto | Integración | Que Squad + Movement se integran |
+| 4D5-A5 | Brain NUNCA produce coordenadas absolutas | Arquitectura | Que la frontera se mantiene |
+
+### Tests concretos
+
+| Test | Propiedad | Input → Output esperado |
+|---|---|---|
+| `FlankLeft_MovesToLeftOfTarget` | Posicionamiento | FlankTarget(Left, 150) + target en (100,100) → NPC se mueve a posición izquierda validada |
+| `FlankLeft_GeoBlocked_TriesAlternatives` | Resiliencia | Posición izquierda bloqueada → prueba ±30°, ±60° → alternativa |
+| `FlankLeft_AllBlocked_MaintainsPosition` | Fallback | Todas bloqueadas → NPC no se mueve, no se congela |
+| `MaintainRange_TooClose_Retreats` | Rango bidireccional | Range=300, target a 100 → NPC retrocede |
+| `MaintainRange_TooFar_Approaches` | Rango bidireccional | Range=300, target a 500 → NPC avanza |
+| `FormationSlot_CorrectPosition` | Integración Squad | SquadDirective con slots → NPC va al slot asignado |
+| `Brain_NeverProducesAbsoluteCoords` | Frontera | Inspeccionar TacticalMovementIntent → no contiene coordenadas X,Y,Z absolutas |
 
 ---
 
@@ -131,13 +161,16 @@ Las categorías de test son:
 
 | ID | Criterio | Tipo | Qué demuestra |
 |---|---|---|---|
-| 4E-A1 | Un escuadrón creado desde Master + MinionList contiene exactamente los miembros que `MinionList` reporta, con roles y estilos correctos | Integración | Que SquadFactory no inventa ni pierde miembros |
-| 4E-A2 | `SquadContext` refleja correctamente: HP promedio, composición viva/muerta, estado del commander, posición centroide | Contrato | Que el snapshot de escuadrón es correcto |
-| 4E-A3 | `SquadThinkCoordinator` garantiza `MaximumConcurrentSquadThinkPerSquad = 1` bajo carga concurrente | Comportamiento | Que la invariante single-flight aplica a escuadrones |
-| 4E-A4 | La muerte del Commander produce un cambio de directiva observable (ej: Retreat o FreeAgent) | Comportamiento | Que el SquadBrain reacciona a eventos críticos |
-| 4E-A5 | Un NPC individual sin SquadDirective (porque su escuadrón no existe o se destruyó) se comporta exactamente como en Phase 4C | Integración | Que la ausencia de squad = fallback limpio, no error |
-| 4E-A6 | `NpcCombatAssignment` modifica los scores del `StrategyBrain` individual de forma consistente y predecible | Comportamiento | Que Frontline, RangedPressure, ProtectSupport producen diferencias observables |
-| 4E-A7 | El SquadBrain no modifica directamente ningún estado del GameServer (no mueve NPCs, no cambia targets, no inflige daño) | Arquitectura | Que el SquadBrain solo produce directivas, igual que el Brain individual solo produce intents |
+| 4E-A1 | Escuadrón desde Master + MinionList contiene exactamente los miembros que `MinionList` reporta | Integración | Que SquadFactory no inventa ni pierde miembros |
+| 4E-A2 | `SquadSnapshot` refleja correctamente: HP promedio, composición viva/muerta, estado del commander, centroide | Contrato | Que el snapshot de escuadrón es correcto |
+| 4E-A3 | `SquadThinkCoordinator` (en GameServer.Model) garantiza `MaxConcurrent = 1` bajo carga concurrente | Comportamiento | Que single-flight aplica a escuadrones |
+| 4E-A4 | Muerte del Commander produce cambio de directiva observable (Retreat o FreeAgent) | Comportamiento | Que el SquadBrain reacciona a eventos críticos |
+| 4E-A5 | NPC sin SquadDirective se comporta exactamente como Phase 4C | Integración | Que ausencia de squad = fallback limpio |
+| 4E-A6 | `NpcCombatAssignment` modifica scores de `PolicyArbitrator` de forma consistente | Comportamiento | Que Frontline/RangedPressure/ProtectSupport producen diferencias observables |
+| 4E-A7 | SquadBrain no modifica directamente ningún estado del GameServer | Arquitectura | Que solo produce directivas |
+| 4E-A8 | `NPC_SQUAD_MODE=Disabled` produce comportamiento Phase 4C exacto | Comportamiento | Que el rollout modal funciona |
+| 4E-A9 | `SquadBrainState` es `internal` en Brain, no público en Contracts | Arquitectura | Que estado privado no se expone |
+| 4E-A10 | SquadDirective contiene causal metadata (SquadKey, SquadGeneration, MembershipRevision) | Contrato | Que un minion respawneado no ejecuta directiva de su encarnación anterior |
 
 ### Tests concretos
 
@@ -145,63 +178,71 @@ Las categorías de test son:
 
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
-| `SquadContext_IsImmutable` | Sin mutación | Intentar modificar SquadContext → fallo |
-| `SquadDirective_IsImmutable` | Sin mutación | Intentar modificar SquadDirective → fallo |
-| `CombatAssignment_HasExpectedValues` | Enum completo | Exactamente: Frontline, FlankLeft, FlankRight, RangedPressure, ProtectSupport, ProtectCommander, Regroup, Retreat, FreeAgent |
-| `SquadContext_DeadMember_ReflectedInComposition` | Snapshot correcto | Squad con 5 miembros, 2 muertos → AliveMemberCount=3, DeadMemberCount=2 |
-| `SquadContext_CentroidCalculation_Correct` | Geometría correcta | 3 miembros en posiciones conocidas → centroide = promedio de las 3 posiciones |
+| `SquadSnapshot_IsImmutable` | Sin mutación | Modificar SquadSnapshot → fallo |
+| `SquadDirective_IsImmutable` | Sin mutación | Modificar SquadDirective → fallo |
+| `CombatAssignment_HasExpectedValues` | Enum completo | Exactamente 9 valores esperados |
+| `SquadSnapshot_DeadMember_ReflectedInComposition` | Snapshot correcto | 5 miembros, 2 muertos → Alive=3, Dead=2 |
+| `SquadSnapshot_CentroidCalculation_Correct` | Geometría correcta | 3 posiciones conocidas → centroide = promedio |
+| `SquadDirective_CausalMetadata_AllFieldsPresent` | Causalidad | SquadKey, SquadGeneration, MembershipRevision, DirectiveSequence presentes |
+| `SquadDirective_GenerationMismatch_Rejected` | Causalidad | Directive con SquadGeneration=3, squad actual Generation=4 → rechazado |
 
 **Brain:**
 
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
-| `SquadBrain_CommanderDied_EmitsRetreatOrFreeAgent` | Reacción a pérdida de líder | SquadContext con CommanderAlive=false → Directive.Objective ∈ {Retreat, FreeAgent} |
-| `SquadBrain_AllMembersHealthy_NoFormationChange` | Estabilidad sin eventos | SquadContext estable → Directive no cambia innecesariamente |
-| `SquadBrain_SupportThreatened_EmitsProtectDirective` | Protección del soporte | SquadContext con support bajo ataque → Al menos un miembro recibe ProtectSupport |
-| `SquadBrain_NumericalDisadvantage_EmitsRegroup` | Adaptación táctica | Squad con 2/5 vivos vs 4 enemigos → Directive.Objective = Regroup o Retreat |
-| `SquadThink_SingleFlight_UnderConcurrency` | Invariante de concurrencia | 1000 wakeups simultáneos para un squad → MaxConcurrent = 1, zero drops |
-| `SquadThink_Coalescing_MultipleWakes` | Eficiencia | 10 MemberDied wakes en 50ms para mismo squad → se fusionan en 1 Think |
-| `Assignment_Frontline_IncreasesApproachScore` | Efecto observable | Mismo NPC con/sin Assignment=Frontline → Approach score mayor con Frontline |
-| `Assignment_ProtectSupport_DecreasesFleeSensitivity` | Efecto observable | Mismo NPC con/sin Assignment=ProtectSupport → Flee score menor |
-| `NoSquad_FallbackToIndividualBrain` | Degradación limpia | NPC sin SquadDirective → produce misma decisión que Phase 4C |
+| `SquadBrain_CommanderDied_EmitsRetreatOrFreeAgent` | Reacción a pérdida | CommanderAlive=false → Objective ∈ {Retreat, FreeAgent} |
+| `SquadBrain_AllMembersHealthy_NoFormationChange` | Estabilidad | Contexto estable → directiva no cambia |
+| `SquadBrain_SupportThreatened_EmitsProtectDirective` | Protección | Support bajo ataque → al menos un ProtectSupport |
+| `SquadBrain_NumericalDisadvantage_EmitsRegroup` | Adaptación | 2/5 vivos vs 4 enemigos → Regroup o Retreat |
+| `SquadThink_SingleFlight_UnderConcurrency` | Concurrencia | 1000 wakeups simultáneos → MaxConcurrent=1, zero drops |
+| `Assignment_Frontline_IncreasesApproachScore` | Efecto observable | Con/sin Frontline → Approach score mayor con Frontline |
+| `NoSquad_FallbackToIndividualBrain` | Degradación limpia | Sin SquadDirective → misma decisión que Phase 4C |
+| `SquadMode_Disabled_Phase4CExact` | Rollout modal | NPC_SQUAD_MODE=Disabled → comportamiento Phase 4C exacto |
+| `SquadBrainState_IsInternal` | Frontera | `SquadBrainState` no es accesible fuera de Brain assembly |
 
 **GameServer.Model:**
 
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
-| `SquadFactory_FromMinionList_CorrectMembers` | Mapeo fiel | Monster con MinionList de 4 minions → Squad con 5 members (master + 4) |
-| `SquadFactory_EmptyMinionList_NoSquadCreated` | Sin escuadrón vacío | Monster sin minions → No se crea Squad |
-| `SquadManager_MemberDeath_UpdatesContext` | Ciclo de vida | Miembro muere → próximo SquadContext refleja DeadMemberCount incrementado |
-| `SquadManager_AllMembersDead_SquadDissolved` | Limpieza | Todos los miembros mueren → Squad removido del manager |
+| `SquadFactory_FromMinionList_CorrectMembers` | Mapeo fiel | Monster + 4 minions → Squad con 5 members |
+| `SquadFactory_EmptyMinionList_NoSquadCreated` | Sin squad vacío | Sin minions → no se crea Squad |
+| `SquadFactory_ClanHelp_NotCreated_InPhase4E` | Solo master/minion | Clan help cluster → no se crea Squad (clan/faction squads son fase futura) |
+| `SquadManager_AllMembersDead_SquadDissolved` | Limpieza | Todos mueren → Squad removido |
+| `SquadThinkCoordinator_InGameServerModel` | Ubicación | SquadThinkCoordinator vive en L2Dn.GameServer.Model, no en Brain |
 
 ---
 
-## Fase 4F — Training Platform
+## Fase 4F-A — Dataset + Behavior Cloning
 
 ### Criterios de aceptación
 
 | ID | Criterio | Tipo | Qué demuestra |
 |---|---|---|---|
-| 4F-A1 | La captura de replay NO degrada los TPS del GameServer más de un 2% | Rendimiento | Que el sistema de captura es verdaderamente pasivo |
-| 4F-A2 | Un `NpcEpisode` exportado puede reconstruir la secuencia completa de decisiones del Brain para ese combate | Contrato | Que el dataset contiene información suficiente para entrenamiento |
-| 4F-A3 | `FeatureExtractor` produce vectores de dimensión fija con valores numéricos normalizados, sin NaN ni Inf | Contrato | Que los datos son consumibles por PyTorch sin preproceso adicional |
-| 4F-A4 | El pipeline `train_imitation.py` converge: la loss disminuye monótonamente en las primeras 100 epochs con un dataset sintético de 1,000 episodios | Comportamiento | Que el modelo puede aprender el patrón determinista |
-| 4F-A5 | `export_onnx.py` produce un `.onnx` cargable por ONNX Runtime C# sin errores de shape o tipo | Integración | Que el puente Python↔C# funciona end-to-end |
-| 4F-A6 | `evaluate.py` reporta acuerdo semántico con formato cuantificable (%, no "se ve bien") | Contrato | Que la evaluación es reproducible y automática |
-| 4F-A7 | El action mask del episodio es consistente: si el mask dice que Heal está bloqueado, la acción elegida NUNCA es Heal | Contrato | Que el mask del dataset refleja la realidad del juego |
+| 4FA-A1 | La captura de replay NO degrada los TPS del GameServer más de un 2% | Rendimiento | Que el sistema de captura es verdaderamente pasivo |
+| 4FA-A2 | Replay guarda hechos crudos (HP delta, damage dealt/received, ally death, etc.), NO reward calculado | Contrato | Que se puede cambiar la función de recompensa sin re-capturar |
+| 4FA-A3 | `FeatureExtractor` usa el MISMO código que produce `NpcPolicyObservationV1` en producción (no reimplementa) | Arquitectura | Que no hay Train/Serve Skew |
+| 4FA-A4 | El pipeline `train_imitation.py` converge con dataset sintético | Comportamiento | Que el modelo puede aprender |
+| 4FA-A5 | `export_onnx.py` produce `.onnx` cargable por ONNX Runtime C# | Integración | Que el puente Python↔C# funciona |
+| 4FA-A6 | Evaluación reporta per-class precision, recall, F1 y confusion matrix (no solo accuracy global) | Contrato | Que no hay class imbalance oculto |
+| 4FA-A7 | Dataset split por Episode completo (no steps aleatorios del mismo combate) | Contrato | Que no hay data leakage entre train/test |
+| 4FA-A8 | Hold-out templates verifica generalización a mobs no vistos en training | Contrato | Que el modelo no solo memoriza |
+| 4FA-A9 | `NpcTrainingReward` vive en `L2Dn.Npc.Training.Contracts`, NO en `L2Dn.Npc.Contracts` | Arquitectura | Que el GameServer no conoce cómo entrenamos |
 
 ### Tests concretos
 
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
-| `FeatureVector_FixedDimension` | Dimensión estable | Cualquier NpcPerception → vector de exactamente N floats (N definido por schema V1) |
-| `FeatureVector_NoNaN_NoInf` | Datos limpios | 10,000 percepciones aleatorias → cero NaN, cero Inf en vectores |
-| `FeatureVector_HPRatio_InZeroOne` | Normalización correcta | HP=500, MaxHP=1000 → hp_ratio=0.5 |
-| `Episode_RoundTrip_Serialization` | Serializabilidad | Crear episodio → serializar JSON → deserializar → comparar → iguales |
-| `Episode_ActionMask_ConsistentWithAction` | Consistencia interna | Para cada step: si action_mask[Heal]=false → action_chosen ≠ Heal |
-| `Replay_Capture_DoesNotBlockThink` | No bloquea | Replay queue llena → Think continúa sin esperar, step descartado con telemetría |
-| `ONNX_Export_LoadableInCSharp` | Interoperabilidad | model.onnx exportado → `new InferenceSession(path)` en C# → sin excepción, shapes correctas |
-| `ImitationLearning_LossDecreases` | Capacidad de aprendizaje | Dataset sintético 1000 episodes, 100 epochs → loss[epoch 100] < loss[epoch 1] × 0.5 |
+| `FeatureVector_SameDimensionAsProduction` | Sin Train/Serve Skew | Mismo NpcPerception → mismo vector en producción y en export |
+| `FeatureVector_NoNaN_NoInf` | Datos limpios | 10,000 percepciones → cero NaN, cero Inf |
+| `Episode_RawFacts_NoRewardField` | Reward offline | Episodio grabado → no contiene campo Reward |
+| `RewardFunction_CanBeChanged_WithoutReCapture` | Flexibilidad | Mismo episodio + RewardFunction v1 → reward X; RewardFunction v2 → reward Y |
+| `Episode_ActionMask_ConsistentWithAction` | Consistencia | Para cada step: si candidato[Heal].eligible=false → action_chosen ≠ Heal |
+| `Replay_Capture_DoesNotBlockThink` | No bloquea | Queue llena → Think continúa, step descartado con telemetría |
+| `ONNX_Export_LoadableInCSharp` | Interop | model.onnx → `new InferenceSession(path)` → sin excepción, shapes correctas |
+| `ImitationLearning_LossDecreases` | Aprendizaje | 1000 episodes, 100 epochs → loss final < loss inicial × 0.5 |
+| `Evaluation_PerClass_Metrics` | Sin class imbalance oculto | Evaluación reporta precision/recall/F1 por acción, no solo accuracy global |
+| `Dataset_SplitByEpisode_NoLeakage` | Sin data leakage | Ningún step de un episodio train aparece en test set |
+| `HoldoutTemplates_Generalization` | Generalización | Templates no vistos en training → accuracy > threshold |
 
 ---
 
@@ -211,25 +252,25 @@ Las categorías de test son:
 
 | ID | Criterio | Tipo | Qué demuestra |
 |---|---|---|---|
-| 4G-A1 | ONNX Runtime cargado al startup, modelo en memoria, CERO lecturas de disco durante Think | Rendimiento | Que la inferencia no tiene I/O en hot path |
-| 4G-A2 | La inferencia neural NO aparece en el Critical reaction path: un ataque recibe respuesta Reflex ANTES de que complete la inferencia neural | Comportamiento | Que la Neural Policy es advisory, no blocking |
-| 4G-A3 | Acuerdo semántico (ExactMatch + SemanticMatch) ≥ 90% en servidor de prueba con modelo behavior-cloned contra 1,000 ciclos de combate | Integración | Que el modelo reproduce razonablemente el comportamiento certificado |
-| 4G-A4 | P99 de inferencia ONNX < 5ms para MLP 128→128→128→64 en CPU | Rendimiento | Que la inferencia individual es rápida |
-| 4G-A5 | Cero inferencias alteran el gameplay: TODAS las decisiones ejecutadas son del pipeline determinista | Comportamiento | Que Shadow es realmente shadow — no leak de decisiones neurales |
-| 4G-A6 | Si `OnnxNpcPolicy` falla (excepción, timeout, modelo corrupto), el NPC usa Strategy determinista sin interrupción visible | Integración | Que el fallback funciona en condiciones reales |
-| 4G-A7 | Memory stable después de 24h de inferencia continua: no hay growth de managed/unmanaged heap atribuible a ONNX | Rendimiento | Que no hay memory leak |
+| 4G-A1 | ONNX Runtime en `L2Dn.Npc.Policy.Onnx`, NO en `L2Dn.Npc.Brain` | Arquitectura | Brain mantiene propiedad de solo depender de Contracts |
+| 4G-A2 | Modelo cargado al startup, en memoria, CERO lecturas de disco durante Think | Rendimiento | Sin I/O en hot path |
+| 4G-A3 | Inferencia neural NO aparece en Critical reaction path: Reflex responde ANTES de completar inferencia | Comportamiento | Neural Policy es advisory, no blocking |
+| 4G-A4 | Shadow comparison usa PolicyEvaluationId pareado (no compara contra Think actual) | Comportamiento | Que la comparación es causal y correcta |
+| 4G-A5 | Cero inferencias alteran gameplay: TODAS las decisiones ejecutadas son del pipeline determinista | Comportamiento | Shadow es realmente shadow |
+| 4G-A6 | Si `OnnxNpcPolicy` falla, NPC usa determinista sin interrupción | Integración | Fallback funciona en condiciones reales |
+| 4G-A7 | Memory stable después de 24h de inferencia continua | Rendimiento | Sin memory leak |
 
 ### Tests concretos
 
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
-| `OnnxPolicy_LoadsAtStartup_NoLaterDiskRead` | Sin I/O en hot path | Cargar modelo → mock filesystem para detectar lecturas posteriores → cero lecturas durante 1000 inferencias |
-| `OnnxPolicy_InferenceOutput_MatchesExpectedShape` | Shape correcta | Input tensor de 128 floats → output tensor de N action logits |
-| `OnnxPolicy_Exception_FallsBackCleanly` | Tolerancia a fallos | Modelo que lanza OrtException → `INpcPolicy.Evaluate` retorna fallback result → StrategyBrain usa determinista |
-| `OnnxPolicy_Timeout_FallsBackCleanly` | Tolerancia a latencia | Inferencia artificialmente lenta (sleep 100ms) → advice marcado como stale → fallback |
-| `Shadow_NeverExecutesNeuralDecision` | Shadow puro | 1000 ciclos en Shadow → TODAS las intents ejecutadas provienen del pipeline determinista |
-| `Shadow_Comparison_EmitsCorrectMetrics` | Telemetría funcional | Decisiones comparadas → counters ExactMatch/SemanticMatch/Different incrementados correctamente |
-| `Reflex_RespondsBeforeInference` | Independencia del Reflex | Target muere + inferencia pendiente → Reflex emite ClearTarget sin esperar inferencia |
+| `OnnxPolicy_InSeparateAssembly` | Frontera | L2Dn.Npc.Brain.csproj no referencia Microsoft.ML.OnnxRuntime |
+| `OnnxPolicy_LoadsAtStartup_NoLaterDiskRead` | Sin I/O en hot path | Mock filesystem → cero lecturas durante 1000 inferencias |
+| `OnnxPolicy_Exception_FallsBackCleanly` | Tolerancia | OrtException → fallback → decisión válida |
+| `Shadow_NeverExecutesNeuralDecision` | Shadow puro | 1000 ciclos → TODAS intents del pipeline determinista |
+| `Shadow_PairedEvaluationId_Comparison` | Causalidad | Solicitud con ID=123 + ExpertAction → respuesta con ID=123 → compara correctamente |
+| `Shadow_ComparisonNeverUsesCurrentThink` | Causalidad | Shadow comparison usa expert action guardada, no decisión del Think actual |
+| `Reflex_RespondsBeforeInference` | Independencia | Target muere + inferencia pendiente → ClearTarget sin esperar |
 | `OnnxRuntime_NoManagedLeak_1000Inferences` | Sin memory leak | 1000 inferencias → GC.GetTotalMemory estable ±5% |
 
 ---
@@ -240,57 +281,99 @@ Las categorías de test son:
 
 | ID | Criterio | Tipo | Qué demuestra |
 |---|---|---|---|
-| 4H-A1 | Con seed fija, la misma secuencia de observaciones produce la misma secuencia de decisiones | Comportamiento | Reproducibilidad para tests y replay |
-| 4H-A2 | Con seed dinámica, el NPC exhibe variabilidad observable: no repite exactamente la misma acción en situaciones idénticas repetidas | Comportamiento | Que el sampling funciona y produce diversidad |
-| 4H-A3 | Una acción enmascarada por ActionMask NUNCA es seleccionada por el sampler, independientemente de la temperature | Contrato | Que el mask es una barrera hard, no sugerencia |
-| 4H-A4 | Temperature 0.01 produce comportamiento casi determinista (>98% de decisiones = argmax) | Comportamiento | Que temperature baja converge a determinismo |
-| 4H-A5 | Temperature 1.0 produce distribución cercana a la original de la red | Comportamiento | Que temperature alta no distorsiona irracionalmente |
-| 4H-A6 | Gateway rejection ratio con Neural Enabled NO es significativamente mayor que con Deterministic (< 5% de diferencia absoluta) | Integración | Que la policy neural no genera un volumen anormal de intents inválidos |
-| 4H-A7 | A/B testing: grupo control y grupo experimental producen métricas de gameplay comparables (TTK, survival ratio) salvo variabilidad estadística esperada | Gameplay | Que la policy neural no rompe el balance |
+| 4H-A1 | Con seed determinista (Hash-based PRNG), misma secuencia de observaciones produce misma secuencia de decisiones | Comportamiento | Reproducibilidad para replay/debug |
+| 4H-A2 | Con NpcDecisionSeed diferente, NPC exhibe variabilidad observable | Comportamiento | Que el sampling produce diversidad perceptible |
+| 4H-A3 | Un candidato inelegible en CandidateSet NUNCA es seleccionado por el sampler, independientemente de temperature | Contrato | Que CandidateSet eligibility es barrera hard |
+| 4H-A4 | Temperature 0.01 produce >98% decisiones = argmax | Comportamiento | Que temperature baja converge a determinismo |
+| 4H-A5 | Temperature 1.0 produce distribución igual a softmax(logits original) | Comportamiento | Que T=1 conserva la distribución original (entropía depende de los logits, no siempre es máxima) |
+| 4H-A6 | Gateway rejection ratio con Neural Enabled < 5% diferencia absoluta vs Deterministic | Integración | Que la policy neural no genera intent storms |
+| 4H-A7 | `NpcAiDifficultyTier` (NO SkillLevel) solo controla: temperature, neural influence, advice refresh, action variability | Contrato | Que no se prometen capacidades que esta fase no implementa |
 
 ### Tests concretos
 
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
-| `Sampler_FixedSeed_Deterministic` | Reproducibilidad | Seed=12345 + misma distribución × 100 → misma secuencia de acciones las 100 veces |
-| `Sampler_DynamicSeed_VariableOutput` | Variabilidad | Seed diferente + misma distribución × 100 → al menos 2 acciones distintas en 100 muestras |
-| `Sampler_MaskedAction_NeverSelected` | Mask inviolable | Mask con Heal=false + distribución donde Heal tiene logit máximo + 10,000 samples → cero Heal seleccionadas |
-| `Sampler_Temperature001_AlmostDeterministic` | Control de temperatura | T=0.01 + distribución clara × 1,000 → >98% selecciona argmax |
-| `Sampler_Temperature10_HighEntropy` | Control de temperatura | T=1.0 + distribución uniforme-ish × 1,000 → entropía cercana a máxima |
-| `SkillLevel_Novice_HighTemperature` | Mapeo correcto | SkillLevel.Novice → temperature ≥ 0.7 |
-| `SkillLevel_Legendary_LowTemperature` | Mapeo correcto | SkillLevel.Legendary → temperature ≤ 0.1 |
-| `GatewayRejections_NeuralVsDeterministic_Comparable` | Sin intent storms | 1000 ciclos Neural Enabled vs 1000 ciclos Deterministic → rejection rate delta < 5% |
+| `Sampler_DeterministicSeed_Reproducible` | Reproducibilidad | NpcDecisionSeed=Hash(NpcKey,Gen,Seq,Version) × 100 → misma secuencia las 100 veces |
+| `Sampler_DifferentNpcKey_DifferentOutput` | Variabilidad | Seeds distintas (NpcKey diferente) × 100 → al menos 2 acciones distintas |
+| `Sampler_IneligibleCandidate_NeverSelected` | CandidateSet barrera | Candidato Heal inelegible + logit máximo + 10,000 samples → cero Heal |
+| `Sampler_Temperature001_AlmostDeterministic` | Control temp | T=0.01 × 1,000 → >98% argmax |
+| `Sampler_Temperature1_PreservesOriginalDistribution` | Control temp correcto | T=1.0 → distribución == softmax(logits) (verificar KL-divergence < ε) |
+| `DifficultyTier_Novice_HighTemperature` | Mapeo correcto | NpcAiDifficultyTier.Novice → temperature ≥ 0.7 |
+| `DifficultyTier_Legendary_LowTemperature` | Mapeo correcto | NpcAiDifficultyTier.Legendary → temperature ≤ 0.1 |
+| `DifficultyTier_DoesNotPromiseLookahead` | Sin promesas falsas | NpcAiDifficultyTier no tiene campo Lookahead ni Coordination |
+| `GatewayRejections_NeuralVsDeterministic_Comparable` | Sin intent storms | 1000 ciclos cada → rejection delta < 5% |
 
 ---
 
-## Fase 4I — Multi-Agent Intelligence
+## Fase 4F-B — Headless Combat Simulator
 
 ### Criterios de aceptación
 
 | ID | Criterio | Tipo | Qué demuestra |
 |---|---|---|---|
-| 4I-A1 | Un squad con Neural Squad Policy produce directivas que difieren de las deterministas de forma observable pero no degenera en oscilación o inacción | Comportamiento | Que la policy de squad aprendida produce comportamiento coherente |
-| 4I-A2 | Parameter sharing: 12 Frontliners usando la misma `frontliner_policy_v4` se comportan de forma coordinada pero no idéntica (seeds diferentes) | Comportamiento | Que shared policies escalan sin uniformidad robótica |
-| 4I-A3 | CTDE: cada NPC individual solo recibe su percepción + su CombatAssignment + SquadDirective, NUNCA el estado global del entrenador | Arquitectura | Que la ejecución es verdaderamente descentralizada |
-| 4I-A4 | Un squad neural que pierde comunicación (SquadBrain falla) degrada limpiamente a comportamiento individual Phase 4C | Integración | Que el fallback funciona a nivel de squad |
-| 4I-A5 | Los rewards no producen comportamiento degenerado: un squad con reward positivo por "formation cohesion" NO se queda parado en formación sin atacar | Comportamiento | Que los rewards incentivan gameplay, no gaming del reward |
+| 4FB-A1 | El simulador implementa función de transición: `S(t) + A(t) → S(t+1)` | Comportamiento | Que es un environment real para RL, no solo replay |
+| 4FB-A2 | El simulador reutiliza la mayor cantidad posible de lógica del GameServer real | Arquitectura | Que se minimiza sim-to-real gap |
+| 4FB-A3 | Gymnasium/RLlib env wrapper funcional | Integración | Que se puede conectar con frameworks de RL estándar |
+| 4FB-A4 | El simulador es determinista con seed fija | Comportamiento | Que los experimentos son reproducibles |
 
 ### Tests concretos
 
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
-| `SharedPolicy_SameInputDifferentSeed_DifferentOutput` | Diversidad con sharing | Misma policy + misma observation + seeds distintas → acciones diferentes |
-| `SharedPolicy_SameInputSameSeed_SameOutput` | Reproducibilidad con sharing | Misma policy + misma observation + misma seed → misma acción |
-| `CTDE_AgentInput_NoGlobalState` | Descentralización | Inspeccionar input tensor del agente → no contiene posiciones/HP de otros agentes |
-| `SquadNeuralFailure_FallbackToIndividual` | Degradación limpia | Neural squad policy throws → cada NPC usa su Brain individual → decisiones válidas |
-| `FormationReward_DoesNotCauseInaction` | Reward sano | Squad con reward de formación + enemigos atacando → squad ATACA, no solo mantiene formación |
-| `TrainingConvergence_5v5_SquadScenario` | Capacidad de aprendizaje | 5v5 training → reward promedio aumenta en 1000 episodes |
+| `Simulator_TransitionFunction_Works` | RL viable | Estado + acción → nuevo estado diferente y plausible |
+| `Simulator_DeterministicWithSeed` | Reproducibilidad | Seed=X + misma secuencia de acciones → misma trayectoria |
+| `Simulator_GymnasiumEnv_ResetStep` | Compatibilidad | env.reset() → observation; env.step(action) → obs, reward, done, info |
+| `Simulator_GameServerLogicReused` | Sin sim-to-real gap | Damage calculation usa misma fórmula que GameServer real |
 
 ---
 
-## Fases 5-7 (visión a largo plazo)
+## Fase 4I-A — MARL / CTDE Individual Policies
 
-Las fases de visión no tienen tests detallados definidos todavía. Se definirán cuando las fases previas establezcan los patrones y las métricas baseline. Sin embargo, cada fase heredará los gates invariantes:
+### Criterios de aceptación
+
+| ID | Criterio | Tipo | Qué demuestra |
+|---|---|---|---|
+| 4IA-A1 | Cada NPC recibe su percepción local + aliados cercanos observables + CombatAssignment, NO información privilegiada global | Arquitectura | CTDE: ejecución descentralizada |
+| 4IA-A2 | NPC PUEDE percibir aliados cercanos (HP, distancia, estado) si están en su percepción local | Comportamiento | Que CTDE no impide percepción local de aliados |
+| 4IA-A3 | Parameter sharing escala: 12 NPCs con misma policy + seeds diferentes → coordinación pero no uniformidad | Comportamiento | Que shared policies funcionan sin roboticismo |
+| 4IA-A4 | Self-play usa opponent pool (no solo current vs current) | Contrato | Que el entrenamiento es robusto contra oscilación |
+| 4IA-A5 | Shared vs separate policies es un experimento, no un contrato fijo | Contrato | Que la decisión se toma con datos, no a priori |
+
+### Tests concretos
+
+| Test | Propiedad | Input → Output esperado |
+|---|---|---|
+| `CTDE_AgentInput_HasLocalAllyInfo` | Percepción local | Input tensor contiene ally_distance, ally_hp para aliados cercanos |
+| `CTDE_AgentInput_NoGlobalState` | Sin info privilegiada | Input no contiene posiciones/HP de agentes fuera de percepción |
+| `SharedPolicy_SameInputDifferentSeed_DifferentOutput` | Diversidad | Misma policy + seeds distintas → acciones diferentes |
+| `SharedPolicy_SameInputSameSeed_SameOutput` | Reproducibilidad | Misma policy + misma seed → misma acción |
+| `SelfPlay_OpponentPool_NotJustCurrent` | Robustez | Training usa pool de ≥3 opponents (v1, v2, deterministic) |
+
+---
+
+## Fase 4I-B — Learned Squad Policy
+
+### Criterios de aceptación
+
+| ID | Criterio | Tipo | Qué demuestra |
+|---|---|---|---|
+| 4IB-A1 | Neural SquadBrain produce directivas coherentes y no degenera en oscilación | Comportamiento | Que la policy de squad aprendida funciona |
+| 4IB-A2 | Squad neural que pierde comunicación degrada a comportamiento individual Phase 4C | Integración | Fallback a nivel de squad |
+| 4IB-A3 | Rewards no producen comportamiento degenerado | Comportamiento | Que rewards incentivan gameplay |
+
+### Tests concretos
+
+| Test | Propiedad | Input → Output esperado |
+|---|---|---|
+| `NeuralSquad_Directives_NotOscillating` | Coherencia | 100 ticks → directiva no cambia más de 5 veces |
+| `NeuralSquad_Failure_FallbackToIndividual` | Degradación | Policy throws → NPCs individuales actúan |
+| `FormationReward_DoesNotCauseInaction` | Reward sano | Reward de formación + enemigos → squad ATACA |
+
+---
+
+## Fases 5-7 (visión)
+
+Las fases de visión no tienen tests detallados definidos todavía. Se definirán cuando las fases previas establezcan los patrones y las métricas baseline. Cada fase heredará los gates invariantes más:
 
 | Gate invariante | Aplica a |
 |---|---|
@@ -302,11 +385,26 @@ Las fases de visión no tienen tests detallados definidos todavía. Se definirá
 | Brain solo referencia Contracts | Todas |
 | Sin I/O en Think | Todas |
 | Model version observable | 4G+ |
+| CandidateSet como única fuente de eligibilidad | 4D+ |
+| Causalidad en Advice y Directive | 4D+ |
+| Remote devuelve Advice, nunca Intent | 5+ |
+| Raid: sin hot-switch a Legacy mid-encounter | 6+ |
+| WorldDirector: Policy Gate con límites | 7+ |
+
+---
+
+## Correcciones de tests de la revisión 1
+
+| Test rev 1 (incorrecto) | Corrección rev 2 | Razón |
+|---|---|---|
+| `Sampler_Temperature10_HighEntropy` con T=1.0 → "entropía máxima" | `Sampler_Temperature1_PreservesOriginalDistribution` → softmax(logits) | T=1.0 conserva distribución original; entropía depende de logits |
+| `EncounterBrain_Failure_FallbackToLegacy` | `EncounterBrain_Failure_FallbackToDeterministicPolicy` | Hot-switch a Legacy mid-encounter es peligroso |
+| `CTDE_AgentInput_NoGlobalState` sin info de aliados | Permite percepción local de aliados cercanos | CTDE no impide ver aliados; impide info privilegiada global |
 
 ---
 
 ## Cómo evoluciona este documento
 
-Este documento se actualiza ANTES de implementar cada fase. Los tests propuestos se convierten en tests reales durante la implementación. Los criterios marcados como "a calibrar" (ej: >90% acuerdo semántico) se calibran con datos reales y se fijan como hard gates una vez establecidos.
+Este documento se actualiza ANTES de implementar cada fase. Los tests propuestos se convierten en tests reales durante la implementación. Los criterios marcados como "a calibrar" se calibran con datos reales y se fijan como hard gates una vez establecidos.
 
 Si un test pasa sin probar la propiedad que dice probar, el test está mal escrito y debe corregirse. Un test verde que no demuestra nada es peor que no tener test: da falsa confianza.

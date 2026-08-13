@@ -11,14 +11,14 @@ Introducir la **inteligencia de escuadrón** para dotar a los grupos de NPCs de 
 - **Fase 3** (ReflexBrain + TacticalBrain)
 - **Fase 4A/4B** (Estilos de Estrategia Certificados)
 - **Fase 4C** (Diseño e Implementación de Roles)
+- **Fase 4D.5** (Tactical Movement Primitives)
 
 ## 4. Diagrama de arquitectura
 ```mermaid
 flowchart TD
     subgraph L2Dn.Npc.Brain [Cerebro Táctico de Escuadrón y NPC]
         SPB[SquadPerceptionBuilder] --> SC[SquadContext]
-        SC --> SCoordinator[SquadThinkCoordinator]
-        SCoordinator --> SB[SquadBrain]
+        SC --> SB[SquadBrain]
         SB --> SD[SquadDirective]
         
         SD --> |Asignación + Directiva| NpcBrain[StrategyBrain Individual]
@@ -34,6 +34,8 @@ flowchart TD
         SF[SquadFactory] --> SM[SquadManager]
         SM --> NP
         SM --> SPB
+        SM --> SCoordinator[SquadThinkCoordinator]
+        SCoordinator --> SB
         IG[Intent Gateway] --> |Valida| Autoridad[World Execution]
     end
 
@@ -45,22 +47,22 @@ flowchart TD
 |---|---|---|---|
 | `SquadId` | `L2Dn.Npc.Contracts` | `Squads/SquadId.cs` | Identificador fuertemente tipado de escuadrón. |
 | `SquadMember` | `L2Dn.Npc.Contracts` | `Squads/SquadMember.cs` | Representa un miembro del escuadrón (NpcKey, Role, Style, State). |
-| `SquadContext` | `L2Dn.Npc.Contracts` | `Squads/SquadContext.cs` | Contexto inmutable del escuadrón. |
-| `SquadState` | `L2Dn.Npc.Contracts` | `Squads/SquadState.cs` | Estado privado del escuadrón (generación, última directiva). |
+| `SquadSnapshot` | `L2Dn.Npc.Contracts` | `Squads/SquadSnapshot.cs` | Contexto inmutable del escuadrón (reemplaza SquadContext). |
+| `SquadBrainState` | `L2Dn.Npc.Brain` | `Squads/SquadBrainState.cs` | Estado privado del escuadrón (`internal`), maneja generación y última directiva. |
 | `SquadDirective` | `L2Dn.Npc.Contracts` | `Squads/SquadDirective.cs` | Directiva generada por el SquadBrain. |
 | `NpcCombatAssignment` | `L2Dn.Npc.Contracts` | `Squads/NpcCombatAssignment.cs` | Enum de roles de combate asignados dinámicamente. |
 | `SquadWakeReason` | `L2Dn.Npc.Contracts` | `Squads/SquadWakeReason.cs` | Flags que determinan la razón del despertar del escuadrón. |
 | `SquadBrain` | `L2Dn.Npc.Brain` | `Squads/SquadBrain.cs` | Cerebro de escuadrón determinista que produce SquadDirectives. |
-| `SquadThinkCoordinator` | `L2Dn.Npc.Brain` | `Squads/SquadThinkCoordinator.cs` | Coordinador single-flight de procesamiento de escuadrones con colas de prioridad. |
-| `SquadPerceptionBuilder` | `L2Dn.Npc.Brain` | `Squads/SquadPerceptionBuilder.cs` | Agrega percepciones individuales para construir el SquadContext. |
+| `SquadThinkCoordinator` | `L2Dn.GameServer.Model` | `AI/Squads/SquadThinkCoordinator.cs` | Coordinador single-flight de procesamiento de escuadrones con colas de prioridad. |
+| `SquadPerceptionBuilder` | `L2Dn.Npc.Brain` | `Squads/SquadPerceptionBuilder.cs` | Agrega percepciones individuales para construir el SquadSnapshot. |
 | `SquadManager` | `L2Dn.GameServer.Model` | `AI/Squads/SquadManager.cs` | Gestiona el ciclo de vida de todos los escuadrones en el mundo. |
-| `SquadFactory` | `L2Dn.GameServer.Model` | `AI/Squads/SquadFactory.cs` | Transforma agrupaciones Legacy en escuadrones (MinionList, Clan Help clusters). |
+| `SquadFactory` | `L2Dn.GameServer.Model` | `AI/Squads/SquadFactory.cs` | Crea los dos tipos de escuadrón soportados: (1) Master + MinionList, (2) Escuadrones explícitos de laboratorio. |
 
 ## 6. Especificación detallada
 
 ### Estructuras inmutables
-- **`SquadContext`**: Contendrá el resumen vital del escuadrón: HP promedio, composición viva/muerta, estado del Commander, amenazas consolidadas, posición del centroide y la formación actualmente observada.
-- **`SquadDirective`**: Salida inmutable del `SquadBrain`. Incluye el `Objective` (PressureHealer, DefendCommander, FocusTarget, Regroup, Retreat, HoldPosition), `Formation` requerida (Line, Arc, DefensiveArc, Surround, Scatter), un `PriorityTarget` (opcional), y el `AssignmentMap` (mapeo `NpcKey` → `NpcCombatAssignment`).
+- **`SquadSnapshot`**: Contendrá el resumen vital del escuadrón: HP promedio, composición viva/muerta, estado del Commander, amenazas consolidadas, posición del centroide y la formación actualmente observada.
+- **`SquadDirective`**: Salida inmutable del `SquadBrain`. Incluye campos de causalidad: `SquadKey`, `SquadGeneration`, `MembershipRevision`, `DirectiveSequence`, `BasedOnSquadRevision`, `IssuedAtWorldTick`, `ExpiresAtWorldTick`. Además incluye el `Objective` (PressureHealer, DefendCommander, FocusTarget, Regroup, Retreat, HoldPosition), `Formation` requerida (Line, Arc, DefensiveArc, Surround, Scatter), un `PriorityTarget` (opcional), y el `AssignmentMap` (mapeo `NpcKey` → `NpcCombatAssignment`).
 - **`NpcCombatAssignment`**: Valores válidos: Frontline, FlankLeft, FlankRight, RangedPressure, ProtectSupport, ProtectCommander, Regroup, Retreat, FreeAgent.
 - **`SquadWakeReason`**: Enum de flags: CombatStarted, MemberDied, CommanderDied, SupportThreatened, EnemyCompositionChanged, TargetLost, FormationBroken, MemberLowHealth, NumericalAdvantageChanged, PeriodicReevaluate.
 
@@ -79,8 +81,18 @@ flowchart TD
 |---|---|
 | **SquadBrain** | Definir composición de roles tácticos, objetivos a nivel de grupo, posicionamiento abstracto (Formation) y asignación de tareas. |
 | **Individual Brain** | Traducir el CombatAssignment y SquadDirective a acciones concretas en el mundo. Seguir ejecutando Intent Generation. |
-| **GameServer** | Spawn de minions, mecánicas de follow del líder, propagación de agresividad (clan-help) y ciclo de vida de los escuadrones. |
+| **GameServer** | Spawn de minions, mecánicas de follow del líder, propagación de agresividad, ciclo de vida de los escuadrones y `SquadThinkCoordinator` para control de colas, backpressure y ciclo de vida de workers. |
 | **Legacy** | Todo el comportamiento y estado duro que SquadBrain no reemplace de forma explícita. |
+
+### Tabla de transición Legacy vs Squad
+| Mecanismo | Shadow | Enabled inicial |
+|---|---|---|
+| Minion spawn | Legacy/GameServer | GameServer |
+| Leader follow | Legacy/GameServer | GameServer |
+| Hate propagation | Legacy | GameServer como threat source |
+| Squad objective | Observado | SquadBrain |
+| Concrete skill/action | Individual Brain | Individual Brain |
+| Movement physical | GameServer | GameServer |
 
 ## 8. Lo que NO incluye
 - Políticas neuronales a nivel de escuadrón (Fase 4I).
@@ -142,6 +154,7 @@ flowchart TD
 - `l2dn.squad.coordinator_queue_depth` (Gauge): Tareas en espera dentro del `SquadThinkCoordinator`.
 
 ## 11. Configuración
+- `NPC_SQUAD_MODE`: Valores `Disabled` (fase 4C exacta), `Shadow` (SquadBrain produce directivas pero NO se consumen), `Enabled` (directivas consumidas por NPC individual).
 - `L2DN_NPC_SQUAD_THINK_MAX_CONCURRENT`: Hilos máximos permitidos para computación global de escuadrones (default: 2).
 - `L2DN_NPC_SQUAD_MIN_THINK_INTERVAL_MS`: Intervalo de throttle para recálculo de directiva general (default: 250).
 - `L2DN_NPC_SQUAD_LAB_ENABLED`: Permite spawnear escuadrones experimentales usando comandos admin (default: false).

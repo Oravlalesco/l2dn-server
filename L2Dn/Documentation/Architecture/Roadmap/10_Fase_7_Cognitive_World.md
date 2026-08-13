@@ -2,6 +2,7 @@
 
 **Estado:** Visión especulativa a largo plazo
 **Fecha:** 12 de Agosto de 2026
+**Revisión:** 2 (2026-08-13)
 
 ## 1. Objetivo
 
@@ -51,14 +52,23 @@ flowchart TD
 
 | Nombre | Ensamblado | Archivo propuesto | Propósito |
 |---|---|---|---|
-| `WorldDirector` | `L2Dn.Npc.Brain` | `Macro/WorldDirector.cs` | Orquesta eventos globales y patrones climáticos/económicos. |
-| `RegionDirector` | `L2Dn.Npc.Brain` | `Macro/RegionDirector.cs` | Controla migraciones y niveles de amenaza por territorio. |
-| `CognitiveMemory` | `L2Dn.Npc.Brain` | `Cognitive/CognitiveMemory.cs` | Subsistema de memoria persistente para NPCs clave. |
-| `LLMDialogueGateway` | `L2Dn.Npc.Contracts` | `Cognitive/LLMDialogueGateway.cs` | Interfaz con API externas (OpenAI/Anthropic) para rol no combate. |
+| `WorldDirector` | `L2Dn.AI.Directors` | `World/WorldDirector.cs` | Orquesta eventos globales y patrones climáticos/económicos. |
+| `RegionDirector` | `L2Dn.AI.Directors` | `Region/RegionDirector.cs` | Controla migraciones y niveles de amenaza por territorio. |
+| `WorldDirective` | `L2Dn.AI.Directors` | `Contracts/WorldDirective.cs` | Directiva inmutable del director con límites presupuestarios. |
+| `DirectorPolicyGate` | `L2Dn.GameServer.Model` | `AI/Directors/DirectorPolicyGate.cs` | Valida directivas del director contra límites de spawn/economy/reward. |
+| `CognitiveMemory` | `L2Dn.AI.Cognitive` | `Memory/CognitiveMemory.cs` | Subsistema de memoria persistente para NPCs clave. |
+| `LLMDialogueGateway` | `L2Dn.AI.Cognitive` | `LLM/LLMDialogueGateway.cs` | Interfaz con API externas (OpenAI/Anthropic) para rol no combate. |
 
 ## 5. Especificación detallada
 
-- **World & Region Directors:** Reemplazan la generación estática de spawns. Si una zona de granja es muy atacada, el `RegionDirector` podría pedir refuerzos de una región aledaña, migrando mobs dinámicamente.
+- **World & Region Directors:** Complementan (no reemplazan) la generación estática de spawns. Si una zona de granja es muy atacada, el `RegionDirector` podría pedir refuerzos de una región aledaña, migrando mobs dinámicamente. Toda directiva pasa por `DirectorPolicyGate` que impone límites:
+  - Max spawn delta por región y por tick
+  - Max event frequency
+  - Cooldown por región
+  - Economy budgets
+  - Reward budgets
+  - Allowlisted actions
+  Misma filosofía que IntentGateway, pero a escala mundial.
 - **Cognitive Memory:** NPCs guardas o comerciantes recuerdan si un jugador completó un objetivo o los atacó semanas atrás.
 - **Dynamic Quests:** Basado en el estado del mundo (ej. "Los orcos tomaron la granja"), un LLM genera textos de quest plausibles y el `WorldDirector` los valida y los integra al modelo de recompensas existente.
 

@@ -9,7 +9,7 @@ Introducir la primera integración real de redes neuronales en el pipeline de IA
 ## Prerequisitos
 - Fase 3 completada (Brain + Intents en producción).
 - Fase 4A/4B completadas (Estilos de estrategia certificados).
-- Fase 4F completada (Entrenamiento Offline en PyTorch y modelo exportado a ONNX).
+- Fase 4F-A completada (Entrenamiento Offline en PyTorch y modelo exportado a ONNX).
 
 ## Diagrama de arquitectura
 
@@ -54,12 +54,12 @@ flowchart TD
 
 | Nombre | Ensamblado | Archivo Propuesto | Propósito |
 |---|---|---|---|
-| `Microsoft.ML.OnnxRuntime` | `L2Dn.Npc.Brain` | `L2Dn.Npc.Brain.csproj` | Paquete NuGet para inferencia (CPU). |
+| `Microsoft.ML.OnnxRuntime` | `L2Dn.Npc.Policy.Onnx` | `L2Dn.Npc.Policy.Onnx.csproj` | Paquete NuGet para inferencia (CPU). Mantiene Brain independiente. |
 | `INpcPolicy` | `L2Dn.Npc.Contracts` | `INpcPolicy.cs` | Interfaz base para políticas de decisión (determinista o neural). |
-| `OnnxNpcPolicy` | `L2Dn.Npc.Brain` | `Policies/OnnxNpcPolicy.cs` | Implementación de `INpcPolicy` que carga y ejecuta el modelo ONNX. |
+| `OnnxNpcPolicy` | `L2Dn.Npc.Policy.Onnx` | `Policies/OnnxNpcPolicy.cs` | Implementación de `INpcPolicy` que carga y ejecuta el modelo ONNX. |
 | `NpcPolicyAdvice` | `L2Dn.Npc.Contracts` | `Policies/NpcPolicyAdvice.cs` | Contrato (struct) con la recomendación probabilística del modelo. |
 | `ShadowPolicyComparer` | `L2Dn.Npc.Brain` | `Policies/ShadowPolicyComparer.cs` | Evalúa si la acción ejecutada coincide semánticamente con la recomendada. |
-| `OrtValueExtensions` | `L2Dn.Npc.Brain` | `Policies/OrtValueExtensions.cs` | Métodos de extensión para manipulación zero-allocation de `OrtValue`. |
+| `OrtValueExtensions` | `L2Dn.Npc.Policy.Onnx` | `Policies/OrtValueExtensions.cs` | Métodos de extensión para manipulación zero-allocation de `OrtValue`. |
 
 ## Especificación detallada
 
@@ -67,12 +67,13 @@ flowchart TD
 - **Thread Safety**: La inferencia debe ser controlada para no competir con los workers del GameServer. Utilizaremos un ThreadPool dedicado o tareas controladas.
 - **Memoria**: Uso intensivo de la API `OrtValue` para minimizar allocations (Zero-allocation path si es posible).
 - **Carga de Modelo**: El archivo `.onnx` se carga al iniciar el servidor (startup). **NUNCA** se lee de disco durante el ciclo `Think`.
-- **Arquitectura de Red**: Para esta fase inicial de validación, usamos una red MLP ligera (128 inputs → Dense(128) → Dense(128) → Dense(64) → Action Logits).
+- **Arquitectura de Red**: Para esta fase inicial de validación, usamos una red MLP ligera (N inputs basados en `FeatureSchemaV1.Dimension` → Dense(128) → Dense(128) → Dense(64) → Action Logits).
 - **GPU**: Desactivado por ahora. Para redes de este tamaño, CPU es más que suficiente y evita overheads de transferencia. Batch inference y GPU se evaluarán más adelante para 64-256 NPCs.
 
 ### 2. Behavior Cloning y Shadow Mode
 - El modelo actual fue entrenado para imitar la `StrategyBrain` determinista actual.
 - Criterio de éxito: >95% de coincidencia semántica en el dataset de validación.
+- **Comparación por Paired Evaluation IDs**: Al encolar solicitud neural, se guarda `PolicyEvaluationId` + `ObservationRevision` + `ExpertAction`. Neural responde con mismo `PolicyEvaluationId`. Se compara el expert action guardado contra el neural advice, asegurando 123 vs 123.
 - En Shadow Mode, el `ShadowPolicyComparer` genera métricas: *ExactMatch* (misma acción, mismo objetivo), *SemanticMatch* (acción equivalente), *DifferentAction*.
 
 ### 3. Fallback y Confiabilidad
@@ -83,7 +84,7 @@ flowchart TD
 
 | Componente | Capa | Responsabilidad |
 |---|---|---|
-| `OnnxNpcPolicy` | Brain | Cargar el modelo, parsear la percepción a tensores, ejecutar ONNX y generar el `NpcPolicyAdvice`. |
+| `OnnxNpcPolicy` | Policy.Onnx | Cargar el modelo, parsear la percepción a tensores, ejecutar ONNX y generar el `NpcPolicyAdvice`. |
 | `ShadowPolicyComparer` | Brain | Comparar `NpcIntent` real vs `NpcPolicyAdvice` y emitir telemetría OTLP. |
 | `GameServer` | Model | Ninguna. Totalmente agnóstico a ONNX o IA. Recibe Intents puros. |
 
