@@ -332,4 +332,4 @@ The development compose remains on `NPC_STRATEGY_MODE=Enabled` with the accepted
 
 Phase 4 is complete at this checkpoint. The tag `npc-brain-phase4-complete` marks this evidence, including the live concurrency scope. A later populated-area or multi-party session can reopen the operational gate without reopening Phase 4 design.
 
-No Phase 5 work is authorized by this tag.
+No Phase 5 work is authorized by this tag. The next design increment is Phase 4C: a second Strategy axis for **role** (Mob, Elite, Minion, Commander, Raid) composed with the certified styles. That work is specified in [`NpcStrategyPhase4C.md`](NpcStrategyPhase4C.md) and is documentation-only until that document is accepted. It does not expand Intent eligibility and does not start a distributed Brain.

@@ -1,0 +1,120 @@
+# Fase 5: Distributed / Accelerated Brain
+
+**Estado:** Visión a largo plazo
+**Fecha:** 12 de Agosto de 2026
+
+## 1. Objetivo
+
+Distribuir las partes más pesadas del razonamiento (como inferencias de redes neuronales y políticas de escuadrón) a *workers* externos, aprovechando aceleración por hardware (GPU) o escalado horizontal, mientras se mantiene la latencia crítica y la autoridad dentro del GameServer.
+
+## 2. Prerequisitos
+
+- Fase 4E (Neural Brain) completada y analizada en producción.
+- Fase 4F (Squad Intelligence) probada en laboratorio.
+- Recolección de datos sobre número de NPCs activos, inferencias por segundo y latencias.
+
+## 3. Diagrama de arquitectura
+
+```mermaid
+flowchart TD
+    GS[GameServer - Authoritative World]
+    
+    subgraph Local Node
+        Gateway[Intent Gateway]
+        LocalBrain[Local Brain]
+        Reflex[ReflexBrain]
+        Tactical[TacticalBrain]
+        LocalBrain --> Reflex
+        LocalBrain --> Tactical
+        Gateway <--> LocalBrain
+    end
+    
+    subgraph Remote Node GPU / Batch
+        RemoteBrain[Remote Brain Worker]
+        Squad[Squad Policy]
+        Neural[Neural Policy]
+        Encounter[Encounter Intelligence]
+        RemoteBrain --> Squad
+        RemoteBrain --> Neural
+        RemoteBrain --> Encounter
+    end
+    
+    GS <--> Gateway
+    LocalBrain <-->|gRPC / IPC - Fallback local| RemoteBrain
+```
+
+## 4. Piezas a crear
+
+| Nombre | Ensamblado | Archivo propuesto | Propósito |
+|---|---|---|---|
+| `IRemoteBrainWorker` | `L2Dn.Npc.Contracts` | `IRemoteBrainWorker.cs` | Contrato para comunicación con el worker remoto. |
+| `GrpcBrainClient` | `L2Dn.Npc.Brain` | `Network/GrpcBrainClient.cs` | Cliente gRPC para solicitar decisiones al backend remoto. |
+| `BrainBatchDispatcher` | `L2Dn.Npc.Brain` | `Network/BrainBatchDispatcher.cs` | Agrupa solicitudes de estado para batch inference (ONNX/GPU). |
+| `RemotePolicyConfig` | `L2Dn.Npc.Brain` | `Config/RemotePolicyConfig.cs` | Configuración de endpoints, latencias máximas y batch sizes. |
+
+## 5. Especificación detallada
+
+- **Distribución Selectiva:** Solamente el razonamiento de alto nivel (Estrategia, Squad, Neural) se envía por la red.
+- **Batch Inference:** En lugar de inferencias 1 a 1, `BrainBatchDispatcher` acumula estados (`NpcPerceptionSnapshot`) en una ventana muy corta de tiempo y los envía para predicción masiva.
+- **Tolerancia a fallos:** El cliente `GrpcBrainClient` debe tener timeouts estrictos y usar el fallback local (`BalancedStrategy`, etc.) definido en el ADR-006 si el worker remoto no responde.
+
+## 6. Ownership
+
+| Componente | Responsabilidad | Equipo / Rol |
+|---|---|---|
+| Backend Remoto (Workers) | Alojamiento de modelos ONNX, inferencia GPU | IA Engineer |
+| Cliente gRPC & Dispatcher | Batching, serialización, manejo de red | Core Server Dev |
+| Fallback System | Garantizar que el NPC no se quede inactivo si la red falla | Core Server Dev |
+
+## 7. Lo que NO incluye
+
+- **Reflex remoto:** Los reflejos (ej. *attack range*, *basic attack*) NUNCA cruzan la red.
+- **Autoridad:** El worker no puede aplicar daño ni mover personajes. Solo devuelve directivas o intents sugeridos.
+- **Critical path dependency:** El loop del GameServer nunca se bloquea esperando a la red.
+
+## Criterios de aceptación
+
+| ID | Criterio | Tipo | Qué demuestra |
+|---|---|---|---|
+| 5-A1 | Reflex Brain NUNCA depende de comunicación remota | Arquitectura | Critical path es local |
+| 5-A2 | Corte de red de 2s activa fallback local sin NPC congelado | Integración | ADR-006 funciona bajo partición |
+| 5-A3 | Batch inference de 256 NPCs en GPU completa en < 10ms | Rendimiento | Justifica la distribución |
+| 5-A4 | Latencia P99 de gRPC roundtrip < 20ms en misma máquina | Rendimiento | Overhead de red aceptable |
+
+> Especificación completa de tests: [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md)
+
+## Tests requeridos
+
+| Test | Propiedad | Input → Output esperado |
+|---|---|---|
+| `Reflex_NeverCallsRemote` | Localidad | Reflex Brain → cero llamadas gRPC |
+| `NetworkPartition_FallbackActivates` | Tolerancia | Simular corte 2s → fallback local → NPCs actúan |
+| `BatchInference_256NPCs_Under10ms` | Rendimiento | 256 tensors → inferencia GPU → < 10ms |
+| `gRPC_Roundtrip_P99_Under20ms` | Latencia | 1000 roundtrips → P99 < 20ms |
+
+## 9. Telemetría
+
+- `l2dn.brain.remote.batch_size` (Histogram): Tamaño de los batches enviados a inferencia.
+- `l2dn.brain.remote.latency_ms` (Histogram): Latencia round-trip de inferencia externa.
+- `l2dn.brain.remote.fallback_count` (Counter): Cantidad de veces que se aplicó fallback por latencia.
+
+## 10. Configuración
+
+- `L2DN_BRAIN_REMOTE_ENABLED` (bool)
+- `L2DN_BRAIN_REMOTE_ENDPOINT` (string)
+- `L2DN_BRAIN_REMOTE_TIMEOUT_MS` (int) - Default: 50
+- `L2DN_BRAIN_BATCH_WINDOW_MS` (int) - Default: 15
+
+## 11. Rollback
+
+1. Cambiar `L2DN_BRAIN_REMOTE_ENABLED=false` desactivará de inmediato los clientes remotos, forzando a los Brains a correr en los módulos locales (Tactical/Strategy predeterminados).
+
+## 12. Relación con fases adyacentes
+
+- **Consume:** Toda la carga procesal expuesta en Fase 4E y 4F.
+- **Provee a:** Fase 6 y Fase 7, donde el coste computacional será masivo y el worker distribuido será el único medio viable.
+
+## 13. Experimentos / laboratorio
+
+- Levantar instancias de Triton Inference Server (ONNX) y medir overhead de gRPC contra invocaciones locales C#.
+- Probar el impacto en CPU y memoria al manejar 10,000 NPCs remotos en lugar de locales.
