@@ -150,8 +150,8 @@ graph TD
     end
 
     subgraph "Runtime de inferencia"
-        PolicyRuntime["L2Dn.Npc.Policy.Runtime\nNpcPolicyInferenceCoordinator,\nNpcPolicyAdviceStore,\nNpcPolicyEvaluationTracker"]
-        PolicyOnnx["L2Dn.Npc.Policy.Onnx\nONNX Runtime, OrtValue,\nmodel loading"]
+        PolicyRuntime["L2Dn.Npc.Policy.Runtime\nNpcPolicyInferenceCoordinator,\nNpcPolicyAdviceStore,\nNpcPolicyEvaluationTracker\n(consume INpcPolicyInferenceEngine)"]
+        PolicyOnnx["L2Dn.Npc.Policy.Onnx\nONNX Runtime, OrtValue,\nmodel loading\n(implementa INpcPolicyInferenceEngine)"]
     end
 
     subgraph "Transporte remoto (Fase 5+)"
@@ -175,19 +175,30 @@ graph TD
     Brain --> Contracts
     PolicyRuntime --> Contracts
     PolicyOnnx --> Contracts
-    PolicyRuntime --> PolicyOnnx
     Transport --> Contracts
     TrainingContracts --> Contracts
     TrainingExport --> TrainingContracts
     WorldDir --> Contracts
     GS --> Brain
     GS --> PolicyRuntime
+    GS --> PolicyOnnx
     GS --> Contracts
 ```
 
 ### Regla: `L2Dn.Npc.Brain` solo referencia `L2Dn.Npc.Contracts` y `System.*`
 
 Esto se preserva. ONNX, gRPC, training y LLM gateways NUNCA entran a Brain.
+
+### Regla: `Policy.Runtime` NO depende de `Policy.Onnx`
+
+`Policy.Runtime` consume `INpcPolicyInferenceEngine` (interfaz en Contracts). `Policy.Onnx` implementa esa interfaz. `GameServer Host` registra la implementación concreta via DI. Esto permite conectar:
+
+- `OnnxInferenceEngine` (local ONNX)
+- `GrpcInferenceEngine` (remote, Fase 5)
+- `NoOpInferenceEngine` (testing)
+- `MockInferenceEngine` (tests unitarios)
+
+sin modificar `Policy.Runtime`.
 
 ---
 

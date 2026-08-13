@@ -52,18 +52,21 @@ Corrige 8 P0 de la tercera auditoría:
 ### Style vs Posture
 
 ```text
-STYLE (permanente)                    POSTURE (dinámica, solo en combate)
-"cómo suelo comportarme"              "qué estoy intentando ahora"
+STYLES (permanente — "cómo suelo comportarme")
+  Balanced
+  AggressivePressure
+  RangedControl
+  Survival
 
-AggressivePressure                    Pressure
-RangedControl                         ControlRange
-Survival                              Recover
-Balanced                              Disengage
+POSTURES (dinámica — "qué estoy intentando ahora", solo en combate)
+  Neutral       (fuera de combate, no compite en utility — ver sección 7)
+  Pressure
+  ControlRange
+  Recover
+  Disengage
 ```
 
-**Neutral** es especial: no combate, no compite con utility (ver sección 7).
-
-Style se convierte en **prior**: predisposición inicial, no jaula.
+> **No existe mapping 1:1 entre Style y Posture.** Un NPC `AggressivePressure` puede estar en `Recover`. Un NPC `Survival` puede estar en `Pressure`. Style es **prior** (predisposición inicial), no jaula.
 
 ---
 
@@ -130,7 +133,7 @@ Strategy produce una **directiva** (biases + postura + rango preferido). Tactica
 | `NpcStrategyState` | Estado: CurrentPosture, PostureEnteredTick, PreviousPosture, TransitionReason, DecisionSequence |
 | `NpcAdaptiveShadowState` | Estado V2 persistente durante sesión Shadow |
 | `NpcUtilityConsideration` | InputSelector + ResponseCurve + Weight (int 0-1000) |
-| `NpcUtilityCurve` | Puntos piecewise-linear: `(int Input, int Utility)` |
+| `NpcUtilityCurve` | Puntos piecewise-linear: `(int Input, int Utility)`. Inmutable después de validación al startup |
 | `NpcPosturePriorTable` | Priors por Style (int 0-1000) |
 | `NpcPostureCandidateSet` | Candidatos con eligibility + utility (análogo a NpcTacticalCandidateSet) |
 | `StrategicUtilityEvaluator` | Media ponderada normalizada |
@@ -223,10 +226,45 @@ foreach (var c in considerations)
     denominator += c.Weight;
 }
 
+// Defensa: si denominator == 0 (configuración inválida), retornar prior
+if (denominator <= 0)
+    return prior;
+
 int utility = (int)(numerator / denominator);    // int 0..1000, sin overflow
 ```
 
+### Protección del denominador
+
+`NPC_STRATEGY_PRIOR_WEIGHT` rango permitido: `1..1000`. Configuración con valor 0 es rechazada al startup.
+
+Además, defensa interna: si `denominator <= 0` (todas las considerations con weight=0 y priorWeight=0 por bug), retorna `prior` en lugar de dividir por cero.
+
 Zero allocation. Determinista. Reproducible.
+
+### Validación de Response Curves al startup
+
+Las curves se validan **una sola vez** al construirlas (startup). Después son inmutables. Think solo hace lookup barato.
+
+```text
+Startup validation → immutable curves → Think lookup O(n) sobre puntos
+```
+
+Reglas de validación:
+
+| Regla | Rechazado si |
+|---|---|
+| Mínimo 2 puntos | `points.Length < 2` |
+| Puntos ordenados por Input | `points[i].Input >= points[i+1].Input` |
+| Sin Input duplicado | `points[i].Input == points[i+1].Input` (produce división por cero en interpolación) |
+| Utility en [0, 1000] | `points[i].Utility < 0 OR points[i].Utility > 1000` |
+
+Ejemplo rechazado:
+
+```text
+(500, 200), (500, 600)  → Input duplicado → interpolación inválida
+(300, 800), (200, 400)  → no ordenado
+(100, -50)              → Utility fuera de rango
+```
 
 ### Ejemplo corregido
 
@@ -545,7 +583,21 @@ Heal:    baseScore=100, roleDelta=0, directiveBias=+350   →  Clamp(450, 0, 100
 Flee:    baseScore=100, roleDelta=-20, directiveBias=+250 →  Clamp(330, 0, 1000) = 330
 ```
 
-Scores negativos no existen. Un score clamped a 0 significa "no considerar esta acción" sin necesidad de eliminarla del CandidateSet (eligibility hace eso). El rango estable `[0, 1000]` garantiza que el expert label para Behavior Cloning (4F-A) opera sobre una escala normalizada y predecible.
+Scores negativos no existen. Score = 0 significa **mínima preferencia**, pero la acción **continúa elegible** si `Eligible = true`. Si una acción no debe poder seleccionarse, debe marcarse `Eligible = false` con `IneligibilityReason` explícita. Score y Eligibility son conceptos estrictamente separados:
+
+```text
+Eligibility = hard constraint  (¿está permitida?)
+Score       = soft preference  (¿cuánto la prefiero?)
+```
+
+Esto mantiene la misma propiedad arquitectónica en Strategy y Tactical:
+
+```text
+STRATEGY:  PostureCandidate   { Eligible, Utility, Reason }
+TACTICAL:  TacticalCandidate  { Eligible, Score,   Reason }
+```
+
+El rango estable `[0, 1000]` garantiza que el expert label para Behavior Cloning (4F-A) opera sobre una escala normalizada y predecible.
 
 ---
 
@@ -613,6 +665,7 @@ V2 mantiene un `NpcAdaptiveShadowState` **persistente durante toda la sesión Sh
 
 ```text
 internal NpcAdaptiveShadowState:
+  OwnerNpcKey                  NpcKey  (ObjectId + Generation)
   V2StrategyState              NpcStrategyState  (misma estructura)
   CreatedAtWorldTick           long
   TotalThinksShadowed          int
@@ -623,13 +676,17 @@ internal NpcAdaptiveShadowState:
 ### Lifecycle
 
 ```text
-NPC spawn → crear NpcAdaptiveShadowState (Posture=Neutral)
+NPC spawn → crear NpcAdaptiveShadowState (OwnerNpcKey=npcKey, Posture=Neutral)
 NPC Think (Shadow mode):
+  0. Si shadow.OwnerNpcKey.Generation != npc.NpcKey.Generation
+       → discard state → crear fresh (Posture=Neutral)
   1. V1 evalúa → Decision A → persist → GAMEPLAY
   2. V2 evalúa con NpcAdaptiveShadowState → Decision B → persist shadow state
   3. Comparar A vs B → telemetría
 NPC death/despawn → descartar shadow state
 ```
+
+> **Invariant**: `NpcAdaptiveShadowState` está keyed por `NpcKey` (ObjectId + Generation). Generation mismatch → discard y crear fresh Neutral. Esto defiende contra reuse de ObjectId sin depender exclusivamente de recibir correctamente el evento de despawn.
 
 ### Percepción
 
@@ -890,7 +947,7 @@ Solo: **un NPC individual capaz de cambiar racionalmente su postura durante un c
 
 | ID | Criterio | Tipo | Qué demuestra |
 |---|---|---|---|
-| 4B5-A1 | `NPC_STRATEGY_ADAPTIVE_MODE=Disabled` produce comportamiento bit-a-bit idéntico a Phase 4B | Comportamiento | Que Static V1 es el baseline exacto |
+| 4B5-A1 | `NPC_STRATEGY_ADAPTIVE_MODE=Disabled`: same perception + same brain state + same wake reason → same `NpcBrainDecision` → same `NpcIntent` → same Gateway result que Phase 4B (Decision/Intent equivalence) | Comportamiento | Que Static V1 es el baseline exacto |
 | 4B5-A2 | NPC `AggressivePressure` con HP<25% y Heal disponible transiciona a `Recover` | Comportamiento | Postura cambia con situación |
 | 4B5-A3 | NPC en `Recover` con HP>70% y skill ready transiciona a `Pressure` o `ControlRange` | Comportamiento | Re-engagement funcional |
 | 4B5-A4 | Oscilación HP 34%↔36% NO produce alternancia Recover↔Pressure | Comportamiento | Hysteresis funciona |
@@ -948,7 +1005,7 @@ Tags: `style` (4 valores), `posture` (5 valores). No ObjectId ni TemplateId.
 
 ## 26. Rollback
 
-`NPC_STRATEGY_ADAPTIVE_MODE=Disabled` → comportamiento bit-a-bit idéntico a Phase 4B. Sin residuo.
+`NPC_STRATEGY_ADAPTIVE_MODE=Disabled` → Decision/Intent equivalence con Phase 4B: same perception → same decision → same intent → same gateway result. Las estructuras internas cambian (NpcReflexPolicy, telemetría), pero el resultado observable es idéntico. Sin residuo.
 
 ---
 
@@ -963,3 +1020,64 @@ Tags: `style` (4 valores), `posture` (5 valores). No ObjectId ni TemplateId.
 | **4E** | CombatAssignment modifica StrategyEvaluationContext, no scores directamente. NPC interpreta órdenes. |
 | **4F-A** | Dataset incluye posturas, utilidades, transiciones → experto mucho más rico. |
 | **4G** | Shadow compara decisiones con contexto de postura. Expert label = Tactical winner con postura context. |
+
+---
+
+## 28. Definition of Done — Gate de congelación
+
+> **Todos los ítems deben verificarse ANTES de considerar 4B.5 completa.**
+
+### Architecture
+
+| # | Requisito | Verificación |
+|---|---|---|
+| A1 | `NpcReflexPolicy` inmutable por Generation | Test: `ReflexFlee_UsesOnlyNpcReflexPolicy` |
+| A2 | Posture `CandidateSet` con eligibility + utility + reason | Test: `PostureCandidate_HasEligibilityAndUtility` |
+| A3 | Eligibility separada de Utility (hard constraint vs soft preference) | Test: `Ineligible_NeverSelected` |
+| A4 | Utility normalizada fixed-point: int 0-1000, weights int, long accumulator | Test: `Utility_WeightedAverage_CorrectResult`, `Weights_AreIntegers` |
+| A5 | Denominador protegido: PriorWeight ∈ [1,1000], defensa `if (denominator <= 0) return prior` | Test: `Utility_DenominatorNeverZero`, `Utility_PriorWeightZero_ConfigRejected` |
+| A6 | Response Curves validadas al startup (ordenadas, sin duplicados, Utility ∈ [0,1000], ≥2 puntos) | Tests: `Curve_*_RejectedAtStartup` (×4) |
+| A7 | Neutral fuera de combate, no compite en utility | Test: `Neutral_NotInCombat_NotEvaluated` |
+| A8 | Hysteresis: switch margin funcional | Test: `HpNoise_NoOscillation` |
+| A9 | Minimum dwell time respetado | Test: `MinimumDwell_NotExpired_Blocked` |
+| A10 | Tie-break explícito | Test: `TieBreak_Deterministic` |
+| A11 | MaintainRange como Tactical candidate | Test: `MaintainRange_TooClose_Retreats` |
+| A12 | Retreat como Tactical candidate | Test: `Retreat_Directive_CandidatePresent` |
+| A13 | Tactical Score ∈ [0, 1000] con Clamp | Test: `TacticalScore_AlwaysInRange_0_1000` |
+| A14 | Shadow longitudinal con NpcAdaptiveShadowState keyed by NpcKey | Test: `ShadowState_PersistsAcrossThinks`, `ShadowState_GenerationMismatch_Discarded` |
+
+### Compatibility
+
+| # | Requisito | Verificación |
+|---|---|---|
+| C1 | `Adaptive Disabled` → Decision/Intent equivalence con Phase 4B | Test: `Disabled_IdenticalToPhase4B` (ExactMatch en replay comparison) |
+| C2 | `NpcReflexPolicy` preserva style overrides de Phase 4B (AggressivePressure → 5%, Survival → 30%) | Tests: `ReflexPolicy_AggressivePressure_FleeFivePercent`, `ReflexPolicy_Survival_FleeThirtyPercent` |
+
+### Safety
+
+| # | Requisito | Verificación |
+|---|---|---|
+| S1 | Reflex > Strategy: si Reflex produce Intent, pipeline se bypasea | Test: `Reflex_Bypasses_Strategy` |
+| S2 | Gateway permanece autoridad para cambios físicos | Invariante arquitectónico |
+| S3 | Zero `Brain` coordinates directas en `NpcIntent` | Build constraint |
+| S4 | Zero I/O en Think path | Invariante arquitectónico |
+
+### Performance
+
+| # | Requisito | Verificación |
+|---|---|---|
+| P1 | Strategy evaluation P99 < 1 ms (preferiblemente < 0.5 ms) | Benchmark: `UtilityEvaluator_SubMillisecond` |
+| P2 | Critical P95 ≤ +25% vs Phase 4B | Test: `R1-R5` regression |
+| P3 | Max concurrent Think/NPC = 1 | Test: R1-R5 `max_concurrent = 1` |
+| P4 | drops = 0 | Test: R1-R5 `zero_drops` |
+| P5 | scheduler failures = 0 | Test: R1-R5 `zero_overflow` |
+
+### Stability
+
+| # | Requisito | Verificación |
+|---|---|---|
+| T1 | HP noise (±2%) no oscila postura | Test: `HpNoise_NoOscillation` |
+| T2 | Range noise no oscila movimiento | Test: `MaintainRange_InBand_NoMovement` |
+| T3 | Minimum dwell respetado | Test: `MinimumDwell_NotExpired_Blocked` |
+| T4 | Emergency Reflex bypasea commitment | Test: `EmergencyFlee_BypassesMinDwell` |
+| T5 | Generation change resetea estado | Test: `ShadowState_GenerationMismatch_Discarded` |

@@ -61,7 +61,8 @@ graph TD
 | `NpcPolicyAction` | `L2Dn.Npc.Contracts` | `NpcPolicyAction.cs` | Enumeración de acciones abstractas posibles |
 | `NpcPolicyVersion` | `L2Dn.Npc.Contracts` | `NpcPolicyVersion.cs` | Versionado con Checksum |
 | `NpcPolicyResult` | `L2Dn.Npc.Contracts` | `NpcPolicyResult.cs` | Resultado de la evaluación |
-| `PolicyArbitrator` | `L2Dn.Npc.Brain` | `PolicyArbitrator.cs` | Combina scores deterministas con neural advice para seleccionar la acción final |
+| `INpcPolicyInferenceEngine` | `L2Dn.Npc.Contracts` | `INpcPolicyInferenceEngine.cs` | Abstracción de motor de inferencia. `Policy.Runtime` consume esta interfaz; `Policy.Onnx` la implementa. Permite conectar ONNX local, gRPC remoto, NoOp o Mock sin modificar Runtime |
+| `PolicyArbitrator` | `L2Dn.Npc.Brain` | `PolicyArbitrator.cs` | Selecciona la fuente de decisión según el modo: determinista para Disabled/fallback; neural logits sobre candidatos elegibles para Enabled; comparación paralela para Shadow. No combina ambas escalas aritméticamente (ADR-017 Opción A) |
 | `NpcPolicyInferenceCoordinator` | `L2Dn.Npc.Policy.Runtime` | `NpcPolicyInferenceCoordinator.cs` | Coordinador de inferencia asíncrona |
 | `NpcPolicyAdviceStore` | `L2Dn.Npc.Policy.Runtime` | `NpcPolicyAdviceStore.cs` | Almacén de advices inyectados al Brain |
 | `NpcPolicyEvaluationTracker` | `L2Dn.Npc.Policy.Runtime` | `NpcPolicyEvaluationTracker.cs` | Seguimiento de latencia y correlaciones |
@@ -119,7 +120,7 @@ No existe un "Action Masker" aislado. `TacticalActionEvaluator` evalúa elegibil
 ### Arbitraje e Independencia del Reflex (ADR-017)
 1. **Reflex Brain:** Siempre evalúa primero (ej. targets muertos, out of leash). **Si Reflex genera un Intent (Intent != null), no se genera policy evaluation ni se consulta a la neural**, previniendo inferencias innecesarias.
 2. Si Reflex no produce Intent, `TacticalCandidateBuilder` genera los candidatos.
-3. El `PolicyArbitrator` toma el `NpcTacticalCandidateSet` determinista y el `NpcPolicyAdvice` inyectado, y computa el ganador final.
+3. El `PolicyArbitrator` toma el `NpcTacticalCandidateSet` y el `NpcPolicyAdvice` inyectado. Según el modo: **Disabled/fallback** → argmax sobre scores deterministas; **Enabled** → neural logits eligen directamente entre candidatos elegibles; **Shadow** → ambos evalúan en paralelo para comparación. No suma `deterministicScore + neuralScore`.
 4. **Regla estricta de StateRevision (V1):** `Advice.BasedOnStateRevision == CurrentStateRevision` debe ser **EXACTO**. No existe un "delta configurable". Si la revisión semántica cambió, el advice es stale (obsoleto).
 5. **Fallback:** Es invariante. Si la política falla, el advice expira o su revisión es obsoleta, el Arbitrator automáticamente recae sobre el `score` determinista mayor. No hay flag configurable para desactivar el fallback.
 

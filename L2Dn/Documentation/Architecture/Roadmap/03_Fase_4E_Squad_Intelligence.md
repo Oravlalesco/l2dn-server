@@ -171,7 +171,7 @@ Resolver con ownership explícito: cuando un NPC tiene `CombatAssignment != Free
 
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
-| `SquadBrain_CommanderDied_EmitsRetreatOrFreeAgent` | Reacción a pérdida | CommanderAlive=false → Objective ∈ {Retreat, FreeAgent} |
+| `SquadBrain_CommanderDied_EmitsRetreatOrRegroup` | Reacción a pérdida | CommanderAlive=false → Objective ∈ {Retreat, Regroup}; NPCs individuales pueden recibir Assignment=FreeAgent si squad se disuelve |
 | `SquadBrain_AllMembersHealthy_NoFormationChange` | Estabilidad | Contexto estable → directiva no cambia |
 | `SquadBrain_SupportThreatened_EmitsProtectDirective` | Protección | Support bajo ataque → al menos un ProtectSupport |
 | `SquadBrain_NumericalDisadvantage_EmitsRegroup` | Adaptación | 2/5 vivos vs 4 enemigos → Regroup o Retreat |

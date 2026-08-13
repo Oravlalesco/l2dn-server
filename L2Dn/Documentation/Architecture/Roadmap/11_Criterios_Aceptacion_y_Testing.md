@@ -37,7 +37,7 @@ Las categorías de test son:
 
 | ID | Criterio | Tipo | Qué demuestra |
 |---|---|---|---|
-| 4B5-A1 | `NPC_STRATEGY_ADAPTIVE_MODE=Disabled` produce comportamiento bit-a-bit idéntico a Phase 4B | Comportamiento | Static V1 es baseline exacto |
+| 4B5-A1 | `NPC_STRATEGY_ADAPTIVE_MODE=Disabled`: same perception + same brain state + same wake reason → same `NpcBrainDecision` → same `NpcIntent` → same Gateway result que Phase 4B (Decision/Intent equivalence) | Comportamiento | Static V1 es baseline exacto |
 | 4B5-A2 | NPC `AggressivePressure` con HP<25% y Heal disponible transiciona a `Recover` | Comportamiento | Postura cambia con situación |
 | 4B5-A3 | NPC en `Recover` con HP>70% transiciona a `Pressure` o `ControlRange` | Comportamiento | Re-engagement funcional |
 | 4B5-A4 | Oscilación HP 34%↔36% NO produce alternancia Recover↔Pressure | Comportamiento | Hysteresis funciona |
@@ -76,7 +76,7 @@ Las categorías de test son:
 
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
-| `Disabled_IdenticalToPhase4B` | Baseline exacto | Disabled + 100 percepciones → bit-a-bit idéntico a Phase 4B |
+| `Disabled_IdenticalToPhase4B` | Baseline exacto | Disabled + 100 percepciones → Decision/Intent equivalence con Phase 4B (ExactMatch en replay comparison) |
 | `AggressivePressure_HighHp_Pressure` | Postura correcta | HP=100%, skill ready, in combat → Posture=Pressure |
 | `AggressivePressure_LowHp_HealReady_Recover` | Transición | HP=24%, heal ready → Posture=Recover |
 | `Survival_SameState_HigherRecoverUtility` | Style prior | Survival vs AP, misma situación → Survival.RecoverUtility ≥ AP.RecoverUtility |
@@ -93,7 +93,14 @@ Las categorías de test son:
 | `Ineligible_NeverSelected` | Hard constraint | Disengage utility=950 pero ineligible → no seleccionada |
 | `Utility_NeverSaturates` | Normalización | 1000 evaluaciones aleatorias → ningún utility = 1000 por saturación aritmética |
 | `Utility_WeightedAverage_CorrectResult` | Cálculo | Input conocido → resultado exacto verificable |
+| `Utility_PriorWeightZero_ConfigRejected` | Validación | PriorWeight=0 al startup → excepción / log error, no acepta |
+| `Utility_NoActiveConsiderations_ReturnsPrior` | Fallback | Todas considerations weight=0 → utility = prior |
+| `Utility_DenominatorNeverZero` | Invariante | 1000 evaluaciones aleatorias → denominador > 0 siempre |
 | `Weights_AreIntegers` | Fixed-point | Reflection → todos los weights son int, no double/float |
+| `Curve_DuplicateInput_RejectedAtStartup` | Validación | Points [(500,200),(500,600)] → excepción al construir |
+| `Curve_UnorderedInput_RejectedAtStartup` | Validación | Points [(300,800),(200,400)] → excepción al construir |
+| `Curve_UtilityOutOfRange_RejectedAtStartup` | Validación | Points [(100,-50)] → excepción al construir |
+| `Curve_LessThanTwoPoints_RejectedAtStartup` | Validación | Points [(500,200)] → excepción al construir |
 | `ReflexFlee_UsesOnlyNpcReflexPolicy` | Separación | ReflexBrain consume NpcReflexPolicy, no strategy.EffectiveFleeHpPercent |
 | `ReflexPolicy_AggressivePressure_FleeFivePercent` | Backward compat | AggressivePressure → NpcReflexPolicy.EmergencyFleeHpPercent = 5% (idéntico Phase 4B) |
 | `ReflexPolicy_Survival_FleeThirtyPercent` | Backward compat | Survival → NpcReflexPolicy.EmergencyFleeHpPercent = 30% (idéntico Phase 4B) |
@@ -103,6 +110,7 @@ Las categorías de test son:
 | `Retreat_AllBlocked_MaintainsPosition` | Fallback | Todas direcciones bloqueadas → posición, no freeze |
 | `ShadowState_PersistsAcrossThinks` | Longitudinal | Shadow: Think1→Pressure, Think2→estado recuerda Pressure |
 | `ShadowState_ValidatesHysteresis` | Longitudinal | Shadow 10 Thinks: V2 muestra transiciones estables |
+| `ShadowState_GenerationMismatch_Discarded` | Lifecycle | Shadow con Gen=5, NPC respawned Gen=6 → estado descartado, fresh Neutral |
 | `ContextBuilder_NoHeapAllocation` | Performance | Construir context → cero allocations |
 | `UtilityEvaluator_SubMillisecond` | Performance | 1000 evaluaciones → P99 < 0.5 ms |
 
@@ -305,7 +313,7 @@ Las categorías de test son:
 
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
-| `SquadBrain_CommanderDied_EmitsRetreatOrFreeAgent` | Reacción a pérdida | CommanderAlive=false → Objective ∈ {Retreat, FreeAgent} |
+| `SquadBrain_CommanderDied_EmitsRetreatOrRegroup` | Reacción a pérdida | CommanderAlive=false → Objective ∈ {Retreat, Regroup}; NPCs individuales pueden recibir Assignment=FreeAgent si squad se disuelve |
 | `SquadBrain_AllMembersHealthy_NoFormationChange` | Estabilidad | Contexto estable → directiva no cambia |
 | `SquadBrain_SupportThreatened_EmitsProtectDirective` | Protección | Support bajo ataque → al menos un ProtectSupport |
 | `SquadBrain_NumericalDisadvantage_EmitsRegroup` | Adaptación | 2/5 vivos vs 4 enemigos → Regroup o Retreat |
