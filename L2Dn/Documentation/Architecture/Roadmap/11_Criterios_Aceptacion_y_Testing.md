@@ -4,7 +4,7 @@ Estado: diseño. Fecha: 2026-08-13.
 
 Este documento define qué debe demostrarse en cada fase para considerarla completa, y qué tests lo demuestran. No lista "cosas que pasan"; lista **qué propiedades prueban y por qué cada test es necesario**.
 
-**Revisión 2**: incorpora correcciones arquitectónicas — CandidateSet como Action Mask, causalidad en Advice/Directive, Pipeline correcto (Strategy→Reflex→Tactical→PolicyArbitrator), splits de fases, seed determinista, correcciones de tests incorrectos.
+**Revisión 3**: incorpora P0 de tercera auditoría — ADR-017 PolicyArbitrator semántica, CurrentTarget en ObservationV1, Generation no duplicado (ya en NpcKey), StateRevision exacta V1, Policy.Runtime fuera de Brain, Reflex→no evaluation, expert label correcto en 4G.
 
 ---
 
@@ -28,6 +28,86 @@ Las categorías de test son:
 | **Rendimiento** | Que no se degradan los SLO existentes | R1-R5, benchmark sintético |
 | **Gameplay** | Que el jugador observa el comportamiento esperado | Sesión manual con OTLP |
 | **Rollback** | Que se puede volver al estado anterior sin residuo | Deploy + rollback + verificación |
+
+---
+
+## Fase 4B.5 — Stateful Strategic Utility & Stability
+
+### Criterios de aceptación
+
+| ID | Criterio | Tipo | Qué demuestra |
+|---|---|---|---|
+| 4B5-A1 | `NPC_STRATEGY_ADAPTIVE_MODE=Disabled` produce comportamiento bit-a-bit idéntico a Phase 4B | Comportamiento | Que Static V1 es el baseline exacto |
+| 4B5-A2 | NPC `AggressivePressure` con HP<25% y Heal disponible transiciona a `Recover` | Comportamiento | Que la postura cambia con la situación |
+| 4B5-A3 | NPC en `Recover` con HP>70% y skill ready transiciona a `Pressure` o `ControlRange` | Comportamiento | Re-engagement funcional |
+| 4B5-A4 | Oscilación HP 34%↔36% con threshold en 35% NO produce alternancia Recover↔Pressure | Comportamiento | Hysteresis funciona |
+| 4B5-A5 | Postura recién adquirida no se abandona antes de `MinimumPostureDurationTicks` (excepto Reflex) | Comportamiento | Commitment funciona |
+| 4B5-A6 | `Survival` en misma situación de HP bajo tiene `RecoverUtility >= AggressivePressure.RecoverUtility` | Comportamiento | Style es prior, no jaula |
+| 4B5-A7 | Todo cambio de postura registra `NpcPostureTransitionReason` | Contrato | Explicabilidad |
+| 4B5-A8 | Replay determinista: misma secuencia → mismas posturas, utilidades, transiciones, directivas, intents | Comportamiento | Reproducibilidad total |
+| 4B5-A9 | Dos candidatos con score idéntico se resuelven por `NpcTieBreakPolicy`, no por orden de código | Contrato | Desempate explícito |
+| 4B5-A10 | Strategy V2 P99 < 1 ms, preferiblemente < 0.5 ms | Rendimiento | No degrada hot path |
+| 4B5-A11 | Zero network I/O, zero DB I/O, zero disk I/O en Strategy evaluation | Rendimiento | Sin I/O en Think |
+| 4B5-A12 | Hot-path allocations ≈ V1 | Rendimiento | Sin regresión de GC |
+| 4B5-A13 | Critical P95 no > +25% vs V1 | Rendimiento | SLO preservado |
+| 4B5-A14 | Utility scores son enteros 0-1000 (fixed-point) | Contrato | Determinismo |
+| 4B5-A15 | Response curves son piecewise-linear | Contrato | Rápido, explicable, determinista |
+| 4B5-A16 | Reflex sigue teniendo autoridad superior a Strategy Posture | Integración | Reflex no se debilita |
+| 4B5-A17 | `NpcStrategicPosture` tiene exactamente 5 valores: Neutral, Pressure, ControlRange, Recover, Disengage | Contrato | Cardinalidad acotada |
+
+### Tests concretos
+
+**Contracts (`L2Dn.Npc.Contracts.Tests`):**
+
+| Test | Propiedad | Input → Output esperado |
+|---|---|---|
+| `Posture_HasExactlyFiveValues` | Cardinalidad | Enum.GetValues → {Neutral, Pressure, ControlRange, Recover, Disengage} |
+| `StrategyContext_IsImmutable` | Sin mutación | readonly struct → compilación falla si se modifica |
+| `StrategyDirective_IsImmutable` | Sin mutación | readonly struct → compilación falla si se modifica |
+| `UtilityCurve_PiecewiseLinear_Interpolation` | Cálculo correcto | Input=400, Points=[(300,600),(500,200)] → Utility=400 |
+| `UtilityCurve_OutOfRange_Clamps` | Sin extrapolación | Input=0 con curva mínima 100 → Utility del primer punto |
+| `TransitionReason_HasExpectedValues` | Enum completo | ≥ 10 razones documentadas |
+| `TieBreakPolicy_HasExplicitOrder` | Desempate declarado | PreferOffensive → orden: Attack > Skill > Approach > Heal > Flee |
+| `PosturePrior_PerStyle_SumsCorrectly` | Priors razonables | AggressivePressure.PressurePrior > Survival.PressurePrior |
+
+**Brain (`L2Dn.Npc.Brain.Tests`):**
+
+| Test | Propiedad | Input → Output esperado |
+|---|---|---|
+| `Disabled_IdenticalToPhase4B` | Baseline exacto | Disabled + 100 percepciones → bit-a-bit idéntico a Phase 4B |
+| `AggressivePressure_HighHp_Pressure` | Postura correcta | HP=100%, skill ready → Posture=Pressure |
+| `AggressivePressure_LowHp_HealReady_Recover` | Transición | HP=24%, heal ready → Posture=Recover |
+| `Survival_SameState_HigherRecoverUtility` | Style como prior | Survival vs AP, misma situación → Survival.RecoverUtility ≥ AP.RecoverUtility |
+| `Hysteresis_OscillatingHp_StablePosture` | Sin oscilación | HP=[34,36,34,36,34,36,34,36,50,70] → máximo 2 transiciones, no 8 |
+| `Commitment_MinDuration_Respected` | Permanencia | Recover recién adquirida + HP 60% antes de MinDuration → permanece Recover |
+| `Commitment_ReflexOverrides` | Reflex autoridad | En commitment Recover + target muere → Reflex ClearTarget |
+| `RangeTolerance_NoOscillation` | Tolerancia rango | Distance=[590,610,595,605] con PreferredRange=600±60 → postura estable |
+| `TieBreak_ExplicitPolicy_NotCodeOrder` | Desempate | Attack=100, Skill=100 + PreferOffensive → Attack gana |
+| `TieBreak_Verified_OrderIndependent` | Desempate | Mismo test con orden evaluación invertido → mismo resultado |
+| `Directive_Recover_IncreasesHealBias` | Biases correctos | Posture=Recover → HealBias > 0, AttackBias < 0 |
+| `Directive_Pressure_IncreasesAttackBias` | Biases correctos | Posture=Pressure → AttackBias > 0, HealBias < 0 |
+| `TransitionReason_AlwaysPresent` | Explicabilidad | Cambio de postura → TransitionReason != null |
+| `Replay_DeterministicPostureSequence` | Reproducibilidad | 100 percepciones × 100 repeticiones → idéntico |
+| `ContextBuilder_NoHeapAllocation` | Performance | Construir StrategyContext → cero allocations |
+| `UtilityEvaluator_SubMillisecond` | Performance | 1000 evaluaciones → P99 < 0.5 ms |
+
+**Temporal (secuencias):**
+
+| Test | Propiedad | Input → Output esperado |
+|---|---|---|
+| `Sequence_GradualHpDrop_SmoothTransition` | Inteligencia temporal | HP=[100→10] gradual → Pressure estable, luego Recover estable |
+| `Sequence_HpRecovery_ReEngagement` | Re-engagement | HP=[30→80] tras Recover → transición a Pressure o ControlRange |
+| `Sequence_CombatDuration_PostureStable` | Estabilidad largo plazo | 200 ticks combate estable → máximo 4-5 transiciones, no 50 |
+
+**Property-based:**
+
+| Test | Propiedad | Verificación |
+|---|---|---|
+| `AsHpDecreases_RecoverUtilityNeverDecreases` | Monotonía | ∀ hp1 < hp2: RecoverUtility(hp1) ≥ RecoverUtility(hp2) |
+| `SurvivalRecover_GEQ_AggressivePressureRecover` | Style prior | ∀ estado: Survival.Recover ≥ AP.Recover |
+| `AggressivePressurePressure_GEQ_SurvivalPressure` | Style prior | ∀ estado: AP.Pressure ≥ Survival.Pressure |
+| `UtilityScores_AlwaysInRange_0_1000` | Acotación | ∀ evaluación: 0 ≤ utility ≤ 1000 |
+| `AllPostures_Reachable_FromAllStyles` | No jaulas | ∀ style: ∃ estado que produce cada postura como ganadora |
 
 ---
 
@@ -91,13 +171,18 @@ Las categorías de test son:
 | 4D-A1 | `TacticalActionEvaluator` refactorizado: `BuildCandidates()` produce `NpcTacticalCandidateSet` y `SelectCandidate()` es separado | Arquitectura | Que existe una sola fuente de verdad para eligibilidad de acciones |
 | 4D-A2 | `NpcTacticalCandidateSet` con candidatos Disabled produce misma decisión que Phase 4C directamente | Comportamiento | Que la refactorización no altera comportamiento |
 | 4D-A3 | `PolicyArbitrator` con mode=Disabled ignora advice y selecciona candidato por score determinista | Comportamiento | Que Disabled = transparente |
-| 4D-A4 | `NpcPolicyAdvice` con causal metadata (NpcKey + Generation + StateRevision) es rechazado si Generation no coincide | Contrato | Que un NPC respawneado no ejecuta advice de su encarnación anterior |
-| 4D-A5 | `NpcPolicyAdvice` con `BasedOnStateRevision` anterior a la revisión actual menos delta es descartado | Contrato | Que advice de estado muy obsoleto no se aplica |
+| 4D-A4 | `NpcPolicyAdvice` rechazado si `NpcKey` no coincide (NpcKey incluye Generation, no se duplica) | Contrato | Que un NPC respawneado no ejecuta advice de su encarnación anterior |
+| 4D-A5 | `NpcPolicyAdvice` rechazado si `BasedOnStateRevision != CurrentStateRevision` (exacto en V1) | Contrato | Que advice de estado obsoleto no se aplica. Regla estricta para V1 |
 | 4D-A6 | `NpcPolicyObservationV1` NUNCA contiene ObjectId, PlayerId, ni ningún identificador técnico | Contrato | Que la red nunca puede aprender identidad técnica |
-| 4D-A7 | V1 NO incluye target selection neural. Target selection continúa determinista | Contrato | Que no se abre el agujero de PreferredTarget sin slots |
-| 4D-A8 | Reflex Brain produce la misma decisión con policy Disabled, Enabled, o error de policy | Comportamiento | Que Reflex NUNCA depende de la policy |
-| 4D-A9 | `L2Dn.Npc.Brain` sigue referenciando SOLO `L2Dn.Npc.Contracts` | Arquitectura | Que la frontera no se viola |
-| 4D-A10 | Fallback determinista es invariante: no existe config que lo desactive | Arquitectura | ADR-014 rev 2 |
+| 4D-A7 | `NpcPolicyObservationV1` incluye CurrentTarget state (HpRatio, Distance, IsCasting, etc.) sin identidad | Contrato | Que la red tiene suficiente información para decidir |
+| 4D-A8 | V1 decide tipo de acción (BasicAttack, Approach, OffensiveSkill, Heal, Flee, Reposition), NO target ni skill concreta | Contrato | Que V1 tiene alcance acotado y crecimiento progresivo |
+| 4D-A9 | Reflex Brain produce la misma decisión con policy Disabled, Enabled, o error de policy | Comportamiento | Que Reflex NUNCA depende de la policy |
+| 4D-A10 | `L2Dn.Npc.Brain` sigue referenciando SOLO `L2Dn.Npc.Contracts` | Arquitectura | Que la frontera no se viola |
+| 4D-A11 | Fallback determinista es invariante: no existe config que lo desactive | Arquitectura | ADR-014 rev 2 |
+| 4D-A12 | PolicyArbitrator implementa Opción A: neural elige directamente entre candidatos elegibles | Arquitectura | ADR-017 |
+| 4D-A13 | Brain NO invoca `INpcPolicy`; solo consume `NpcPolicyAdvice?` inyectado | Arquitectura | Elimina dependencia síncrona de ONNX |
+| 4D-A14 | `NpcPolicyInferenceCoordinator` y `NpcPolicyAdviceStore` viven en `L2Dn.Npc.Policy.Runtime`, no en Brain | Arquitectura | Brain no conoce cómo se obtiene el advice |
+| 4D-A15 | Reflex Intent != null → no se genera policy evaluation para ese Think | Comportamiento | Reduce inferencias innecesarias |
 
 ### Tests concretos
 
@@ -107,24 +192,30 @@ Las categorías de test son:
 |---|---|---|
 | `ObservationV1_NoObjectIds` | Sin identidad técnica | Reflection sobre campos → ningún ObjectId |
 | `ObservationV1_IsImmutable` | Sin mutación | Modificar campo → fallo de compilación (readonly struct) |
+| `ObservationV1_HasCurrentTargetState` | Target info suficiente | Campos: HasTarget, HpRatio, DistanceNormalized, IsCasting, IsMoving, IsDisabled, RelativeAngle, ThreatRatio, WithinPhysicalRange |
 | `CandidateSet_ContainsEligibilityAndReason` | Información completa | Cada candidato tiene score, eligible, ineligibilityReason |
-| `Advice_GenerationMismatch_Rejected` | Causalidad | Advice con Generation=5, NPC en Generation=6 → rechazado |
-| `Advice_StateRevisionTooOld_Rejected` | Causalidad | Advice con StateRevision=100, NPC en StateRevision=115 → rechazado |
+| `Advice_NpcKeyMismatch_Rejected` | Causalidad | Advice con NpcKey.ObjectId=100/Gen=5, NPC con NpcKey.ObjectId=100/Gen=6 → rechazado (NpcKey incluye Generation) |
+| `Advice_StateRevisionMismatch_Rejected` | Causalidad V1 estricta | Advice con StateRevision=100, NPC en StateRevision=101 → rechazado (exacto, no delta) |
 | `Advice_ExpiresAtPast_IsStale` | Expiración | ExpiresAt=100, tick=101 → `IsStale == true` |
 | `PolicyVersion_ChecksumMismatch_Rejected` | Modelo corrupto | Checksum alterado → `Rejected(ChecksumMismatch)` |
 | `AdviceV1_NoPreferredTarget` | V1 sin target selection | NpcPolicyAdvice V1 no contiene campo PreferredTarget/Slot |
+| `AdviceV1_NoSeparateGeneration` | Sin duplicación | NpcPolicyAdvice no contiene campo Generation separado (ya está en NpcKey) |
 
 **Brain:**
 
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
 | `CandidateSet_Phase4Parity_AllScenarios` | Transparencia | S1-S9: BuildCandidates + SelectCandidate == TacticalActionEvaluator original |
-| `PolicyArbitrator_Disabled_UsesDeterministic` | Disabled transparente | Mode=Disabled → PolicyArbitrator ignora advice → misma decisión que sin policy |
-| `PolicyArbitrator_NeuralBias_ModifiesEligibleOnly` | Neural solo toca elegibles | Advice con bias para Heal, pero Heal ineligible → Heal ignorado |
-| `StaleAdvice_FallsBackToDeterministic` | Fallback funcional | Advice vencido → PolicyArbitrator usa scores deterministas |
+| `PolicyArbitrator_Disabled_UsesDeterministic` | Disabled transparente | Mode=Disabled → PolicyArbitrator ignora advice → argmax(deterministic scores) |
+| `PolicyArbitrator_Enabled_NeuralSelectsFromEligible` | ADR-017 Opción A | Enabled + neural logits → softmax → candidato elegible seleccionado |
+| `PolicyArbitrator_NeuralLogit_IneligibleCandidate_Ignored` | Neural solo toca elegibles | Logit máximo para Heal, pero Heal ineligible → Heal nunca seleccionado |
+| `StaleAdvice_FallsBackToDeterministic` | Fallback funcional | Advice con StateRevision != Current → PolicyArbitrator usa argmax(deterministic) |
 | `PolicyError_FallsBackToDeterministic` | Tolerancia a fallos | Policy con excepción → fallback → decisión válida |
 | `ReflexBrain_IgnoresPolicy_TargetDead` | Reflex independiente | Target muerto + advice "Attack" → Reflex emite ClearTarget, ignora advice |
 | `ReflexBrain_IgnoresPolicy_OutsideLeash` | Reflex independiente | Fuera de leash + advice "Approach" → Reflex emite ReturnHome |
+| `ReflexIntent_SkipsPolicyEvaluation` | Eficiencia | Reflex produce Intent → no se encola policy evaluation para este Think |
+| `Brain_NeverInvokesINpcPolicy` | Frontera | L2Dn.Npc.Brain assembly → reflection: no referencia a INpcPolicy.Evaluate ni similar |
+| `InferenceCoordinator_InPolicyRuntime` | Ubicación | NpcPolicyInferenceCoordinator vive en L2Dn.Npc.Policy.Runtime, no en Brain |
 | `ObservationExtraction_NoHeapAllocation` | Performance | Extraer observation → cero allocations (benchmark) |
 
 ---

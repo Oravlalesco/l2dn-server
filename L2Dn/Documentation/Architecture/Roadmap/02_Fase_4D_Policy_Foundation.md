@@ -15,17 +15,26 @@ Introducir la **capa de política intercambiable** que permitirá más adelante 
 
 ```mermaid
 graph TD
-    A[NpcPerception] -->|Feature Extraction| B[NpcPolicyObservation]
+    A[NpcPerception] -->|Feature Extraction| B[NpcPolicyObservationV1]
+    
+    subgraph L2Dn.Npc.Policy.Runtime
+    IC[NpcPolicyInferenceCoordinator]
+    AS[NpcPolicyAdviceStore]
+    end
+    
+    B --> IC
+    IC -.->|Async Inference| PolicyLayer{INpcPolicy}
+    PolicyLayer -.->|Stores Advice| AS
     
     subgraph Brain Pipeline
     A --> S[StrategyBrain]
     S --> R[ReflexBrain]
+    R -->|Si Reflex Intent != null: NO evaluar política| END_REFLEX[Reflex Intent]
     R -->|Si no hay Reflex Intent| T[TacticalCandidateBuilder]
     T -->|BuildCandidates| CS[NpcTacticalCandidateSet]
     
-    CS --> PA[PolicyArbitrator]
-    B --> PolicyLayer{INpcPolicy}
-    PolicyLayer -->|NpcPolicyAdvice| PA
+    AS -->|Inyecta NpcPolicyAdvice?| PA[PolicyArbitrator]
+    CS --> PA
     PA -->|Selection| I[NpcIntent]
     end
     
@@ -53,43 +62,97 @@ graph TD
 | `NpcPolicyVersion` | `L2Dn.Npc.Contracts` | `NpcPolicyVersion.cs` | Versionado con Checksum |
 | `NpcPolicyResult` | `L2Dn.Npc.Contracts` | `NpcPolicyResult.cs` | Resultado de la evaluación |
 | `PolicyArbitrator` | `L2Dn.Npc.Brain` | `PolicyArbitrator.cs` | Combina scores deterministas con neural advice para seleccionar la acción final |
-| `DeterministicNpcPolicy` | `L2Dn.Npc.Brain` | `DeterministicNpcPolicy.cs` | Implementación baseline (Legacy) |
-| `NoOpNpcPolicy` | `L2Dn.Npc.Brain` | `NoOpNpcPolicy.cs` | Implementación nula para testing |
-| `NpcPolicyEvaluator` | `L2Dn.Npc.Brain` | `NpcPolicyEvaluator.cs` | Coordinador de políticas |
+| `NpcPolicyInferenceCoordinator` | `L2Dn.Npc.Policy.Runtime` | `NpcPolicyInferenceCoordinator.cs` | Coordinador de inferencia asíncrona |
+| `NpcPolicyAdviceStore` | `L2Dn.Npc.Policy.Runtime` | `NpcPolicyAdviceStore.cs` | Almacén de advices inyectados al Brain |
+| `NpcPolicyEvaluationTracker` | `L2Dn.Npc.Policy.Runtime` | `NpcPolicyEvaluationTracker.cs` | Seguimiento de latencia y correlaciones |
+| `NpcPolicyRuntimeOptions` | `L2Dn.Npc.Policy.Runtime` | `NpcPolicyRuntimeOptions.cs` | Opciones de encolamiento y rendimiento |
+
+### Composición en GameServer
+El `GameServer` hace la composición final. El `Brain` recibe `NpcPolicyAdvice?` inyectado y **NUNCA** llama a `INpcPolicy` directamente. Esto elimina arquitectónicamente la posibilidad de que ONNX se convierta en una dependencia síncrona del ciclo de Think.
+**Dependencias de ensamblado:**
+- `Policy.Runtime` → `Contracts`
+- `Policy.Onnx` → `Contracts`
 
 ## 5. Especificación Detallada
 
 ### NpcPolicyObservationV1
 Contiene la abstracción del entorno estructurada. Su tamaño se define por `FeatureSchemaV1.Dimension` y sus campos escalares.
-**Regla de oro: NUNCA poner ObjectId/PlayerId como input**.
+**Regla de oro: NUNCA poner ObjectId, PlayerId o Name como input.**
 - **Self:** HP ratio, MP ratio, casting, moving, stunned, distance from home, combat duration, recent damage.
 - **Environment:** nearby enemies count, nearest enemy distance, average enemy distance.
 - **Intelligence:** Style, Role, FleeAllowed, PreferredRange.
+- **CurrentTarget:**
+  - `HasTarget` (bool)
+  - `HpRatio` (float, 0-1)
+  - `DistanceNormalized` (float, >= 0)
+  - `IsCasting` (bool)
+  - `IsMoving` (bool)
+  - `IsDisabled` (bool)
+  - `RelativeAngle` (float, 0-360)
+  - `ThreatRatio` (float, 0-1)
+  - `WithinPhysicalRange` (bool)
 
 ### NpcPolicyAdvice y Causalidad
 El `NpcPolicyAdvice` incluye campos estrictos de causalidad para garantizar que un consejo estocástico no se aplique a un estado inválido:
-- **Causalidad:** `NpcKey`, `Generation`, `BasedOnStateRevision`, `PolicyEvaluationId`.
-- **Temporalidad:** `GeneratedAtWorldTick`, `ExpiresAtWorldTick`.
-- **Metadata:** `ModelVersion`, `ConfidenceScore`.
-- **Action Biases:** Scores o logits por `NpcPolicyAction`.
+- `NpcKey`: Identificador que **ya contiene ObjectId + Generation**.
+- `BasedOnStateRevision`: Revisión del estado al momento de extraer la observación.
+- `PolicyEvaluationId`: ID único para Shadow correlation.
+- `GeneratedAtWorldTick`: Tick en que se generó.
+- `ExpiresAtWorldTick`: Tick en que expira.
+- `ModelVersion`: Versión del modelo.
+- `FeatureSchemaVersion`: Versión del esquema de features.
+- `ActionSchemaVersion`: Versión del esquema de acciones.
+- `ActionPreferences`: Logits/scores por candidato elegible.
 
-*(Nota: La versión 1 de la política NO incluye target selection neural, la selección de target sigue siendo estrictamente determinista del Brain. Para V2 se propondrán Target Candidate Slots).*
+*(Nota: La versión 1 de la política decide exclusivamente la acción abstracta, NO el target ni la skill específica:*
+- **V1:** BasicAttack, Approach, OffensiveSkill, Heal, Flee, Reposition
+- **V2 (futuro):** + TargetCandidateSlots
+- **V3 (futuro):** + SkillCandidateSlots
+
+**ConfidenceScore:** Se mantiene exclusivamente para telemetría. NO debe usarse como barrera de seguridad, ya que las probabilidades de una red no están necesariamente calibradas.
 
 ### Action Masking mediante NpcTacticalCandidateSet
 No existe un "Action Masker" aislado. `TacticalActionEvaluator` evalúa elegibilidad determinista (cooldowns, MP, rangos, disables) y expone `BuildCandidates()`, lo cual produce un `NpcTacticalCandidateSet` inmutable con `score`, `eligible` (bool) y `reason`.
 - La política solo procesará o será validada contra el subset de candidatos que sean `eligible == true`. El CandidateSet *ES* la única fuente de la verdad para el Action Masking.
 
-### Arbitraje e Independencia del Reflex
-1. **Reflex Brain:** Siempre evalúa primero (ej. targets muertos, out of leash). NUNCA consulta políticas neuronales.
+### Arbitraje e Independencia del Reflex (ADR-017)
+1. **Reflex Brain:** Siempre evalúa primero (ej. targets muertos, out of leash). **Si Reflex genera un Intent (Intent != null), no se genera policy evaluation ni se consulta a la neural**, previniendo inferencias innecesarias.
 2. Si Reflex no produce Intent, `TacticalCandidateBuilder` genera los candidatos.
-3. El `PolicyArbitrator` toma el `NpcTacticalCandidateSet` determinista y el `NpcPolicyAdvice` y computa el ganador final.
-4. **Fallback:** Es invariante. Si la política falla, expira, o emite un advice inválido, el Arbitrator automáticamente recae sobre el `score` determinista mayor. No hay flag configurable para desactivar el fallback.
+3. El `PolicyArbitrator` toma el `NpcTacticalCandidateSet` determinista y el `NpcPolicyAdvice` inyectado, y computa el ganador final.
+4. **Regla estricta de StateRevision (V1):** `Advice.BasedOnStateRevision == CurrentStateRevision` debe ser **EXACTO**. No existe un "delta configurable". Si la revisión semántica cambió, el advice es stale (obsoleto).
+5. **Fallback:** Es invariante. Si la política falla, el advice expira o su revisión es obsoleta, el Arbitrator automáticamente recae sobre el `score` determinista mayor. No hay flag configurable para desactivar el fallback.
+
+### Saturación del Inference Coordinator
+El `NpcPolicyInferenceCoordinator` maneja la sobrecarga mediante una estrategia estricta:
+- Bounded queue (cola delimitada).
+- Single pending request / NPC (máximo de 1 petición concurrente por NPC).
+- Latest wins (coalescing: si llega otra petición para el mismo NPC, sobrescribe la pendiente).
+- Stale drop (descarta peticiones si la revisión queda obsoleta en cola).
+- No blocking (nunca bloquea el pipeline determinista).
+
+### ModelManifest
+La validación y carga del modelo se acompaña de `model.manifest.json`:
+```json
+{
+  "policyId": "...",
+  "modelVersion": "...",
+  "featureSchemaVersion": 1,
+  "featureDimension": N,
+  "actionSchemaVersion": 1,
+  "actionCount": 6,
+  "checksum": "...",
+  "trainingDatasetVersion": "...",
+  "createdAt": "..."
+}
+```
+En startup, modelo y manifest se validan de forma conjunta. Si no coinciden, la política se marca como Disabled.
 
 ## 6. Ownership
 
 | Componente | Equipo/Rol Responsable |
 |---|---|
 | `L2Dn.Npc.Contracts` (Policy) | Core Architecture Team |
+| `L2Dn.Npc.Policy.Runtime` | AI Infrastructure Team |
 | `L2Dn.Npc.Brain` (Arbitrator, Evaluator) | AI Engine Team |
 | `TacticalCandidateBuilder` | Game Logic Team |
 
@@ -130,7 +193,14 @@ No existe un "Action Masker" aislado. `TacticalActionEvaluator` evalúa elegibil
 ## 9. Telemetría
 - `npc.brain.policy.evaluation_ms`: Tiempo gastado en el Evaluator/Arbitrator.
 - `npc.brain.policy.fallback_rate`: Porcentaje de ciclos que cayeron en fallback por latencia o error.
-- `npc.brain.policy.stale_advices`: Consejos ignorados por `BasedOnStateRevision` antiguo.
+- `l2dn.npc.policy.queue.depth`: Profundidad actual de la cola.
+- `l2dn.npc.policy.queue.high_watermark`: Pico máximo de la cola.
+- `l2dn.npc.policy.request.total`: Total de peticiones asíncronas iniciadas.
+- `l2dn.npc.policy.request.coalesced`: Peticiones combinadas (latest wins) antes de ejecutarse.
+- `l2dn.npc.policy.request.dropped_stale`: Peticiones descartadas sin ejecutar por obsolescencia.
+- `l2dn.npc.policy.advice.applied`: Consejos evaluados y aplicados exitosamente.
+- `l2dn.npc.policy.advice.stale`: Consejos rechazados por `BasedOnStateRevision` antiguo (`stale_advices`).
+- `l2dn.npc.policy.advice.superseded`: Consejos descartados al recibir uno más nuevo.
 
 ## 10. Configuración
 - `NPC_POLICY_MODE`: Valores posibles `Disabled`, `Shadow`, `Enabled`.

@@ -10,31 +10,29 @@ Activar la ejecución real de la política neuronal e introducir un comportamien
 - Fase 4F-A completada (Dataset y Behavior Cloning).
 - Fase 4G completada (ONNX integrado, pipeline Shadow validado y telemetría funcionando).
 - Acuerdo semántico en Phase 4G consistentemente por encima del 90%.
+- Alineación con ADR-017 (Policy Arbitration Semantics).
 
 ## Diagrama de arquitectura
 
 ```mermaid
 flowchart TD
-    Obs[NpcPolicyObservation] --> Mask[ActionMask - Filtra inválidas]
-    Mask --> Neu[OnnxNpcPolicy - Inferencia]
+    StrategyRole["Strategy × Role"] --> Reflex
+    Reflex -->|si no Reflex Intent| BuildCandidates["BuildCandidates()"]
+    BuildCandidates --> CandidateSet["NpcTacticalCandidateSet"]
     
-    Neu --> Dist[Distribución Probabilística Logits]
+    CandidateSet --> PolicyArbitrator
+    PolicyArbitrator -->|Disabled| ArbDisabled["argmax(deterministic scores)"]
+    PolicyArbitrator -->|Shadow| ArbShadow["deterministic ejecuta / neural compara"]
+    PolicyArbitrator -->|Enabled| ArbEnabled["neural logits → mask ineligible → softmax"]
     
-    subgraph Stochastic Selection
-    Dist --> Temp[Temperature Scaling]
-    Temp --> Sample[Probabilistic Sampling]
-    Sample --> Advice[NpcPolicyAdvice]
-    end
+    ArbDisabled --> SelectedCandidate
+    ArbShadow --> SelectedCandidate
+    ArbEnabled --> StochasticSampler["StochasticSampler (si NpcAiDifficultyTier lo requiere)"]
+    StochasticSampler --> SelectedCandidate
     
-    Advice --> Strat[StrategyBrain - Modificadores]
-    Strat --> Tac[TacticalBrain - Selección Final]
-    Tac --> Intent[NpcIntent]
-    Intent --> Gateway[Intent Gateway] --> GS[GameServer]
-    
-    classDef real fill:#9f9,stroke:#333,stroke-width:2px;
-    class Advice,Strat,Tac real;
+    SelectedCandidate --> TacticalIntentBuilder
+    TacticalIntentBuilder --> NpcIntent
 ```
-
 Ejemplo de Output Probabilístico:
 ```text
 Attack      0.20
@@ -48,8 +46,7 @@ Flee        0.05
 
 | Nombre | Ensamblado | Archivo Propuesto | Propósito |
 |---|---|---|---|
-| `StochasticSampler` | `L2Dn.Npc.Brain` | `Policies/StochasticSampler.cs` | Aplica temperature y hace sampling sobre la distribución de acciones. |
-| `ActionMasker` | `L2Dn.Npc.Brain` | `Policies/ActionMasker.cs` | Evita que la red elija acciones imposibles (ej. curarse sin MP). |
+| `StochasticSampler` | `L2Dn.Npc.Brain` | `Policies/StochasticSampler.cs` | Recibe logits neuronales, aplica temperature, y elige entre candidatos elegibles en el CandidateSet. |
 | `NpcAiDifficultyTier` | `L2Dn.Npc.Contracts` | `Models/NpcAiDifficultyTier.cs` | Enum: `Novice`, `Normal`, `Veteran`, `Elite`, `Legendary`. |
 | `DifficultyTierModifiers` | `L2Dn.Npc.Brain` | `Models/DifficultyTierModifiers.cs` | Tabla de mapeo de NpcAiDifficultyTier a Temperature, Neural Influence, Advice Refresh Interval, y Action Variability. |
 | `AbTestCoordinator` | `L2Dn.Npc.Brain` | `Policies/AbTestCoordinator.cs` | Asigna templates a control (determinista) o experimental (neural) en runtime. |
@@ -63,12 +60,12 @@ El sistema ya no elige simplemente `max(acciones)`. Aplica *Temperature Scaling*
 
 ### 2. Reproducibilidad
 La aleatoriedad debe ser recuperable. NO usar aleatoriedad irrecuperable.
-- **Seed determinista**: Se usa `NpcDecisionSeed = Hash(NpcKey, Generation, DecisionSequence, PolicyVersion)`.
+- **Seed determinista**: Se usa `NpcDecisionSeed = Hash(ServerRunSeed, NpcKey, DecisionSequence, PolicyVersion)`. NO seed dinámica.
 - **Entorno de Producción**: Los jugadores perciben variabilidad y naturalidad; nosotros reproducimos la toma de decisiones en un replay.
 - **Entorno de Testing**: Al ser determinista basado en el hash, una secuencia exacta reproducirá siempre el mismo muestreo, permitiendo debuggar el comportamiento y escribir unit tests deterministas sobre una política estocástica.
 
 ### 3. NpcAiDifficultyTier
-Se introduce un nuevo concepto de dificultad sin "inflar" stats (HP/P.Atk):
+Se introduce un nuevo concepto de dificultad sin "inflar" stats (HP/P.Atk). El NpcAiDifficultyTier SOLO controla en esta fase: temperature, neural influence weight, advice refresh interval, y action variability. (NO lookahead, NO coordinación, NO retreat perfecto).
 | NpcAiDifficultyTier | Temperature | Neural Influence | Advice Refresh Interval | Action Variability |
 |---|---|---|---|---|
 | Novice | 0.80 | Baja | Lento | Alta |
@@ -81,8 +78,7 @@ Se introduce un nuevo concepto de dificultad sin "inflar" stats (HP/P.Atk):
 
 | Componente | Capa | Responsabilidad |
 |---|---|---|
-| `StochasticSampler` | Brain | Aplicar las matemáticas estocásticas (Softmax con temperatura) y PRNG. |
-| `ActionMasker` | Brain | Validar y anular logits de acciones ilegales antes del sampling. |
+| `StochasticSampler` | Brain | Aplicar las matemáticas estocásticas (Softmax con temperatura) y PRNG sobre el CandidateSet. |
 | `GameServer` | Model | Proveer el contexto si es necesario, pero sigue ciego a si la IA es neural o determinista. |
 
 ## Lo que NO incluye
@@ -95,8 +91,8 @@ Se introduce un nuevo concepto de dificultad sin "inflar" stats (HP/P.Atk):
 | ID | Criterio | Tipo | Qué demuestra |
 |---|---|---|---|
 | 4H-A1 | Con seed fija, misma secuencia de observaciones produce misma secuencia de decisiones | Comportamiento | Reproducibilidad para tests y replay |
-| 4H-A2 | Con seed dinámica, NPC exhibe variabilidad observable | Comportamiento | Sampling produce diversidad |
-| 4H-A3 | Acción enmascarada NUNCA seleccionada por sampler, independientemente de temperature | Contrato | Mask es barrera hard |
+| 4H-A2 | Con NpcDecisionSeed diferente (diferente NpcKey o DecisionSequence), NPC exhibe variabilidad observable | Comportamiento | Sampling produce diversidad |
+| 4H-A3 | Candidato inelegible en CandidateSet NUNCA es seleccionado, independientemente de temperature | Contrato | Elegibilidad es barrera hard |
 | 4H-A4 | Temperature 0.01 produce >98% decisiones = argmax | Comportamiento | Temperature baja converge a determinismo |
 | 4H-A5 | Temperature 1.0 produce distribución igual a softmax(logits original) | Comportamiento | Temperature = 1.0 conserva softmax(logits original) |
 | 4H-A6 | Gateway rejection ratio con Neural Enabled < 5% diferencia absoluta vs Deterministic | Integración | Policy neural no genera intent storms |
@@ -109,10 +105,10 @@ Se introduce un nuevo concepto de dificultad sin "inflar" stats (HP/P.Atk):
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
 | `Sampler_FixedSeed_Deterministic` | Reproducibilidad | Seed=12345 × 100 → misma secuencia las 100 veces |
-| `Sampler_DynamicSeed_VariableOutput` | Variabilidad | Seeds distintas × 100 → al menos 2 acciones distintas |
-| `Sampler_MaskedAction_NeverSelected` | Mask inviolable | Heal=false + Heal logit máximo + 10,000 samples → cero Heal |
+| `Sampler_DifferentSeed_VariableOutput` | Variabilidad | NpcDecisionSeeds distintas × 100 → al menos 2 acciones distintas |
+| `Sampler_IneligibleCandidate_NeverSelected` | Elegibilidad inviolable | Heal inelegible en CandidateSet + Heal logit máximo + 10,000 samples → cero Heal |
 | `Sampler_Temperature001_AlmostDeterministic` | Control temp | T=0.01 × 1,000 → >98% argmax |
-| `Sampler_Temperature10_HighEntropy` | Control temp | T=1.0 × 1,000 → distribución igual a softmax(logits original) |
+| `Sampler_Temperature10_SoftmaxMatch` | Control temp | T=1.0 × 1,000 → distribución igual a softmax(logits original) |
 | `DifficultyTier_Novice_HighTemperature` | Mapeo correcto | Novice → temperature ≥ 0.7 |
 | `DifficultyTier_Legendary_LowTemperature` | Mapeo correcto | Legendary → temperature ≤ 0.1 |
 | `GatewayRejections_NeuralVsDeterministic_Comparable` | Sin intent storms | 1000 ciclos cada → rejection delta < 5% |

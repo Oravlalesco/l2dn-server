@@ -1,6 +1,16 @@
-# Fase 4I — Multi-Agent Intelligence
+# ⛔ SUPERSEDED — NO IMPLEMENTAR
 
-**Estado:** Diseño  
+> **Este documento fue reemplazado por:**
+> - [`07a_Fase_4IA_MARL_CTDE.md`](07a_Fase_4IA_MARL_CTDE.md)
+> - [`07b_Fase_4IB_Learned_Squad_Policy.md`](07b_Fase_4IB_Learned_Squad_Policy.md)
+>
+> Se conserva únicamente como referencia histórica. Las especificaciones de este documento mezclan Neural Squad con CTDE y proponen SharedPolicyLoader/AgentRewardTracker dentro de Brain.
+
+---
+
+# ~~Fase 4I — Multi-Agent Intelligence~~ (SUPERSEDED)
+
+**Estado:** ~~Diseño~~ SUPERSEDED
 **Fecha:** 12/08/2026
 
 ## Objetivo

@@ -1,10 +1,10 @@
 # Roadmap Maestro — Inteligencia de NPCs L2Dn
 
-Estado: **diseño — revisión 2**. Fecha: 2026-08-13.
+Estado: **diseño — revisión 3**. Fecha: 2026-08-13.
 
 Este documento redefine el roadmap del programa de modernización de IA de NPCs a partir del checkpoint `npc-brain-phase4-complete`. La arquitectura existente (Phases 2–4B) no se modifica; se aprovecha como cimiento para introducir inteligencia aprendida como una nueva capa.
 
-**Revisión 2**: incorpora correcciones arquitectónicas derivadas del contraste directo con el código de `feature/npc-strategy-brain` (`NpcBrainCoordinator`, `ReflexBrain`, `TacticalBrain`, `TacticalActionEvaluator`, `NpcIntent`, `NpcBrainStateStore`).
+**Revisión 3**: inserta Phase 4B.5 (Stateful Strategic Utility) entre 4B y 4C. La Strategy actual es un Static Tactical Bias Profile; 4B.5 lo convierte en un sistema de posturas dinámicas con utility, hysteresis y commitment. Esto produce un experto determinista mucho más rico para todo lo que viene después.
 
 ---
 
@@ -16,11 +16,12 @@ El roadmap anterior preveía distribuir el Brain antes de descubrir cómo será 
 
 ---
 
-## Roadmap aprobado (revisión 2)
+## Roadmap aprobado (revisión 3)
 
 ```mermaid
 flowchart TD
-    P4C["4C\nStyle × Role"]
+    P4B5["4B.5\nStateful Strategic Utility"]
+    P4C["4C\nStyle × Role\n(+ Posture Priors)"]
     P4D["4D\nPolicy Foundation\n+ CandidateSet + Causal Advice"]
     P4D5["4D.5\nTactical Movement Primitives"]
     P4E["4E\nSquad Foundation\nmaster/minion + lab"]
@@ -34,6 +35,7 @@ flowchart TD
     P6["6\nEncounter / Raid"]
     P7["7+\nCognitive / World"]
 
+    P4B5 --> P4C
     P4C --> P4D
     P4D --> P4D5
     P4D5 --> P4E
@@ -47,7 +49,8 @@ flowchart TD
     P5 --> P6
     P6 --> P7
 
-    style P4C fill:#e6a817,color:#000
+    style P4B5 fill:#e6a817,color:#000
+    style P4C fill:#4a90d9,color:#fff
     style P4D fill:#4a90d9,color:#fff
     style P4D5 fill:#4a90d9,color:#fff
     style P4E fill:#4a90d9,color:#fff
@@ -64,17 +67,18 @@ flowchart TD
 
 | Fase | Nombre | Cambio vs rev 1 |
 |---|---|---|
-| **4C** | Style × Role | Sin hot override; registry inmutable al startup |
-| **4D** | Policy Foundation | CandidateSet desde Tactical (no ActionMasker duplicado); causal metadata; PolicyArbitrator; sin NpcPolicyContext en Contracts |
-| **4D.5** | Tactical Movement Primitives | **NUEVA** — Reposition/Flank/Formation intents semánticos |
-| **4E** | Squad Foundation | Solo master/minion + lab explícito; Disabled/Shadow/Enabled; ownership table Legacy; SquadThinkCoordinator en GameServer.Model |
-| **4F-A** | Dataset + Behavior Cloning | **SPLIT** — Solo replay/dataset/imitation; reward calculado offline |
-| **4G** | Neural Policy Shadow | ONNX en `L2Dn.Npc.Policy.Onnx`, no en Brain; paired evaluation IDs |
-| **4H** | Stochastic Individual Policy | Rename SkillLevel → NpcAiDifficultyTier; seed determinista reproducible |
-| **4F-B** | Headless Combat Simulator | **NUEVA** — Simulador real para RL, separado de replay |
-| **4I-A** | MARL / CTDE Individual | **SPLIT** — Solo shared policies individuales con percepción local |
-| **4I-B** | Learned Squad Policy | **SPLIT** — Neural SquadPolicy separada de CTDE individual |
-| **5** | Distributed Policy Runtime | Transmite Observation vectorizada, no Perception; devuelve Advice, no Intent; circuit breaker |
+| **4B.5** | Stateful Strategic Utility | **NUEVA** — Posturas dinámicas (Pressure/Recover/ControlRange/Disengage), utility evaluator, hysteresis, commitment, tie-break explícito |
+| **4C** | Style × Role | Sin hot override; registry inmutable; Role afecta PosturePriors además de tácticos |
+| **4D** | Policy Foundation | CandidateSet desde Tactical; causal metadata; PolicyArbitrator (ADR-017); Policy.Runtime |
+| **4D.5** | Tactical Movement Primitives | Reposition/Flank/Formation intents semánticos |
+| **4E** | Squad Foundation | Solo master/minion + lab; Disabled/Shadow/Enabled; CombatAssignment modifica StrategyContext |
+| **4F-A** | Dataset + Behavior Cloning | Replay/dataset/imitation; reward offline; experto con posturas dinámicas |
+| **4G** | Neural Policy Shadow | ONNX en `L2Dn.Npc.Policy.Onnx`; paired evaluation IDs; expert = Tactical winner |
+| **4H** | Stochastic Individual Policy | NpcAiDifficultyTier; seed determinista; CandidateSet → PolicyArbitrator → Sampler |
+| **4F-B** | Headless Combat Simulator | Simulador real para RL, separado de replay |
+| **4I-A** | MARL / CTDE Individual | Shared policies individuales con percepción local |
+| **4I-B** | Learned Squad Policy | Neural SquadPolicy separada de CTDE individual |
+| **5** | Distributed Policy Runtime | Transmite Observation vectorizada; devuelve Advice; circuit breaker |
 | **6** | Encounter / Raid | Sin hot-switch a Legacy mid-fight; separa mechanics de intelligence |
 | **7+** | Cognitive / World | WorldDirector en assembly separado; Policy Gate con límites |
 
@@ -86,8 +90,13 @@ Esta es la arquitectura correcta, alineada con el código actual de `feature/npc
 
 ```mermaid
 flowchart TD
-    PERCEP["NpcPerception"] --> STRAT["STATIC STRATEGY\nStyle × Role"]
-    STRAT --> REFLEX["REFLEX BRAIN\nsafety / leash / invalid target\n(NUNCA depende de neural)"]
+    PERCEP["NpcPerception"] --> SCTX["STRATEGY CONTEXT\n(derivado de percepción)"]
+
+    SCTX --> SUTIL["STRATEGIC UTILITY EVALUATOR\nPosture utilities + Style priors"]
+    SUTIL --> SGATE["STABILITY GATE\nhysteresis + commitment"]
+    SGATE --> SDIR["STRATEGY DIRECTIVE\nPosture + Biases + Range + Reason"]
+
+    SDIR --> REFLEX["REFLEX BRAIN\nsafety / leash / invalid target\n(NUNCA depende de neural ni strategy)"]
 
     REFLEX -->|"Intent encontrado"| GW["IntentGateway"]
     REFLEX -->|"No Reflex Intent"| TCB["TACTICAL CANDIDATE BUILDER\n(TacticalActionEvaluator refactorizado)"]
@@ -122,7 +131,7 @@ flowchart LR
 |---|---|---|
 | Policy → Strategy → Reflex → Tactical | Strategy → Reflex → Tactical Candidates → Policy Overlay → Selection | El código real ejecuta Reflex ANTES de Tactical. Policy no puede modificar Reflex. |
 | `NpcPolicyActionMask` + `ActionMasker` (nuevos) | CandidateSet de `TacticalActionEvaluator` (existente) | Una sola fuente de verdad. `TacticalActionEvaluator` ya sabe qué es elegible. |
-| Advice con TTL solamente | Advice con NpcKey + Generation + StateRevision + WorldTick | Un advice asíncrono necesita saber para qué encarnación y estado fue calculado. |
+| Advice con TTL solamente | Advice con NpcKey (incluye Generation) + StateRevision + WorldTick | Un advice asíncrono necesita saber para qué encarnación y estado fue calculado. NpcKey ya contiene Generation; no se duplica. |
 | `PreferredTarget` en Advice | Target Candidate Slots (V2) o sin target selection (V1) | La red no puede devolver ObjectId. |
 
 ---
@@ -140,6 +149,7 @@ graph TD
     end
 
     subgraph "Runtime de inferencia"
+        PolicyRuntime["L2Dn.Npc.Policy.Runtime\nNpcPolicyInferenceCoordinator,\nNpcPolicyAdviceStore,\nNpcPolicyEvaluationTracker"]
         PolicyOnnx["L2Dn.Npc.Policy.Onnx\nONNX Runtime, OrtValue,\nmodel loading"]
     end
 
@@ -162,13 +172,15 @@ graph TD
     end
 
     Brain --> Contracts
+    PolicyRuntime --> Contracts
     PolicyOnnx --> Contracts
+    PolicyRuntime --> PolicyOnnx
     Transport --> Contracts
     TrainingContracts --> Contracts
     TrainingExport --> TrainingContracts
     WorldDir --> Contracts
     GS --> Brain
-    GS --> PolicyOnnx
+    GS --> PolicyRuntime
     GS --> Contracts
 ```
 
@@ -201,10 +213,9 @@ Esto se preserva. ONNX, gRPC, training y LLM gateways NUNCA entran a Brain.
 ### NpcPolicyAdvice
 
 ```text
-NpcKey
-Generation
-BasedOnStateRevision
-PolicyEvaluationId
+NpcKey                                ← ya contiene ObjectId + Generation (no duplicar)
+BasedOnStateRevision                  ← debe ser == CurrentStateRevision (V1 estricto)
+PolicyEvaluationId                    ← ID único para Shadow correlation
 
 GeneratedAtWorldTick
 ExpiresAtWorldTick
@@ -213,19 +224,22 @@ ModelVersion
 FeatureSchemaVersion
 ActionSchemaVersion
 
-ActionPreferences (biases por candidato elegible)
-Confidence
+ActionPreferences                     ← logits por candidato elegible (Opción A, ADR-017)
+Confidence                            ← solo telemetría, NO barrera de seguridad
 ```
+
+> **Regla V1**: `Advice.BasedOnStateRevision == CurrentStateRevision` (exacto). Si la revisión semántica cambió, el advice es stale.
 
 ### SquadDirective
 
 ```text
 SquadKey
-SquadGeneration
-MembershipRevision
-DirectiveSequence
+SquadGeneration                       ← generación del squad (no del NPC)
+MembershipRevision                    ← cambia cuando entran/salen miembros
+SquadStateRevision                    ← cambia por hechos semánticos (HP, deaths, threats)
+DirectiveSequence                     ← número monótono creciente
 
-BasedOnSquadRevision
+BasedOnSquadStateRevision             ← debe ser == SquadStateRevision actual (V1 estricto)
 
 IssuedAtWorldTick
 ExpiresAtWorldTick
@@ -272,9 +286,9 @@ No usar aleatoriedad irrecuperable en producción.
 
 ```text
 NpcDecisionSeed = Hash(
-  NpcKey,
-  Generation,
-  DecisionSequence,
+  ServerRunSeed,            ← reproducibilidad entre ejecuciones (guardado en replay)
+  NpcKey,                   ← ya contiene ObjectId + Generation
+  DecisionSequence,         ← contador monótono por NPC
   PolicyVersion
 )
 ```
@@ -318,12 +332,15 @@ Comparación: `123 vs 123`. No contra el Think actual (que puede estar en otra r
 | 6 | Sin I/O en Think (modelo precargado) | ADR-004 ext |
 | 7 | Single-flight por NPC y por Squad | — |
 | 8 | Brain solo referencia Contracts | ADR-008 |
-| 9 | Causalidad obligatoria: NpcKey + Generation + StateRevision en todo Advice/Directive | ADR-015 nuevo |
+| 9 | Causalidad obligatoria: NpcKey (con Generation) + StateRevision exacta en todo Advice/Directive | ADR-015 rev |
 | 10 | Observaciones sin identidad técnica | — |
 | 11 | Rollback con un flag | — |
-| 12 | Remote Brain devuelve Advice, nunca Intent | ADR-016 nuevo |
+| 12 | Remote Brain devuelve Advice, nunca Intent | ADR-016 |
 | 13 | Reward calculado offline, no en replay bruto | — |
 | 14 | Raid fallback: deterministic encounter policy, no hot-switch a Legacy | — |
+| 15 | PolicyArbitrator: Neural elige directamente entre candidatos elegibles (Opción A) | ADR-017 |
+| 16 | Brain NUNCA invoca INpcPolicy; solo consume NpcPolicyAdvice? inyectado | — |
+| 17 | Reflex Intent != null → no generar policy evaluation (reduce inferencias innecesarias) | — |
 
 ---
 
@@ -335,7 +352,9 @@ Comparación: `123 vs 123`. No contra el Think actual (que puede estar en otra r
 | Gateway | Todo cambio físico pasa por Gateway |
 | Reflex | Nunca depende obligatoriamente de inferencia |
 | ActionMask | Una sola fuente (TacticalActionEvaluator), no dos |
-| Causalidad | Advice rechazado si NpcKey/Generation/StateRevision no coinciden |
+| Causalidad | Advice rechazado si NpcKey o BasedOnStateRevision no coinciden (exacto en V1) |
+| Reflex → no evaluation | Si Reflex produce Intent, no se genera policy evaluation |
+| Brain isolation | Brain no invoca INpcPolicy; solo consume NpcPolicyAdvice? |
 | Network | Sin llamada remota en Critical path |
 | Database | Sin DB en Think |
 | Disk | Modelo precargado; sin lectura durante Think |
@@ -356,6 +375,7 @@ Comparación: `123 vs 123`. No contra el Think actual (que puede estar en otra r
 
 | Documento | Fase |
 |---|---|
+| [`01b_Fase_4B5_Stateful_Strategic_Utility.md`](01b_Fase_4B5_Stateful_Strategic_Utility.md) | 4B.5 |
 | [`01_Fase_4C_Style_x_Role.md`](01_Fase_4C_Style_x_Role.md) | 4C |
 | [`02_Fase_4D_Policy_Foundation.md`](02_Fase_4D_Policy_Foundation.md) | 4D |
 | [`02b_Fase_4D5_Tactical_Movement.md`](02b_Fase_4D5_Tactical_Movement.md) | 4D.5 |
@@ -375,8 +395,9 @@ Comparación: `123 vs 123`. No contra el Think actual (que puede estar en otra r
 
 | ADR | Decisión |
 |---|---|
-| [`ADR-012`](../ADR/ADR-012-neural-policy-advisory-only.md) | Neural Policy produce recomendaciones, no intents directos |
+| [`ADR-012`](../ADR/ADR-012-neural-policy-advisory-only.md) | Neural Policy produce preferencias sobre acciones, no intents directos |
 | [`ADR-013`](../ADR/ADR-013-action-masking-before-policy.md) | Action Mask: una sola fuente (TacticalActionEvaluator existente) |
 | [`ADR-014`](../ADR/ADR-014-mandatory-deterministic-fallback.md) | Fallback determinista es invariante, no configurable |
-| [`ADR-015`](../ADR/ADR-015-causal-advice-metadata.md) | Causalidad obligatoria en Advice y Directive |
+| [`ADR-015`](../ADR/ADR-015-causal-advice-metadata.md) | Causalidad obligatoria en Advice y Directive (NpcKey con Generation, StateRevision exacta V1) |
 | [`ADR-016`](../ADR/ADR-016-remote-returns-advice-not-intent.md) | Remote Brain devuelve Advice, nunca Intent |
+| [`ADR-017`](../ADR/ADR-017-policy-arbitration-semantics.md) | PolicyArbitrator: Opción A — Neural elige directamente entre candidatos elegibles |

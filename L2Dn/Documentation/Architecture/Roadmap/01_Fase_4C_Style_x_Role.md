@@ -10,6 +10,7 @@ Implementar el eje de **rol** compuesto con el eje de **estilo** ya certificado 
 ## 2. Prerequisitos
 - Fase 4A completada y certificada.
 - Fase 4B completada y certificada (Estilos de Estrategia: Balanced, AggressivePressure, RangedControl, Survival).
+- Fase 4B.5 completada (Stateful Strategic Utility). La razón: Role ya no solo modifica scores tácticos; ahora también modifica PosturePriors del sistema de posturas dinámicas.
 - Fase 3 completada (Pipeline Perception → ReflexBrain → TacticalBrain → NpcIntent → IntentGateway → GameServer).
 
 ## 3. Diagrama de Arquitectura
@@ -48,6 +49,47 @@ graph TD
 - `NpcCombatAssignment` (futura fase 4E) representa **qué trabajo estoy realizando AHORA** (misión dinámica).
 No deben mezclarse. Por ejemplo, un Minion con estilo `AggressivePressure` puede tener un CombatAssignment de `ProtectSupport`.
 
+### Role afecta PosturePriors
+Además de los deltas tácticos existentes (Attack, Skill, Flee, etc.), cada Role ahora incluye:
+
+```text
+Elite:
+  PressurePrior  +100
+  RecoverPrior   -50
+  DisengagePrior -100
+  CommitmentDelta +50 (más difícil de cambiar de postura)
+  + Attack +10, Skill +15, Flee -20  (tácticos existentes)
+
+Minion:
+  PressurePrior  +50
+  RecoverPrior   +50
+  DisengagePrior +100
+  CommitmentDelta -30 (cambia de postura más fácilmente)
+
+Commander:
+  PressurePrior  +80
+  ControlRangePrior +50
+  RecoverPrior   +30
+  DisengagePrior -150
+  CommitmentDelta +100
+
+Raid:
+  PressurePrior  +150
+  RecoverPrior   -100
+  DisengagePrior -200
+  CommitmentDelta +150
+
+Mob:
+  Todos +0 (identidad)
+```
+
+### Composición Completa
+```text
+effectivePosturePrior = Style.PosturePrior + Role.PosturePriorDelta
+effectiveCommitment = baseCommitment + Role.CommitmentDelta
+effectiveTacticalScore = Style.TacticalBase + Role.TacticalDelta + StrategyDirective.Bias
+```
+
 ### Deltas de Rol Propuestos
 | Rol | BasicAttack | Approach | OffensiveSkill | Heal | Flee | Heal HP% |
 |---|---:|---:|---:|---:|---:|---:|
@@ -58,10 +100,10 @@ No deben mezclarse. Por ejemplo, un Minion con estilo `AggressivePressure` puede
 | Raid | 0 | +5 | +20 | +10 | -40 | 0 |
 
 ### Tabla de Composición de Ejemplo
-*Ejemplo para Elite + AggressivePressure:*
-- **AggressivePressure base:** BasicAttack: 75, Approach: 90, OffensiveSkill: 105, Heal: 85, Flee: 70, Heal HP%: 25
-- **Elite delta:** BasicAttack: +10, Approach: +5, OffensiveSkill: +15, Heal: 0, Flee: -20, Heal HP%: -10
-- **Effective Profile:** BasicAttack: 85, Approach: 95, OffensiveSkill: 120, Heal: 85, Flee: 50, Heal HP%: 15
+*Ejemplo para Elite + AggressivePressure (asumiendo AggressivePressure base PosturePriors: PressurePrior: 50, RecoverPrior: -20, DisengagePrior: -50, y un baseCommitment de 100):*
+- **AggressivePressure base:** BasicAttack: 75, Approach: 90, OffensiveSkill: 105, Heal: 85, Flee: 70, Heal HP%: 25 | PressurePrior: 50, RecoverPrior: -20, DisengagePrior: -50
+- **Elite delta:** BasicAttack: +10, Approach: +5, OffensiveSkill: +15, Heal: 0, Flee: -20, Heal HP%: -10 | PressurePrior: +100, RecoverPrior: -50, DisengagePrior: -100, CommitmentDelta: +50
+- **Effective Profile:** BasicAttack: 85, Approach: 95, OffensiveSkill: 120, Heal: 85, Flee: 50, Heal HP%: 15 | PressurePrior: 150, RecoverPrior: -70, DisengagePrior: -150, Commitment: 150
 
 ## 6. Ownership
 
@@ -89,6 +131,9 @@ No deben mezclarse. Por ejemplo, un Minion con estilo `AggressivePressure` puede
 | 4C-A6 | `NpcBrainEligibility` rechaza todo actor que no sea exacto `Monster` + exacto `AttackableAI`, independientemente del rol configurado | Integración | Que un Guard con rol Commander sigue en Legacy |
 | 4C-A7 | R1-R5 con Strategy Enabled y roles configurados mantiene zero drops, zero overflow, max concurrent 1 | Rendimiento | Que la composición no degrada el scheduler |
 | 4C-A8 | Release build sin errores nuevos | Arquitectura | Que no se introdujeron dependencias prohibidas |
+| 4C-A10 | Role.PosturePriorDelta de Mob es cero para todas las posturas (identidad) | Comportamiento | Que el rol Mob no altera los priors base |
+| 4C-A11 | Role.CommitmentDelta de Elite > 0 (Elite es más persistente en su postura) | Comportamiento | Que Elite es más persistente en su postura |
+| 4C-A12 | `effectivePosturePrior = Style.PosturePrior + Role.PosturePriorDelta` produce posturas correctas | Comportamiento | Que la suma matemática produce los priors efectivos |
 
 > Especificación completa de tests: [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md)
 

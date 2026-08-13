@@ -10,6 +10,7 @@ Introducir la primera integración real de redes neuronales en el pipeline de IA
 - Fase 3 completada (Brain + Intents en producción).
 - Fase 4A/4B completadas (Estilos de estrategia certificados).
 - Fase 4F-A completada (Entrenamiento Offline en PyTorch y modelo exportado a ONNX).
+- Conformidad con **ADR-017** (Policy Arbitration Semantics).
 
 ## Diagrama de arquitectura
 
@@ -63,21 +64,28 @@ flowchart TD
 
 ## Especificación detallada
 
-### 1. Inferencia con ONNX Runtime
-- **Thread Safety**: La inferencia debe ser controlada para no competir con los workers del GameServer. Utilizaremos un ThreadPool dedicado o tareas controladas.
-- **Memoria**: Uso intensivo de la API `OrtValue` para minimizar allocations (Zero-allocation path si es posible).
+### 1. Inferencia con ONNX Runtime (Best Practices)
+- **Thread Safety & Oversubscription**: ONNX Runtime tiene su propio threading. Debemos evitar el oversubscription de la CPU. NO usar `Task.Run()` de manera indiscriminada; se debe usar un **Bounded Inference Coordinator** con un número fijo de consumers.
+- **Sesión de Inferencia**: Se debe instanciar una **Shared InferenceSession per model version** (long-lived). **NO** instanciar `new InferenceSession()` por cada NPC ni por cada Think.
+- **Memoria**: Uso intensivo de la API `OrtValue` para minimizar allocations. Todo `OrtValue` debe ser disposed correctamente.
 - **Carga de Modelo**: El archivo `.onnx` se carga al iniciar el servidor (startup). **NUNCA** se lee de disco durante el ciclo `Think`.
-- **Arquitectura de Red**: Para esta fase inicial de validación, usamos una red MLP ligera (N inputs basados en `FeatureSchemaV1.Dimension` → Dense(128) → Dense(128) → Dense(64) → Action Logits).
-- **GPU**: Desactivado por ahora. Para redes de este tamaño, CPU es más que suficiente y evita overheads de transferencia. Batch inference y GPU se evaluarán más adelante para 64-256 NPCs.
+- **Exportación**: El script `export_onnx.py` debe utilizar `torch.onnx.export(..., dynamo=True)`.
+- **Arquitectura de Red**: Para esta fase inicial de validación, usamos una red MLP ligera (MLP (architecture determined by training, not by contract)).
+- **GPU**: Desactivado por ahora. Para redes de este tamaño, CPU es más que suficiente y evita overheads de transferencia. Batch inference y GPU se evaluarán más adelante.
 
 ### 2. Behavior Cloning y Shadow Mode
-- El modelo actual fue entrenado para imitar la `StrategyBrain` determinista actual.
+- El modelo de Behavior Cloning debe entrenarse contra el **ExpertSelectedCandidate** (el candidato ganador determinista de `TacticalActionEvaluator`), NO contra `StrategyBrain`. La `StrategyBrain` no selecciona la acción final (el pipeline es Strategy → Reflex → Tactical). El experto es el ganador de Tactical cuando Reflex no tomó autoridad.
 - Criterio de éxito: >95% de coincidencia semántica en el dataset de validación.
+- **Shadow debe ignorar Thinks resueltos por Reflex**: Si Reflex produce un intent (ej. target dead, leash, etc.), NO se genera evaluación de policy para ese Think. No tiene sentido preguntar "Attack o Heal?" si Reflex ya dijo "ClearTarget". Esto reduce inferencias innecesarias.
 - **Comparación por Paired Evaluation IDs**: Al encolar solicitud neural, se guarda `PolicyEvaluationId` + `ObservationRevision` + `ExpertAction`. Neural responde con mismo `PolicyEvaluationId`. Se compara el expert action guardado contra el neural advice, asegurando 123 vs 123.
-- En Shadow Mode, el `ShadowPolicyComparer` genera métricas: *ExactMatch* (misma acción, mismo objetivo), *SemanticMatch* (acción equivalente), *DifferentAction*.
 
-### 3. Fallback y Confiabilidad
-- Si la recomendación neural toma mucho tiempo y expira, o falla, el sistema cae de manera segura al `StrategyBrain` determinista.
+### 3. Estrategia de Saturación
+- La cola de inferencia debe ser una **bounded queue**.
+- Máximo 1 inferencia corriendo por NPC (running inference) + 1 observación pendiente más reciente por NPC (latest pending observation).
+- **Latest wins**: Si llega una nueva observación mientras otra está en cola, se descarta la vieja (stale drop). El encolado es non-blocking.
+
+### 4. Fallback y Confiabilidad
+- Si la recomendación neural toma mucho tiempo y expira, o falla, el sistema cae de manera segura al pipeline determinista.
 - El Reflex Brain intercepta amenazas inmediatas sin esperar a la red neuronal.
 
 ## Ownership
@@ -101,10 +109,11 @@ flowchart TD
 | 4G-A1 | ONNX Runtime cargado al startup, modelo en memoria, CERO lecturas de disco durante Think | Rendimiento | Sin I/O en hot path |
 | 4G-A2 | Inferencia neural NO aparece en Critical reaction path: ataque recibe respuesta Reflex ANTES de completar inferencia | Comportamiento | Neural Policy es advisory, no blocking |
 | 4G-A3 | Acuerdo semántico ≥ 90% en 1,000 ciclos de combate con modelo behavior-cloned | Integración | Modelo reproduce razonablemente el comportamiento certificado |
-| 4G-A4 | P99 de inferencia ONNX < 5ms para MLP 128→128→128→64 en CPU | Rendimiento | Inferencia individual es rápida |
+| 4G-A4 | P99 de inferencia ONNX < 5ms para la arquitectura actual en CPU | Rendimiento | Inferencia individual es rápida |
 | 4G-A5 | Cero inferencias alteran gameplay: TODAS las decisiones ejecutadas son del pipeline determinista | Comportamiento | Shadow es realmente shadow |
 | 4G-A6 | Si `OnnxNpcPolicy` falla, NPC usa Strategy determinista sin interrupción | Integración | Fallback funciona en condiciones reales |
 | 4G-A7 | Memory stable después de 24h de inferencia continua | Rendimiento | Sin memory leak |
+| 4G-A8 | Paridad PyTorch ↔ ONNX: En 1000 validation observations, max_abs_error < ε y argmax agreement = 100% (salvo empates exactos) | Integración | El modelo exportado es idéntico al entrenado |
 
 > Especificación completa de tests: [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md)
 
@@ -113,7 +122,7 @@ flowchart TD
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
 | `OnnxPolicy_LoadsAtStartup_NoLaterDiskRead` | Sin I/O en hot path | Mock filesystem → cero lecturas durante 1000 inferencias |
-| `OnnxPolicy_InferenceOutput_MatchesExpectedShape` | Shape correcta | 128 floats → N action logits |
+| `OnnxPolicy_InferenceOutput_MatchesExpectedShape` | Shape correcta | FeatureSchemaV1.Dimension floats → NpcPolicyActionCount logits |
 | `OnnxPolicy_Exception_FallsBackCleanly` | Tolerancia a fallos | OrtException → fallback → decisión válida |
 | `OnnxPolicy_Timeout_FallsBackCleanly` | Tolerancia a latencia | Sleep 100ms → advice stale → fallback |
 | `Shadow_NeverExecutesNeuralDecision` | Shadow puro | 1000 ciclos → TODAS intents del pipeline determinista |
@@ -132,6 +141,8 @@ flowchart TD
 - `l2dn.npc.policy.model.version`: Versión del modelo cargado (Atributo de contexto).
 - `l2dn.npc.policy.batch.size`: Tamaño del batch de inferencia, 1 por defecto (Histograma).
 - `l2dn.npc.policy.queue.depth`: Profundidad de cola de inferencia (Gauge).
+- `l2dn.npc.policy.request.coalesced`: Solicitudes combinadas/actualizadas con nueva observación (Counter).
+- `l2dn.npc.policy.request.dropped_stale`: Solicitudes descartadas por stale drop (Counter).
 - `l2dn.npc.policy.invalid_action_masked`: Acciones enmascaradas o inválidas (Counter).
 - `l2dn.npc.policy.entropy`: Entropía de la distribución probabilística (Histograma).
 

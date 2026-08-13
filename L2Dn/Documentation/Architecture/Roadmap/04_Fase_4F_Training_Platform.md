@@ -1,7 +1,17 @@
-# Fase 4F — Training & Simulation Platform
+# ⛔ SUPERSEDED — NO IMPLEMENTAR
+
+> **Este documento fue reemplazado por:**
+> - [`04a_Fase_4FA_Dataset_BehaviorCloning.md`](04a_Fase_4FA_Dataset_BehaviorCloning.md)
+> - [`04b_Fase_4FB_Headless_Simulator.md`](04b_Fase_4FB_Headless_Simulator.md)
+>
+> Se conserva únicamente como referencia histórica. Las especificaciones de este documento contienen decisiones que fueron corregidas en la revisión 2 (reward en runtime, training contracts en Npc.Contracts, RL mezclado con replay, 128 inputs hardcodeados).
+
+---
+
+# ~~Fase 4F — Training & Simulation Platform~~ (SUPERSEDED)
 
 ## 1. Encabezado
-**Estado:** Diseño
+**Estado:** ~~Diseño~~ SUPERSEDED
 **Fecha:** Agosto 2026
 
 ## 2. Objetivo
