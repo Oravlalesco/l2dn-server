@@ -48,7 +48,7 @@ Flee        0.05
 |---|---|---|---|
 | `StochasticSampler` | `L2Dn.Npc.Brain` | `Policies/StochasticSampler.cs` | Recibe logits neuronales, aplica temperature, y elige entre candidatos elegibles en el CandidateSet. |
 | `NpcAiDifficultyTier` | `L2Dn.Npc.Contracts` | `Models/NpcAiDifficultyTier.cs` | Enum: `Novice`, `Normal`, `Veteran`, `Elite`, `Legendary`. |
-| `DifficultyTierModifiers` | `L2Dn.Npc.Brain` | `Models/DifficultyTierModifiers.cs` | Tabla de mapeo de NpcAiDifficultyTier a Temperature, Neural Influence, Advice Refresh Interval, y Action Variability. |
+| `DifficultyTierModifiers` | `L2Dn.Npc.Brain` | `Models/DifficultyTierModifiers.cs` | Tabla de mapeo de NpcAiDifficultyTier a Temperature, Advice Refresh Interval, y Action Variability. |
 | `AbTestCoordinator` | `L2Dn.Npc.Brain` | `Policies/AbTestCoordinator.cs` | Asigna templates a control (determinista) o experimental (neural) en runtime. |
 
 ## Especificación detallada
@@ -65,14 +65,14 @@ La aleatoriedad debe ser recuperable. NO usar aleatoriedad irrecuperable.
 - **Entorno de Testing**: Al ser determinista basado en el hash, una secuencia exacta reproducirá siempre el mismo muestreo, permitiendo debuggar el comportamiento y escribir unit tests deterministas sobre una política estocástica.
 
 ### 3. NpcAiDifficultyTier
-Se introduce un nuevo concepto de dificultad sin "inflar" stats (HP/P.Atk). El NpcAiDifficultyTier SOLO controla en esta fase: temperature, neural influence weight, advice refresh interval, y action variability. (NO lookahead, NO coordinación, NO retreat perfecto).
-| NpcAiDifficultyTier | Temperature | Neural Influence | Advice Refresh Interval | Action Variability |
-|---|---|---|---|---|
-| Novice | 0.80 | Baja | Lento | Alta |
-| Normal | 0.50 | Media | Normal | Media |
-| Veteran | 0.30 | Alta | Rápido | Baja |
-| Elite | 0.15 | Muy Alta | Muy Rápido | Muy Baja |
-| Legendary | 0.05 | Máxima | Instantáneo | Mínima |
+Se introduce un nuevo concepto de dificultad sin "inflar" stats (HP/P.Atk). El NpcAiDifficultyTier SOLO controla en esta fase: temperature, advice refresh interval, y action variability. (NO lookahead, NO coordinación, NO retreat perfecto).
+| NpcAiDifficultyTier | Temperature | Advice Refresh Interval | Action Variability |
+|---|---|---|---|
+| Novice | 0.80 | Lento | Alta |
+| Normal | 0.50 | Normal | Media |
+| Veteran | 0.30 | Rápido | Baja |
+| Elite | 0.15 | Muy Rápido | Muy Baja |
+| Legendary | 0.05 | Instantáneo | Mínima |
 
 ## Ownership
 

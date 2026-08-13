@@ -31,29 +31,34 @@ Las categorías de test son:
 
 ---
 
-## Fase 4B.5 — Stateful Strategic Utility & Stability
+## Fase 4B.5 — Stateful Strategic Utility & Stability (rev 2)
 
 ### Criterios de aceptación
 
 | ID | Criterio | Tipo | Qué demuestra |
 |---|---|---|---|
-| 4B5-A1 | `NPC_STRATEGY_ADAPTIVE_MODE=Disabled` produce comportamiento bit-a-bit idéntico a Phase 4B | Comportamiento | Que Static V1 es el baseline exacto |
-| 4B5-A2 | NPC `AggressivePressure` con HP<25% y Heal disponible transiciona a `Recover` | Comportamiento | Que la postura cambia con la situación |
-| 4B5-A3 | NPC en `Recover` con HP>70% y skill ready transiciona a `Pressure` o `ControlRange` | Comportamiento | Re-engagement funcional |
-| 4B5-A4 | Oscilación HP 34%↔36% con threshold en 35% NO produce alternancia Recover↔Pressure | Comportamiento | Hysteresis funciona |
-| 4B5-A5 | Postura recién adquirida no se abandona antes de `MinimumPostureDurationTicks` (excepto Reflex) | Comportamiento | Commitment funciona |
-| 4B5-A6 | `Survival` en misma situación de HP bajo tiene `RecoverUtility >= AggressivePressure.RecoverUtility` | Comportamiento | Style es prior, no jaula |
+| 4B5-A1 | `NPC_STRATEGY_ADAPTIVE_MODE=Disabled` produce comportamiento bit-a-bit idéntico a Phase 4B | Comportamiento | Static V1 es baseline exacto |
+| 4B5-A2 | NPC `AggressivePressure` con HP<25% y Heal disponible transiciona a `Recover` | Comportamiento | Postura cambia con situación |
+| 4B5-A3 | NPC en `Recover` con HP>70% transiciona a `Pressure` o `ControlRange` | Comportamiento | Re-engagement funcional |
+| 4B5-A4 | Oscilación HP 34%↔36% NO produce alternancia Recover↔Pressure | Comportamiento | Hysteresis funciona |
+| 4B5-A5 | Postura recién adquirida no abandona antes de `MinimumPostureDurationTicks` (excepto Reflex Emergency) | Comportamiento | Commitment funciona |
+| 4B5-A6 | `Survival` misma situación: `RecoverUtility >= AggressivePressure.RecoverUtility` | Comportamiento | Style es prior, no jaula |
 | 4B5-A7 | Todo cambio de postura registra `NpcPostureTransitionReason` | Contrato | Explicabilidad |
 | 4B5-A8 | Replay determinista: misma secuencia → mismas posturas, utilidades, transiciones, directivas, intents | Comportamiento | Reproducibilidad total |
-| 4B5-A9 | Dos candidatos con score idéntico se resuelven por `NpcTieBreakPolicy`, no por orden de código | Contrato | Desempate explícito |
+| 4B5-A9 | Dos candidatos con score idéntico → `NpcTieBreakPolicy` (no orden de código) | Contrato | Desempate explícito |
 | 4B5-A10 | Strategy V2 P99 < 1 ms, preferiblemente < 0.5 ms | Rendimiento | No degrada hot path |
-| 4B5-A11 | Zero network I/O, zero DB I/O, zero disk I/O en Strategy evaluation | Rendimiento | Sin I/O en Think |
-| 4B5-A12 | Hot-path allocations ≈ V1 | Rendimiento | Sin regresión de GC |
+| 4B5-A11 | Zero network/DB/disk I/O en Strategy evaluation | Rendimiento | Sin I/O en Think |
+| 4B5-A12 | Hot-path allocations ≈ V1 | Rendimiento | Sin regresión GC |
 | 4B5-A13 | Critical P95 no > +25% vs V1 | Rendimiento | SLO preservado |
-| 4B5-A14 | Utility scores son enteros 0-1000 (fixed-point) | Contrato | Determinismo |
-| 4B5-A15 | Response curves son piecewise-linear | Contrato | Rápido, explicable, determinista |
-| 4B5-A16 | Reflex sigue teniendo autoridad superior a Strategy Posture | Integración | Reflex no se debilita |
-| 4B5-A17 | `NpcStrategicPosture` tiene exactamente 5 valores: Neutral, Pressure, ControlRange, Recover, Disengage | Contrato | Cardinalidad acotada |
+| 4B5-A14 | Utility: media ponderada normalizada, resultado 0-1000 sin saturación artificial | Contrato | Información relativa preservada |
+| 4B5-A15 | Weights son int 0-1000, cálculo con long accumulator | Contrato | Fixed-point real |
+| 4B5-A16 | Reflex Emergency Flee usa SOLO `EmergencyFleeHpThreshold` de IntelligenceProfile | Integración | Reflex no depende de Strategy |
+| 4B5-A17 | `Neutral` solo fuera de combate; no compite en utility | Contrato | Semántica clara |
+| 4B5-A18 | Postura ineligible nunca seleccionada (Disengage con FleeNotAllowed) | Contrato | Hard constraints |
+| 4B5-A19 | Shadow V2 mantiene estado longitudinal durante toda la sesión | Comportamiento | Valida hysteresis/commitment en Shadow |
+| 4B5-A20 | `MaintainRange` produce movimiento correcto (retroceder/acercar según distancia vs preferred) | Comportamiento | Movement mínimo funcional |
+| 4B5-A21 | `Retreat` con todas direcciones bloqueadas → NPC mantiene posición, no se congela | Comportamiento | Fallback de movimiento |
+| 4B5-A22 | `NpcUtilityConsideration` y `NpcUtilityCurve` en Brain internal, no en Contracts | Arquitectura | Frontera correcta |
 
 ### Tests concretos
 
@@ -62,33 +67,40 @@ Las categorías de test son:
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
 | `Posture_HasExactlyFiveValues` | Cardinalidad | Enum.GetValues → {Neutral, Pressure, ControlRange, Recover, Disengage} |
-| `StrategyContext_IsImmutable` | Sin mutación | readonly struct → compilación falla si se modifica |
-| `StrategyDirective_IsImmutable` | Sin mutación | readonly struct → compilación falla si se modifica |
-| `UtilityCurve_PiecewiseLinear_Interpolation` | Cálculo correcto | Input=400, Points=[(300,600),(500,200)] → Utility=400 |
-| `UtilityCurve_OutOfRange_Clamps` | Sin extrapolación | Input=0 con curva mínima 100 → Utility del primer punto |
-| `TransitionReason_HasExpectedValues` | Enum completo | ≥ 10 razones documentadas |
-| `TieBreakPolicy_HasExplicitOrder` | Desempate declarado | PreferOffensive → orden: Attack > Skill > Approach > Heal > Flee |
-| `PosturePrior_PerStyle_SumsCorrectly` | Priors razonables | AggressivePressure.PressurePrior > Survival.PressurePrior |
+| `StrategyDirective_IsImmutable` | Sin mutación | readonly record struct → compilación falla si se modifica |
+| `PostureUtilities_IsValueType` | Sin allocation | NpcPostureUtilities es readonly record struct, no class/array |
+| `TransitionReason_HasExpectedValues` | Enum completo | ≥ 12 razones documentadas (incluye CombatStarted/CombatEnded) |
 
 **Brain (`L2Dn.Npc.Brain.Tests`):**
 
 | Test | Propiedad | Input → Output esperado |
 |---|---|---|
 | `Disabled_IdenticalToPhase4B` | Baseline exacto | Disabled + 100 percepciones → bit-a-bit idéntico a Phase 4B |
-| `AggressivePressure_HighHp_Pressure` | Postura correcta | HP=100%, skill ready → Posture=Pressure |
+| `AggressivePressure_HighHp_Pressure` | Postura correcta | HP=100%, skill ready, in combat → Posture=Pressure |
 | `AggressivePressure_LowHp_HealReady_Recover` | Transición | HP=24%, heal ready → Posture=Recover |
-| `Survival_SameState_HigherRecoverUtility` | Style como prior | Survival vs AP, misma situación → Survival.RecoverUtility ≥ AP.RecoverUtility |
-| `Hysteresis_OscillatingHp_StablePosture` | Sin oscilación | HP=[34,36,34,36,34,36,34,36,50,70] → máximo 2 transiciones, no 8 |
-| `Commitment_MinDuration_Respected` | Permanencia | Recover recién adquirida + HP 60% antes de MinDuration → permanece Recover |
-| `Commitment_ReflexOverrides` | Reflex autoridad | En commitment Recover + target muere → Reflex ClearTarget |
-| `RangeTolerance_NoOscillation` | Tolerancia rango | Distance=[590,610,595,605] con PreferredRange=600±60 → postura estable |
+| `Survival_SameState_HigherRecoverUtility` | Style prior | Survival vs AP, misma situación → Survival.RecoverUtility ≥ AP.RecoverUtility |
+| `Hysteresis_OscillatingHp_StablePosture` | Sin oscilación | HP=[34,36,34,36,34,36,50,70] → máximo 2 transiciones, no 8 |
+| `Commitment_MinDuration_Respected` | Permanencia | Recover recién adquirida + HP 60% antes MinDuration → permanece Recover |
+| `Commitment_ReflexEmergencyOverrides` | Reflex autoridad | En commitment + HP < EmergencyThreshold → Reflex Emergency Flee |
+| `RangeTolerance_NoOscillation` | Tolerancia rango | Distance=[590,610,595,605] con PreferredRange=600±60 → estable |
 | `TieBreak_ExplicitPolicy_NotCodeOrder` | Desempate | Attack=100, Skill=100 + PreferOffensive → Attack gana |
-| `TieBreak_Verified_OrderIndependent` | Desempate | Mismo test con orden evaluación invertido → mismo resultado |
+| `TieBreak_OrderIndependent` | Desempate | Orden evaluación invertido → mismo resultado |
 | `Directive_Recover_IncreasesHealBias` | Biases correctos | Posture=Recover → HealBias > 0, AttackBias < 0 |
-| `Directive_Pressure_IncreasesAttackBias` | Biases correctos | Posture=Pressure → AttackBias > 0, HealBias < 0 |
-| `TransitionReason_AlwaysPresent` | Explicabilidad | Cambio de postura → TransitionReason != null |
-| `Replay_DeterministicPostureSequence` | Reproducibilidad | 100 percepciones × 100 repeticiones → idéntico |
-| `ContextBuilder_NoHeapAllocation` | Performance | Construir StrategyContext → cero allocations |
+| `Neutral_OnlyOutsideCombat` | Semántica | No combat/no target → Neutral; combat started → utility evaluation |
+| `Neutral_NeverComputedAsUtility` | Semántica | Utility evaluation no incluye Neutral en candidatos |
+| `Disengage_Ineligible_FleeNotAllowed` | Eligibility | CanFlee=false → Disengage.Eligible=false |
+| `Ineligible_NeverSelected` | Hard constraint | Disengage utility=950 pero ineligible → no seleccionada |
+| `Utility_NeverSaturates` | Normalización | 1000 evaluaciones aleatorias → ningún utility = 1000 por saturación aritmética |
+| `Utility_WeightedAverage_CorrectResult` | Cálculo | Input conocido → resultado exacto verificable |
+| `Weights_AreIntegers` | Fixed-point | Reflection → todos los weights son int, no double/float |
+| `ReflexFlee_UsesOnlyEmergencyThreshold` | Separación | ReflexBrain no accede a strategy.EffectiveFleeHpPercent |
+| `MaintainRange_TooClose_Retreats` | Movement | Range=300, target a 100 → NPC retrocede |
+| `MaintainRange_TooFar_Approaches` | Movement | Range=300, target a 500 → NPC avanza |
+| `MaintainRange_InBand_NoMovement` | Tolerance | Range=300±60, target a 310 → no se mueve |
+| `Retreat_AllBlocked_MaintainsPosition` | Fallback | Todas direcciones bloqueadas → posición, no freeze |
+| `ShadowState_PersistsAcrossThinks` | Longitudinal | Shadow: Think1→Pressure, Think2→estado recuerda Pressure |
+| `ShadowState_ValidatesHysteresis` | Longitudinal | Shadow 10 Thinks: V2 muestra transiciones estables |
+| `ContextBuilder_NoHeapAllocation` | Performance | Construir context → cero allocations |
 | `UtilityEvaluator_SubMillisecond` | Performance | 1000 evaluaciones → P99 < 0.5 ms |
 
 **Temporal (secuencias):**
@@ -97,7 +109,7 @@ Las categorías de test son:
 |---|---|---|
 | `Sequence_GradualHpDrop_SmoothTransition` | Inteligencia temporal | HP=[100→10] gradual → Pressure estable, luego Recover estable |
 | `Sequence_HpRecovery_ReEngagement` | Re-engagement | HP=[30→80] tras Recover → transición a Pressure o ControlRange |
-| `Sequence_CombatDuration_PostureStable` | Estabilidad largo plazo | 200 ticks combate estable → máximo 4-5 transiciones, no 50 |
+| `Sequence_CombatDuration_PostureStable` | Estabilidad | 200 ticks combate estable → máximo 4-5 transiciones |
 
 **Property-based:**
 
@@ -105,11 +117,13 @@ Las categorías de test son:
 |---|---|---|
 | `AsHpDecreases_RecoverUtilityNeverDecreases` | Monotonía | ∀ hp1 < hp2: RecoverUtility(hp1) ≥ RecoverUtility(hp2) |
 | `SurvivalRecover_GEQ_AggressivePressureRecover` | Style prior | ∀ estado: Survival.Recover ≥ AP.Recover |
-| `AggressivePressurePressure_GEQ_SurvivalPressure` | Style prior | ∀ estado: AP.Pressure ≥ Survival.Pressure |
 | `UtilityScores_AlwaysInRange_0_1000` | Acotación | ∀ evaluación: 0 ≤ utility ≤ 1000 |
-| `AllPostures_Reachable_FromAllStyles` | No jaulas | ∀ style: ∃ estado que produce cada postura como ganadora |
+| `AllCombatPostures_Reachable_FromAllStyles` | No jaulas | ∀ style: ∃ estado que produce cada postura de combate como ganadora |
+| `IneligiblePosture_NeverSelected` | Hard constraint | ∀ evaluación: postura ganadora siempre es eligible |
 
 ---
+
+
 
 ## Fase 4C — Style × Role
 

@@ -90,13 +90,14 @@ Esta es la arquitectura correcta, alineada con el código actual de `feature/npc
 
 ```mermaid
 flowchart TD
-    PERCEP["NpcPerception"] --> SCTX["STRATEGY CONTEXT\n(derivado de percepción)"]
+    PERCEP["NpcPerception"] --> SCTX["STRATEGY EVALUATION CONTEXT\n(internal Brain)"]
 
-    SCTX --> SUTIL["STRATEGIC UTILITY EVALUATOR\nPosture utilities + Style priors"]
+    SCTX --> SELIG["POSTURE ELIGIBILITY\n(hard constraints)"]
+    SELIG --> SUTIL["STRATEGIC UTILITY EVALUATOR\nweighted average normalized (0-1000)\n+ Style priors"]
     SUTIL --> SGATE["STABILITY GATE\nhysteresis + commitment"]
     SGATE --> SDIR["STRATEGY DIRECTIVE\nPosture + Biases + Range + Reason"]
 
-    SDIR --> REFLEX["REFLEX BRAIN\nsafety / leash / invalid target\n(NUNCA depende de neural ni strategy)"]
+    SDIR --> REFLEX["REFLEX BRAIN\nEmergency Flee (IntelligenceProfile threshold)\nleash / invalid target\n(NUNCA depende de neural NI strategy)"]
 
     REFLEX -->|"Intent encontrado"| GW["IntentGateway"]
     REFLEX -->|"No Reflex Intent"| TCB["TACTICAL CANDIDATE BUILDER\n(TacticalActionEvaluator refactorizado)"]
@@ -328,7 +329,7 @@ Comparación: `123 vs 123`. No contra el Think actual (que puede estar en otra r
 | 2 | Neural Policy produce recomendaciones, no intents | ADR-012 |
 | 3 | Action Mask tiene una sola fuente: TacticalActionEvaluator (no duplicar) | ADR-013 rev |
 | 4 | Fallback a determinístico es INVARIANTE, no configurable | ADR-014 rev |
-| 5 | Reflex NUNCA depende de inferencia neural | ADR-006 ext |
+| 5 | Reflex NUNCA depende de inferencia neural NI de Strategy | ADR-006 ext |
 | 6 | Sin I/O en Think (modelo precargado) | ADR-004 ext |
 | 7 | Single-flight por NPC y por Squad | — |
 | 8 | Brain solo referencia Contracts | ADR-008 |
@@ -340,7 +341,10 @@ Comparación: `123 vs 123`. No contra el Think actual (que puede estar en otra r
 | 14 | Raid fallback: deterministic encounter policy, no hot-switch a Legacy | — |
 | 15 | PolicyArbitrator: Neural elige directamente entre candidatos elegibles (Opción A) | ADR-017 |
 | 16 | Brain NUNCA invoca INpcPolicy; solo consume NpcPolicyAdvice? inyectado | — |
-| 17 | Reflex Intent != null → no generar policy evaluation (reduce inferencias innecesarias) | — |
+| 17 | Reflex Intent != null → no generar policy evaluation | — |
+| 18 | Reflex Emergency Flee usa SOLO EmergencyFleeHpThreshold de IntelligenceProfile (no de Strategy) | — |
+| 19 | Utility internals (Considerations, Curves, PriorTable) son Brain internal, no Contracts | — |
+| 20 | Utility scores: media ponderada normalizada (0-1000), weights int, long accumulator | — |
 
 ---
 
@@ -350,7 +354,8 @@ Comparación: `123 vs 123`. No contra el Think actual (que puede estar en otra r
 |---|---|
 | Autoridad | Neural Network nunca modifica GameServer |
 | Gateway | Todo cambio físico pasa por Gateway |
-| Reflex | Nunca depende obligatoriamente de inferencia |
+| Reflex | Nunca depende obligatoriamente de inferencia ni de Strategy |
+| Reflex Flee | Emergency Flee usa SOLO EmergencyFleeHpThreshold de IntelligenceProfile |
 | ActionMask | Una sola fuente (TacticalActionEvaluator), no dos |
 | Causalidad | Advice rechazado si NpcKey o BasedOnStateRevision no coinciden (exacto en V1) |
 | Reflex → no evaluation | Si Reflex produce Intent, no se genera policy evaluation |

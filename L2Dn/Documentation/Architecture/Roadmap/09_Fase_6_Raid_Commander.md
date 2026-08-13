@@ -9,7 +9,7 @@ Expandir el alcance de la arquitectura basada en Brain + Intents para manejar ev
 
 ## 2. Prerequisitos
 
-- Fase 4F (Squad Intelligence) probada exhaustivamente.
+- Fase 4E (Squad Intelligence) probada exhaustivamente.
 - Posiblemente Fase 5 (si el cálculo es demasiado oneroso localmente).
 - Aprobación técnica para expandir el `NpcBrainEligibility` más allá de `typeof(Monster)`.
 
@@ -35,17 +35,18 @@ flowchart TD
         SquadDirB --> Npc4
     end
     
-    subgraph Raid Boss
-        RaidBrain[RaidBrain]
-        PhaseManager[Phase Manager]
-        Mechanics[Mechanic Controller]
-        RaidBrain --> PhaseManager
-        RaidBrain --> Mechanics
+    subgraph Raid Boss / Encounter Architecture
+        MechanicController[Mechanic Controller]
+        EncounterFacts[Encounter Facts]
+        EncounterBrain[EncounterBrain / RaidBrain]
+        EncounterDirective[EncounterDirective]
+        
+        MechanicController --> EncounterFacts --> EncounterBrain --> EncounterDirective
     end
     
+    EncounterDirective --> EncounterDir
     EncounterDir --> SquadDirA
     EncounterDir --> SquadDirB
-    EncounterDir --> RaidBrain
 ```
 
 ## 4. Piezas a crear

@@ -20,11 +20,15 @@ flowchart TD
     
     subgraph Local Node
         Gateway[Intent Gateway]
-        LocalBrain[Local Brain]
+        AdviceStore[NpcPolicyAdviceStore]
+        GrpcClient[GrpcBrainClient\n(L2Dn.Npc.Transport.Grpc)]
+        LocalBrain[Local Brain\n(L2Dn.Npc.Brain)]
         Reflex[ReflexBrain]
         Tactical[TacticalBrain]
+        
         LocalBrain --> Reflex
         LocalBrain --> Tactical
+        AdviceStore -.->|Inyecta NpcPolicyAdvice?| LocalBrain
         Gateway <--> LocalBrain
     end
     
@@ -39,7 +43,8 @@ flowchart TD
     end
     
     GS <--> Gateway
-    LocalBrain <-->|gRPC / IPC - Fallback local| RemoteBrain
+    GrpcClient <-->|gRPC / IPC - Fallback local| RemoteBrain
+    GrpcClient --> AdviceStore
 ```
 
 ## 4. Piezas a crear
@@ -47,9 +52,9 @@ flowchart TD
 | Nombre | Ensamblado | Archivo propuesto | Propósito |
 |---|---|---|---|
 | `IRemoteBrainWorker` | `L2Dn.Npc.Contracts` | `IRemoteBrainWorker.cs` | Contrato para comunicación con el worker remoto. |
-| `GrpcBrainClient` | `L2Dn.Npc.Brain` | `Network/GrpcBrainClient.cs` | Cliente gRPC para solicitar decisiones al backend remoto. |
-| `BrainBatchDispatcher` | `L2Dn.Npc.Brain` | `Network/BrainBatchDispatcher.cs` | Agrupa solicitudes de estado para batch inference (ONNX/GPU). |
-| `RemotePolicyConfig` | `L2Dn.Npc.Brain` | `Config/RemotePolicyConfig.cs` | Configuración de endpoints, latencias máximas y batch sizes. |
+| `GrpcBrainClient` | `L2Dn.Npc.Transport.Grpc` | `GrpcBrainClient.cs` | Cliente gRPC para solicitar decisiones al backend remoto. |
+| `BrainBatchDispatcher` | `L2Dn.Npc.Transport.Grpc` | `BrainBatchDispatcher.cs` | Agrupa solicitudes de estado para batch inference (ONNX/GPU). |
+| `RemotePolicyConfig` | `L2Dn.Npc.Transport.Grpc` | `RemotePolicyConfig.cs` | Configuración de endpoints, latencias máximas y batch sizes. |
 
 ## 5. Especificación detallada
 

@@ -54,40 +54,48 @@ Además de los deltas tácticos existentes (Attack, Skill, Flee, etc.), cada Rol
 
 ```text
 Elite:
-  PressurePrior  +100
-  RecoverPrior   -50
-  DisengagePrior -100
-  CommitmentDelta +50 (más difícil de cambiar de postura)
+  PressurePriorDelta      = +100
+  ControlRangePriorDelta  = +50
+  RecoverPriorDelta       = -50
+  DisengagePriorDelta     = -100
+  SwitchMarginDelta       = +50    (int, utility points)
+  MinDurationDelta        = +100   (int, ticks)
   + Attack +10, Skill +15, Flee -20  (tácticos existentes)
 
 Minion:
-  PressurePrior  +50
-  RecoverPrior   +50
-  DisengagePrior +100
-  CommitmentDelta -30 (cambia de postura más fácilmente)
+  PressurePriorDelta      = +50
+  ControlRangePriorDelta  = 0
+  RecoverPriorDelta       = +50
+  DisengagePriorDelta     = +100
+  SwitchMarginDelta       = -30
+  MinDurationDelta        = -50
 
 Commander:
-  PressurePrior  +80
-  ControlRangePrior +50
-  RecoverPrior   +30
-  DisengagePrior -150
-  CommitmentDelta +100
+  PressurePriorDelta      = +80
+  ControlRangePriorDelta  = +50
+  RecoverPriorDelta       = +30
+  DisengagePriorDelta     = -150
+  SwitchMarginDelta       = +100
+  MinDurationDelta        = +200
 
 Raid:
-  PressurePrior  +150
-  RecoverPrior   -100
-  DisengagePrior -200
-  CommitmentDelta +150
+  PressurePriorDelta      = +150
+  ControlRangePriorDelta  = 0
+  RecoverPriorDelta       = -100
+  DisengagePriorDelta     = -200
+  SwitchMarginDelta       = +150
+  MinDurationDelta        = +300
 
 Mob:
-  Todos +0 (identidad)
+  Todos = 0 (identidad)
 ```
 
 ### Composición Completa
 ```text
-effectivePosturePrior = Style.PosturePrior + Role.PosturePriorDelta
-effectiveCommitment = baseCommitment + Role.CommitmentDelta
-effectiveTacticalScore = Style.TacticalBase + Role.TacticalDelta + StrategyDirective.Bias
+effectivePosturePrior    = Style.Prior + Role.PriorDelta
+effectiveSwitchMargin    = baseSwitchMargin + Role.SwitchMarginDelta
+effectiveMinDuration     = baseMinDuration + Role.MinDurationDelta
+effectiveTacticalScore   = Style.TacticalBase + Role.TacticalDelta + Directive.Bias
 ```
 
 ### Deltas de Rol Propuestos
@@ -100,10 +108,10 @@ effectiveTacticalScore = Style.TacticalBase + Role.TacticalDelta + StrategyDirec
 | Raid | 0 | +5 | +20 | +10 | -40 | 0 |
 
 ### Tabla de Composición de Ejemplo
-*Ejemplo para Elite + AggressivePressure (asumiendo AggressivePressure base PosturePriors: PressurePrior: 50, RecoverPrior: -20, DisengagePrior: -50, y un baseCommitment de 100):*
-- **AggressivePressure base:** BasicAttack: 75, Approach: 90, OffensiveSkill: 105, Heal: 85, Flee: 70, Heal HP%: 25 | PressurePrior: 50, RecoverPrior: -20, DisengagePrior: -50
-- **Elite delta:** BasicAttack: +10, Approach: +5, OffensiveSkill: +15, Heal: 0, Flee: -20, Heal HP%: -10 | PressurePrior: +100, RecoverPrior: -50, DisengagePrior: -100, CommitmentDelta: +50
-- **Effective Profile:** BasicAttack: 85, Approach: 95, OffensiveSkill: 120, Heal: 85, Flee: 50, Heal HP%: 15 | PressurePrior: 150, RecoverPrior: -70, DisengagePrior: -150, Commitment: 150
+*Ejemplo para Elite + AggressivePressure (asumiendo AggressivePressure base PosturePriors: PressurePrior: 50, RecoverPrior: -20, DisengagePrior: -50, baseSwitchMargin: 100, baseMinDuration: 0):*
+- **AggressivePressure base:** BasicAttack: 75, Approach: 90, OffensiveSkill: 105, Heal: 85, Flee: 70, Heal HP%: 25 | PressurePrior: 50, RecoverPrior: -20, DisengagePrior: -50, SwitchMargin: 100, MinDuration: 0
+- **Elite delta:** BasicAttack: +10, Approach: +5, OffensiveSkill: +15, Heal: 0, Flee: -20, Heal HP%: -10 | PressurePriorDelta: +100, RecoverPriorDelta: -50, DisengagePriorDelta: -100, SwitchMarginDelta: +50, MinDurationDelta: +100
+- **Effective Profile:** BasicAttack: 85, Approach: 95, OffensiveSkill: 120, Heal: 85, Flee: 50, Heal HP%: 15 | PressurePrior: 150, RecoverPrior: -70, DisengagePrior: -150, SwitchMargin: 150, MinDuration: 100
 
 ## 6. Ownership
 
@@ -123,7 +131,7 @@ effectiveTacticalScore = Style.TacticalBase + Role.TacticalDelta + StrategyDirec
 
 | ID | Criterio | Tipo | Qué demuestra |
 |---|---|---|---|
-| 4C-A1 | `Balanced × Mob` produce exactamente los mismos scores que Phase 4 `Balanced` sin rol | Comportamiento | Que el rol `Mob` es la identidad (delta cero) y no altera el baseline certificado |
+| 4C-A1 | Con Adaptive Disabled: `Balanced × Mob` = Phase 4B Static V1. Con Adaptive Enabled: `Balanced × Mob` = Balanced Adaptive V2 sin role delta | Comportamiento | Que el rol `Mob` es la identidad (delta cero) y no altera el baseline certificado |
 | 4C-A2 | Cada combinación `style × role` produce scores deterministas e iguales en 1,000 evaluaciones idénticas | Comportamiento | Que la composición es pura y no introduce estado ni aleatoriedad |
 | 4C-A3 | Un perfil con intelligence profile legacy explícito NO hereda un rol no-Balanced a menos que el registro lo declare | Comportamiento | Que scripts y tests existentes no cambian de comportamiento implícitamente |
 | 4C-A4 | Una entrada de registro malformada o con rol desconocido emite warning y NO habilita silenciosamente `Balanced:Mob` | Contrato | Que errores de configuración no se esconden detrás de un default seguro |
@@ -131,9 +139,9 @@ effectiveTacticalScore = Style.TacticalBase + Role.TacticalDelta + StrategyDirec
 | 4C-A6 | `NpcBrainEligibility` rechaza todo actor que no sea exacto `Monster` + exacto `AttackableAI`, independientemente del rol configurado | Integración | Que un Guard con rol Commander sigue en Legacy |
 | 4C-A7 | R1-R5 con Strategy Enabled y roles configurados mantiene zero drops, zero overflow, max concurrent 1 | Rendimiento | Que la composición no degrada el scheduler |
 | 4C-A8 | Release build sin errores nuevos | Arquitectura | Que no se introdujeron dependencias prohibidas |
-| 4C-A10 | Role.PosturePriorDelta de Mob es cero para todas las posturas (identidad) | Comportamiento | Que el rol Mob no altera los priors base |
-| 4C-A11 | Role.CommitmentDelta de Elite > 0 (Elite es más persistente en su postura) | Comportamiento | Que Elite es más persistente en su postura |
-| 4C-A12 | `effectivePosturePrior = Style.PosturePrior + Role.PosturePriorDelta` produce posturas correctas | Comportamiento | Que la suma matemática produce los priors efectivos |
+| 4C-A10 | Role.PosturePriorDelta de Mob es cero para todas las posturas y SwitchMarginDelta=0 y MinDurationDelta=0 (identidad completa) | Comportamiento | Que el rol Mob no altera los priors base |
+| 4C-A11 | Elite.SwitchMarginDelta > 0 AND Elite.MinDurationDelta > 0 (Elite es más persistente en postura) | Comportamiento | Que Elite es más persistente en su postura |
+| 4C-A12 | `effectivePosturePrior = Style.Prior + Role.PriorDelta` produce posturas correctas | Comportamiento | Que la suma matemática produce los priors efectivos |
 
 > Especificación completa de tests: [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md)
 
