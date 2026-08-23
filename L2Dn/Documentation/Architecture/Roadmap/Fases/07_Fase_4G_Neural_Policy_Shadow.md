@@ -115,7 +115,7 @@ flowchart TD
 | 4G-A7 | Memory stable después de 24h de inferencia continua | Rendimiento | Sin memory leak |
 | 4G-A8 | Paridad PyTorch ↔ ONNX: En 1000 validation observations, max_abs_error < ε y argmax agreement = 100% (salvo empates exactos) | Integración | El modelo exportado es idéntico al entrenado |
 
-> Especificación completa de tests: [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md)
+> Especificación completa de tests: [`04_Criterios_Aceptacion_y_Testing.md`](../04_Criterios_Aceptacion_y_Testing.md)
 
 ## Tests requeridos
 

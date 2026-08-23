@@ -1,8 +1,8 @@
 # ⛔ SUPERSEDED — NO IMPLEMENTAR
 
 > **Este documento fue reemplazado por:**
-> - [`04a_Fase_4FA_Dataset_BehaviorCloning.md`](04a_Fase_4FA_Dataset_BehaviorCloning.md)
-> - [`04b_Fase_4FB_Headless_Simulator.md`](04b_Fase_4FB_Headless_Simulator.md)
+> - [`06a_Fase_4FA_Dataset_BehaviorCloning.md`](06a_Fase_4FA_Dataset_BehaviorCloning.md)
+> - [`06b_Fase_4FB_Headless_Simulator.md`](06b_Fase_4FB_Headless_Simulator.md)
 >
 > Se conserva únicamente como referencia histórica. Las especificaciones de este documento contienen decisiones que fueron corregidas en la revisión 2 (reward en runtime, training contracts en Npc.Contracts, RL mezclado con replay, 128 inputs hardcodeados).
 
@@ -127,7 +127,7 @@ Adicional a las recompensas, medir en offline:
 | 4F-A6 | `evaluate.py` reporta acuerdo semántico cuantificable (%) | Contrato | Que la evaluación es reproducible y automática |
 | 4F-A7 | Action mask del episodio es consistente: si mask dice Heal bloqueado, acción NUNCA es Heal | Contrato | Que el mask refleja la realidad del juego |
 
-> Especificación completa de tests: [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md)
+> Especificación completa de tests: [`04_Criterios_Aceptacion_y_Testing.md`](../04_Criterios_Aceptacion_y_Testing.md)
 
 ## 9b. Tests requeridos
 

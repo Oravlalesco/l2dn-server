@@ -153,7 +153,7 @@ Resolver con ownership explícito: cuando un NPC tiene `CombatAssignment != Free
 | 4E-A6 | `NpcCombatAssignment` modifica scores de `StrategyBrain` de forma consistente | Comportamiento | Que Frontline/RangedPressure/ProtectSupport producen diferencias observables |
 | 4E-A7 | SquadBrain no modifica directamente ningún estado del GameServer | Arquitectura | Que solo produce directivas |
 
-> Especificación completa de tests: [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md)
+> Especificación completa de tests: [`04_Criterios_Aceptacion_y_Testing.md`](../04_Criterios_Aceptacion_y_Testing.md)
 
 ## 9b. Tests requeridos
 

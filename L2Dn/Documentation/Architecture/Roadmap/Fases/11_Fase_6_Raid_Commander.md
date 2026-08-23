@@ -89,7 +89,7 @@ flowchart TD
 | 6-A4 | Certificación vertical completa de un boss sencillo (ej: Ant Queen) con el nuevo pipeline: spawn → engage → phase transitions → adds → death | Integración | Que el pipeline completo funciona end-to-end para un encuentro real |
 | 6-A5 | Fallback: si `EncounterBrain` falla mid-fight, usa `DeterministicEncounterPolicy`, no Legacy script | Integración | Que la tolerancia a fallos en combate mantiene el nuevo pipeline activo |
 
-> Especificación completa de tests: [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md)
+> Especificación completa de tests: [`04_Criterios_Aceptacion_y_Testing.md`](../04_Criterios_Aceptacion_y_Testing.md)
 
 ## 8b. Tests requeridos
 

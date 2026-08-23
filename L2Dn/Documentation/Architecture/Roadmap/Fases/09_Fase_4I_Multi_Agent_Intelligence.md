@@ -1,8 +1,8 @@
 # ⛔ SUPERSEDED — NO IMPLEMENTAR
 
 > **Este documento fue reemplazado por:**
-> - [`07a_Fase_4IA_MARL_CTDE.md`](07a_Fase_4IA_MARL_CTDE.md)
-> - [`07b_Fase_4IB_Learned_Squad_Policy.md`](07b_Fase_4IB_Learned_Squad_Policy.md)
+> - [`09a_Fase_4IA_MARL_CTDE.md`](09a_Fase_4IA_MARL_CTDE.md)
+> - [`09b_Fase_4IB_Learned_Squad_Policy.md`](09b_Fase_4IB_Learned_Squad_Policy.md)
 >
 > Se conserva únicamente como referencia histórica. Las especificaciones de este documento mezclan Neural Squad con CTDE y proponen SharedPolicyLoader/AgentRewardTracker dentro de Brain.
 
@@ -105,7 +105,7 @@ Para que los agentes aprendan a cooperar, el entorno de entrenamiento usa recomp
 | 4I-A4 | Squad neural que pierde comunicación degrada a comportamiento individual Phase 4C | Integración | Fallback funciona a nivel de squad |
 | 4I-A5 | Rewards no producen comportamiento degenerado (ej: squad con reward de formación NO se queda parado sin atacar) | Comportamiento | Rewards incentivan gameplay, no gaming del reward |
 
-> Especificación completa de tests: [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md)
+> Especificación completa de tests: [`04_Criterios_Aceptacion_y_Testing.md`](../04_Criterios_Aceptacion_y_Testing.md)
 
 ## Tests requeridos
 

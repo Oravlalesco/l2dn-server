@@ -98,7 +98,7 @@ Se introduce un nuevo concepto de dificultad sin "inflar" stats (HP/P.Atk). El N
 | 4H-A6 | Gateway rejection ratio con Neural Enabled < 5% diferencia absoluta vs Deterministic | Integración | Policy neural no genera intent storms |
 | 4H-A7 | A/B: grupo control y experimental producen métricas comparables salvo variabilidad esperada | Gameplay | Policy neural no rompe balance |
 
-> Especificación completa de tests: [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md)
+> Especificación completa de tests: [`04_Criterios_Aceptacion_y_Testing.md`](../04_Criterios_Aceptacion_y_Testing.md)
 
 ## Tests requeridos
 

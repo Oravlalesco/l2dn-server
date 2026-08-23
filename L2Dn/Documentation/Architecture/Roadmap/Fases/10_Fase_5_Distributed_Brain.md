@@ -91,7 +91,7 @@ flowchart TD
 | 5-A3 | Batch inference de 256 NPCs en GPU completa en < 10ms | Rendimiento | Justifica la distribución |
 | 5-A4 | Latencia P99 de gRPC roundtrip < 20ms en misma máquina | Rendimiento | Overhead de red aceptable |
 
-> Especificación completa de tests: [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md)
+> Especificación completa de tests: [`04_Criterios_Aceptacion_y_Testing.md`](../04_Criterios_Aceptacion_y_Testing.md)
 
 ## Tests requeridos
 

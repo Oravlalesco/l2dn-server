@@ -95,7 +95,7 @@ flowchart TD
 | 7-A4 | Si el servicio LLM no está disponible, el NPC usa HTML estático sin error visible | Integración | Que la ausencia de LLM es transparente al jugador |
 | 7-A5 | El combate no muestra degradación de TPS ni latencia cuando las APIs cognitivas están activas | Rendimiento | Que la capa cognitiva es ortogonal al combat loop |
 
-> Especificación completa de tests: [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md)
+> Especificación completa de tests: [`04_Criterios_Aceptacion_y_Testing.md`](../04_Criterios_Aceptacion_y_Testing.md)
 
 ## 8b. Tests requeridos
 

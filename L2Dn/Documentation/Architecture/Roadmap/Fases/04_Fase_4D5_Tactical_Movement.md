@@ -131,7 +131,7 @@ GameServer ejecuta movimiento a la coordenada validada
 | `FormationSlot_CorrectPosition` | Integración Squad | SquadDirective con slots → NPC va al slot asignado |
 | `Brain_NeverProducesAbsoluteCoords` | Frontera | Inspeccionar TacticalMovementIntent → no contiene coordenadas X,Y,Z absolutas |
 
-> Especificación completa: [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md)
+> Especificación completa: [`04_Criterios_Aceptacion_y_Testing.md`](../04_Criterios_Aceptacion_y_Testing.md)
 
 ## 9. Telemetría
 

@@ -387,25 +387,35 @@ Comparación: `123 vs 123`. No contra el Think actual (que puede estar en otra r
 
 ---
 
+## Documentos rectores y operativos
+
+| Documento | Propósito |
+|---|---|
+| [`01_Plan_Implementacion_NPC_AI.md`](01_Plan_Implementacion_NPC_AI.md) | Secuencia de ejecución técnica reconciliada con el código |
+| [`02_Estrategia_Validacion_Testing.md`](02_Estrategia_Validacion_Testing.md) | Pirámide de testing transversal y laboratorios |
+| [`03_Backlog_Issues_Por_Fase.md`](03_Backlog_Issues_Por_Fase.md) | Backlog operativo de issues (VAL-xx y NPC-xx) |
+| [`04_Criterios_Aceptacion_y_Testing.md`](04_Criterios_Aceptacion_y_Testing.md) | Matriz completa de criterios de aceptación |
+
 ## Documentos de detalle por fase
 
 | Documento | Fase |
 |---|---|
-| [`01b_Fase_4B5_Stateful_Strategic_Utility.md`](01b_Fase_4B5_Stateful_Strategic_Utility.md) | 4B.5 |
-| [`01_Fase_4C_Style_x_Role.md`](01_Fase_4C_Style_x_Role.md) | 4C |
-| [`02_Fase_4D_Policy_Foundation.md`](02_Fase_4D_Policy_Foundation.md) | 4D |
-| [`02b_Fase_4D5_Tactical_Movement.md`](02b_Fase_4D5_Tactical_Movement.md) | 4D.5 |
-| [`03_Fase_4E_Squad_Intelligence.md`](03_Fase_4E_Squad_Intelligence.md) | 4E |
-| [`04a_Fase_4FA_Dataset_BehaviorCloning.md`](04a_Fase_4FA_Dataset_BehaviorCloning.md) | 4F-A |
-| [`05_Fase_4G_Neural_Policy_Shadow.md`](05_Fase_4G_Neural_Policy_Shadow.md) | 4G |
-| [`06_Fase_4H_Stochastic_Policy.md`](06_Fase_4H_Stochastic_Policy.md) | 4H |
-| [`04b_Fase_4FB_Headless_Simulator.md`](04b_Fase_4FB_Headless_Simulator.md) | 4F-B |
-| [`07a_Fase_4IA_MARL_CTDE.md`](07a_Fase_4IA_MARL_CTDE.md) | 4I-A |
-| [`07b_Fase_4IB_Learned_Squad_Policy.md`](07b_Fase_4IB_Learned_Squad_Policy.md) | 4I-B |
-| [`08_Fase_5_Distributed_Brain.md`](08_Fase_5_Distributed_Brain.md) | 5 |
-| [`09_Fase_6_Raid_Commander.md`](09_Fase_6_Raid_Commander.md) | 6 |
-| [`10_Fase_7_Cognitive_World.md`](10_Fase_7_Cognitive_World.md) | 7+ |
-| [`11_Criterios_Aceptacion_y_Testing.md`](11_Criterios_Aceptacion_y_Testing.md) | Testing (todas) |
+| [`01_Fase_4B5_Stateful_Strategic_Utility.md`](Fases/01_Fase_4B5_Stateful_Strategic_Utility.md) | 4B.5 |
+| [`02_Fase_4C_Style_x_Role.md`](Fases/02_Fase_4C_Style_x_Role.md) | 4C |
+| [`03_Fase_4D_Policy_Foundation.md`](Fases/03_Fase_4D_Policy_Foundation.md) | 4D |
+| [`04_Fase_4D5_Tactical_Movement.md`](Fases/04_Fase_4D5_Tactical_Movement.md) | 4D.5 |
+| [`05_Fase_4E_Squad_Intelligence.md`](Fases/05_Fase_4E_Squad_Intelligence.md) | 4E |
+| [`06_Fase_4F_Training_Platform.md`](Fases/06_Fase_4F_Training_Platform.md) | 4F |
+| [`06a_Fase_4FA_Dataset_BehaviorCloning.md`](Fases/06a_Fase_4FA_Dataset_BehaviorCloning.md) | 4F-A |
+| [`06b_Fase_4FB_Headless_Simulator.md`](Fases/06b_Fase_4FB_Headless_Simulator.md) | 4F-B |
+| [`07_Fase_4G_Neural_Policy_Shadow.md`](Fases/07_Fase_4G_Neural_Policy_Shadow.md) | 4G |
+| [`08_Fase_4H_Stochastic_Policy.md`](Fases/08_Fase_4H_Stochastic_Policy.md) | 4H |
+| [`09_Fase_4I_Multi_Agent_Intelligence.md`](Fases/09_Fase_4I_Multi_Agent_Intelligence.md) | 4I |
+| [`09a_Fase_4IA_MARL_CTDE.md`](Fases/09a_Fase_4IA_MARL_CTDE.md) | 4I-A |
+| [`09b_Fase_4IB_Learned_Squad_Policy.md`](Fases/09b_Fase_4IB_Learned_Squad_Policy.md) | 4I-B |
+| [`10_Fase_5_Distributed_Brain.md`](Fases/10_Fase_5_Distributed_Brain.md) | 5 |
+| [`11_Fase_6_Raid_Commander.md`](Fases/11_Fase_6_Raid_Commander.md) | 6 |
+| [`12_Fase_7_Cognitive_World.md`](Fases/12_Fase_7_Cognitive_World.md) | 7+ |
 
 ## ADRs
 
