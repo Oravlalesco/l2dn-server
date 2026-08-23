@@ -137,6 +137,6 @@ public class ArchetypeHateTests
 
         // No target acquired via threat table; passive (no Aggressive cap needed here since
         // there are no visible hostiles to auto-acquire either).
-        decision.Intents.Should().NotContain(i => i is AcquireTargetIntent { } a && a.Target == Tank);
+        decision.Intents.OfType<AcquireTargetIntent>().Should().NotContain(a => a.Target == Tank);
     }
 }

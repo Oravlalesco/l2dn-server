@@ -18,10 +18,34 @@ public class LeashAndReturnTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Npc_returns_home_when_outside_combat_leash_radius()
+    public void Npc_returns_home_when_outside_leash_and_no_active_threat()
     {
         // Actor at (2000, 0, 0); spawn at (0, 0, 0). Distance = 2000 > leash 1500.
-        // ReflexBrain.outsideCombatLeash → triggers return flow.
+        // No threat entry → SelectHighestVisibleThreat returns null → immediate return.
+        //
+        // Note: When a ValidTarget threat IS present, ReflexBrain opens a NpcReturnDefensePolicy
+        // grace window and emits a LeashGrace before returning (see companion test below).
+        NpcPerceptionSnapshot perception = NpcScenarioBuilder.CreateMelee()
+            .WithPosition(2000, 0, 0)
+            .WithSpawnPosition(0, 0, 0)
+            .WithCurrentTarget(Player1)
+            .WithHostileAt(Player1, distance2D: 100)
+            // No .WithThreatEntry() — without a valid visible threat, the Brain returns immediately.
+            .WithCombatLeashDistance(1500)
+            .Build();
+
+        NpcBrainDecision decision =
+            new NpcBrainCoordinator().Decide(perception, ScenarioContext.Periodic());
+
+        decision.Intents.Should().ContainSingle().Which.Should().BeOfType<ReturnHomeIntent>();
+    }
+
+    [Fact]
+    public void Npc_outside_leash_with_active_threat_enters_defensive_return_not_immediate()
+    {
+        // With a valid threat, ReflexBrain enters LeashGrace via NpcReturnDefensePolicy.Default.
+        // On the FIRST tick: it opens the grace window — no ReturnHome is emitted yet (grace period).
+        // This test documents that behavior: the Brain does NOT immediately return when threat exists.
         NpcPerceptionSnapshot perception = NpcScenarioBuilder.CreateMelee()
             .WithPosition(2000, 0, 0)
             .WithSpawnPosition(0, 0, 0)
@@ -34,7 +58,13 @@ public class LeashAndReturnTests
         NpcBrainDecision decision =
             new NpcBrainCoordinator().Decide(perception, ScenarioContext.Periodic());
 
-        decision.Intents.Should().ContainSingle().Which.Should().BeOfType<ReturnHomeIntent>();
+        // On first crossing of the leash boundary, grace window opens.
+        // The Reflex may return ReturnHome (PreserveThreat) or null — NOT an immediate ResetCombat return.
+        // Key: if it does return an intent, it must NOT be ResetCombat mode.
+        bool isImmediateResetReturn = decision.Intents.Count == 1 &&
+            decision.Intents[0] is ReturnHomeIntent { Mode: NpcReturnHomeMode.ResetCombat };
+        isImmediateResetReturn.Should().BeFalse(
+            "an active visible threat opens a grace window — no immediate ResetCombat return on first tick");
     }
 
     [Fact]

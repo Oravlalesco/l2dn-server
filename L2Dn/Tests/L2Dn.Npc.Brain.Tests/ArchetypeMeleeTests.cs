@@ -112,8 +112,8 @@ public class ArchetypeMeleeTests
 
         // Either BasicAttack or CastSkill is acceptable depending on fighter preference;
         // the key assertion is that an attack-class intent is produced (not Approach).
-        decision.Intents.Should().ContainSingle().Which.Should()
-            .Match<NpcIntent>(i => i is BasicAttackIntent or CastSkillIntent);
+        decision.Intents.Should().ContainSingle();
+        (decision.Intents[0] is BasicAttackIntent or CastSkillIntent).Should().BeTrue();
     }
 
     // -----------------------------------------------------------------------

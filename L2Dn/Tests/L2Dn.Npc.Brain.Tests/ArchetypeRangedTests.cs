@@ -79,8 +79,8 @@ public class ArchetypeRangedTests
             perception, ScenarioContext.Periodic(), NpcStrategyProfileResolver.RangedControl);
 
         // BasicAttack or CastSkill; crucially NOT ApproachTargetIntent.
-        decision.Intents.Should().ContainSingle().Which.Should()
-            .Match<NpcIntent>(i => i is BasicAttackIntent or CastSkillIntent);
+        decision.Intents.Should().ContainSingle();
+        (decision.Intents[0] is BasicAttackIntent or CastSkillIntent).Should().BeTrue();
         decision.Intents.Should().NotContain(i => i is ApproachTargetIntent);
     }
 

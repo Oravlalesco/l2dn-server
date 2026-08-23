@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using L2Dn.NpcContracts;
+using L2Dn.NpcBrain;
 
 namespace L2Dn.Npc.Brain.Tests;
 
@@ -87,10 +88,12 @@ public sealed class NpcScenarioBuilder
     /// Archer-class NPC. Resolves internally to Aggressive intelligence profile (rango 0)
     /// because LegacyAiType.Archer is not Mage/Healer/Fighter. Tests that need ranged
     /// behavior must call DecideWithStrategy(…, NpcStrategyProfileResolver.RangedControl).
+    /// PhysicalAttackRange is set to 600 to model a bow attack (physical ranged, not Magic).
     /// </summary>
     public static NpcScenarioBuilder CreateArcher() => new NpcScenarioBuilder()
         .SetAiType(LegacyNpcAiType.Archer)
-        .SetCapabilities(NpcCapabilities.CanMove | NpcCapabilities.CanAttack | NpcCapabilities.Aggressive);
+        .SetCapabilities(NpcCapabilities.CanMove | NpcCapabilities.CanAttack | NpcCapabilities.Aggressive)
+        .WithPhysicalAttackRange(600);
 
     /// <summary>Mage-class NPC (Caster intelligence profile, PreferredRange 400).</summary>
     public static NpcScenarioBuilder CreateMage() => new NpcScenarioBuilder()
@@ -160,6 +163,17 @@ public sealed class NpcScenarioBuilder
     public NpcScenarioBuilder WithCombatLeashDistance(int units)
     {
         _combatLeashDistance = units;
+        return this;
+    }
+
+    /// <summary>
+    /// Overrides the physical attack range. Default is 40 (melee).
+    /// Use 600 for archers (bow), or match the skill range for casters.
+    /// This drives TacticalBrain's physicalReach calculation and HasReadyPhysicalMeleeSkill.
+    /// </summary>
+    public NpcScenarioBuilder WithPhysicalAttackRange(int range)
+    {
+        _physicalAttackRange = range;
         return this;
     }
 
@@ -254,7 +268,7 @@ public sealed class NpcScenarioBuilder
     {
         foreach ((EntityKey target, long hate, double distance) in entries)
         {
-            _threats.Add(new ThreatEntry(target, hate, hate / 2, distance, visible: true, validTarget: true));
+            _threats.Add(new ThreatEntry(target, hate, hate / 2, distance, Visible: true, ValidTarget: true));
         }
 
         return this;
@@ -274,13 +288,13 @@ public sealed class NpcScenarioBuilder
     public NpcScenarioBuilder WithSkillReady(int id, NpcSkillCategory category, int range = 0,
         int mpCost = 0, NpcSkillObservationFlags flags = NpcSkillObservationFlags.Ready)
     {
-        _skills.Add(new NpcSkillObservation(id, level: 1, range, mpCost, category, flags));
+        _skills.Add(new NpcSkillObservation(id, Level: 1, range, mpCost, category, flags));
         return this;
     }
 
     public NpcScenarioBuilder WithSkillOnCooldown(int id, NpcSkillCategory category, int range = 0)
     {
-        _skills.Add(new NpcSkillObservation(id, level: 1, range, mpCost: 0, category,
+        _skills.Add(new NpcSkillObservation(id, Level: 1, range, MpCost: 0, category,
             NpcSkillObservationFlags.Cooldown));
         return this;
     }
@@ -318,16 +332,16 @@ public sealed class NpcScenarioBuilder
 
         NpcPhysicalState physical = new(
             _position, _currentHp, _maxHp,
-            currentMp: 50, maximumMp: 50,
+            CurrentMp: 50, MaximumMp: 50,
             DefaultCollisionRadius, DefaultCollisionHeight, _physicalFlags);
 
         NpcCombatFacts combat = new(_currentTarget, _physicalAttackRange, _aggroRange, _combatFlags);
 
         NpcEnvironment environment = new(
             new RegionKey(0, 1, 1), _spawnPosition,
-            regionActive: true, neighborsActive: true,
-            randomWalkingEnabled: false, _returningToSpawn,
-            canReturnToSpawn: true, DefaultReturnHomeDistance, _combatLeashDistance);
+            RegionActive: true, NeighborsActive: true,
+            RandomWalkingEnabled: false, _returningToSpawn,
+            CanReturnToSpawn: true, DefaultReturnHomeDistance, _combatLeashDistance);
 
         NpcPerceptionState state = new(
             identity, physical, combat, environment,
