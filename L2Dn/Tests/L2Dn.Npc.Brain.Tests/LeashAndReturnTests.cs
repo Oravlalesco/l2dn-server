@@ -61,7 +61,7 @@ public class LeashAndReturnTests
         // On first crossing of the leash boundary, grace window opens.
         // The Reflex may return ReturnHome (PreserveThreat) or null — NOT an immediate ResetCombat return.
         // Key: if it does return an intent, it must NOT be ResetCombat mode.
-        bool isImmediateResetReturn = decision.Intents.Count == 1 &&
+        bool isImmediateResetReturn = decision.Intents.Length == 1 &&
             decision.Intents[0] is ReturnHomeIntent { Mode: NpcReturnHomeMode.ResetCombat };
         isImmediateResetReturn.Should().BeFalse(
             "an active visible threat opens a grace window — no immediate ResetCombat return on first tick");
