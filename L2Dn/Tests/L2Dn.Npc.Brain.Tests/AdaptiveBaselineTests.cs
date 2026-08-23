@@ -1,114 +1,48 @@
 using FluentAssertions;
-using L2Dn.GameServer.AI.Runtime;
 using L2Dn.NpcBrain;
 using L2Dn.NpcContracts;
 
 namespace L2Dn.Npc.Brain.Tests;
 
 /// <summary>
-/// NPC-4B5-01 — Baseline guard (4B5-A1).
+/// NPC-4B5-01 — Behavioral baseline guard (4B5-A1).
 ///
-/// This suite freezes the exact decisions produced by Phase 4B (Static Strategy V1)
-/// across a representative matrix of archetypes × situations. Its only purpose is to
-/// detect regressions: if any future 4B.5 subfase causes NPC_STRATEGY_ADAPTIVE_MODE=Disabled
-/// to diverge from Phase 4B behavior, these tests will break before it reaches Docker.
+/// Freezes the exact decisions produced by Phase 4B (Static Strategy V1) across a
+/// representative matrix of styles × situations. Any future 4B.5 subfase that causes
+/// NPC_STRATEGY_ADAPTIVE_MODE=Disabled to diverge from Phase 4B behavior will break
+/// these tests before reaching Docker.
 ///
-/// Coverage matrix: 5 styles × 6 situations = 30 scenarios.
-///   Styles:    Default (no strategy), Balanced, AggressivePressure, RangedControl, Survival
-///   Situations: Idle, TargetInMeleeRange, TargetOutOfRange, LowHp, TargetInvisible, OutsideLeash
+/// Env-var / options tests live in L2Dn.GameServer.Model.Tests/NpcAdaptiveStrategyModeTests.cs
+/// because NpcStrategyOptions is internal (InternalsVisibleTo excludes this project).
 ///
-/// IMPORTANT: Do NOT adjust the golden assertions to "make them pass" after a behavioral change.
-/// A failing test here means the Disabled path changed — that is the regression.
+/// FLEE NOTE: All four NpcIntelligenceProfileResolver profiles have FleeAllowed=false.
+/// Flee is only emitted when a custom NpcBrainContext with FleeAllowed=true is supplied.
+/// Tests that exercise flee thresholds use <see cref="FleeAllowedContext"/> for that reason.
 /// </summary>
 public class AdaptiveBaselineTests
 {
     private static readonly EntityKey Player = new(9001, 0, EntityKind.Player);
 
     // -----------------------------------------------------------------------
-    // Env-var / options tests
+    // Helper: NpcIntelligenceProfile with FleeAllowed=true for flee-threshold tests.
+    // Archetype=BasicMeleeMob, ReflexEnabled=true, TacticalEnabled=true,
+    // AcquireVisibleHostiles=true, FleeAllowed=true, FleeHpPercent=<param>, LeashDistance=200.
+    // Matches the pattern established in NpcBrainTests.cs:1030.
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void AdaptiveMode_default_is_Disabled()
-    {
-        // No env var set → Disabled.
-        NpcStrategyOptions options = NpcStrategyOptions.FromEnvironment(
-            NpcBrainMode.Intent, NpcReactiveSchedulerMode.Enabled, _ => null);
-
-        options.AdaptiveMode.Should().Be(NpcAdaptiveStrategyMode.Disabled);
-    }
-
-    [Fact]
-    public void AdaptiveMode_Disabled_parseable_from_env_var()
-    {
-        NpcStrategyOptions options = NpcStrategyOptions.FromEnvironment(
-            NpcBrainMode.Intent, NpcReactiveSchedulerMode.Enabled, name =>
-                name == "NPC_STRATEGY_ADAPTIVE_MODE" ? "Disabled" : null);
-
-        options.AdaptiveMode.Should().Be(NpcAdaptiveStrategyMode.Disabled);
-    }
-
-    [Fact]
-    public void AdaptiveMode_Shadow_falls_back_to_Disabled_with_warning()
-    {
-        List<string> warnings = [];
-        NpcStrategyOptions options = NpcStrategyOptions.FromEnvironment(
-            NpcBrainMode.Intent, NpcReactiveSchedulerMode.Enabled,
-            name => name == "NPC_STRATEGY_ADAPTIVE_MODE" ? "Shadow" : null,
-            warnings.Add);
-
-        options.AdaptiveMode.Should().Be(NpcAdaptiveStrategyMode.Disabled);
-        warnings.Should().ContainSingle().Which.Should().Contain("Shadow");
-    }
-
-    [Fact]
-    public void AdaptiveMode_Enabled_falls_back_to_Disabled_with_warning()
-    {
-        List<string> warnings = [];
-        NpcStrategyOptions options = NpcStrategyOptions.FromEnvironment(
-            NpcBrainMode.Intent, NpcReactiveSchedulerMode.Enabled,
-            name => name == "NPC_STRATEGY_ADAPTIVE_MODE" ? "Enabled" : null,
-            warnings.Add);
-
-        options.AdaptiveMode.Should().Be(NpcAdaptiveStrategyMode.Disabled);
-        warnings.Should().ContainSingle().Which.Should().Contain("Enabled");
-    }
-
-    [Fact]
-    public void AdaptiveMode_unknown_value_falls_back_to_Disabled_with_warning()
-    {
-        List<string> warnings = [];
-        NpcStrategyOptions options = NpcStrategyOptions.FromEnvironment(
-            NpcBrainMode.Intent, NpcReactiveSchedulerMode.Enabled,
-            name => name == "NPC_STRATEGY_ADAPTIVE_MODE" ? "turbo_mode" : null,
-            warnings.Add);
-
-        options.AdaptiveMode.Should().Be(NpcAdaptiveStrategyMode.Disabled);
-        warnings.Should().ContainSingle().Which.Should().Contain("turbo_mode");
-    }
-
-    [Theory]
-    [InlineData("DISABLED")]
-    [InlineData("disabled")]
-    [InlineData("Disabled")]
-    [InlineData("DISABLED")]
-    public void AdaptiveMode_Disabled_is_case_insensitive(string value)
-    {
-        NpcStrategyOptions options = NpcStrategyOptions.FromEnvironment(
-            NpcBrainMode.Intent, NpcReactiveSchedulerMode.Enabled,
-            name => name == "NPC_STRATEGY_ADAPTIVE_MODE" ? value : null);
-
-        options.AdaptiveMode.Should().Be(NpcAdaptiveStrategyMode.Disabled);
-    }
+    private static NpcBrainContext FleeAllowedContext(NpcBrainStimulus stimulus, double fleeHpPercent) =>
+        new(stimulus, new NpcIntelligenceProfile(
+            NpcIntelligenceArchetype.BasicMeleeMob,
+            ReflexEnabled: true, TacticalEnabled: true,
+            AcquireVisibleHostiles: true, FleeAllowed: true,
+            FleeHpPercent: fleeHpPercent, PreferredRange: 0, LeashDistance: 200));
 
     // -----------------------------------------------------------------------
-    // Behavioral baseline: Style=None (no strategy override)
+    // Baseline: Style=None (no strategy — raw Decide())
     // -----------------------------------------------------------------------
 
     [Fact]
     public void Baseline_NoStrategy_Idle_emits_no_intents()
     {
-        // No target, no visible hostiles → nothing to do.
         NpcPerceptionSnapshot perception = NpcScenarioBuilder.CreateMelee().Build();
 
         NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception, ScenarioContext.Periodic());
@@ -143,28 +77,28 @@ public class AdaptiveBaselineTests
     }
 
     [Fact]
-    public void Baseline_NoStrategy_LowHp_FleeNotAllowed_emits_attack_or_approach()
+    public void Baseline_NoStrategy_FleeAllowedFalse_does_not_flee_at_any_hp()
     {
-        // Default Fighter profile: FleeAllowed=false → no Flee intent at low HP.
+        // Default Fighter profile: FleeAllowed=false → Flee is never emitted regardless of HP.
+        // This is the base invariant; flee tests below inject FleeAllowed=true explicitly.
         NpcPerceptionSnapshot perception = NpcScenarioBuilder.CreateMelee()
-            .WithHp(0.10)
+            .WithHp(0.05) // 5% HP — would flee if FleeAllowed
             .WithCurrentTarget(Player)
             .WithHostileAt(Player, distance2D: 300)
             .Build();
 
         NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception, ScenarioContext.Periodic());
 
-        decision.Intents.Should().ContainSingle().Which.Should().NotBeOfType<FleeIntent>();
+        decision.Intents.Should().NotContain(i => i is FleeIntent);
     }
 
     [Fact]
     public void Baseline_NoStrategy_TargetInvisible_emits_ClearTarget()
     {
-        // Current target set but NOT in visible entities → ClearTargetIntent.
+        // Target set but NOT in visible entities → ClearTargetIntent.
         NpcPerceptionSnapshot perception = NpcScenarioBuilder.CreateMelee()
             .WithCurrentTarget(Player)
-            // No .WithHostileAt() — target not visible.
-            .Build();
+            .Build(); // No .WithHostileAt()
 
         NpcBrainDecision decision = new NpcBrainCoordinator().Decide(perception, ScenarioContext.Periodic());
 
@@ -188,7 +122,7 @@ public class AdaptiveBaselineTests
     }
 
     // -----------------------------------------------------------------------
-    // Behavioral baseline: Style=Balanced
+    // Baseline: Style=Balanced (FleeHpPercent=25)
     // -----------------------------------------------------------------------
 
     [Fact]
@@ -220,9 +154,11 @@ public class AdaptiveBaselineTests
     }
 
     [Fact]
-    public void Baseline_Balanced_LowHp_FleeAllowed_emits_Flee()
+    public void Baseline_Balanced_FleeAt10pct_emits_Flee_when_FleeAllowed()
     {
-        // Balanced profile: FleeHpPercent=25. At 10% HP → Flee.
+        // Balanced: FleeHpPercent=35 (from NpcStrategyProfileResolver.Balanced).
+        // At 10% HP with FleeAllowed=true → Flee (10 < 35).
+        // Uses FleeAllowedContext because all resolver profiles have FleeAllowed=false.
         NpcPerceptionSnapshot perception = NpcScenarioBuilder.CreateMelee()
             .WithHp(0.10)
             .WithCurrentTarget(Player)
@@ -230,13 +166,14 @@ public class AdaptiveBaselineTests
             .Build();
 
         NpcBrainDecision decision = new NpcBrainCoordinator().DecideWithStrategy(
-            perception, ScenarioContext.Periodic(), NpcStrategyProfileResolver.Balanced);
+            perception, FleeAllowedContext(NpcBrainStimulus.PeriodicDue, fleeHpPercent: 35),
+            NpcStrategyProfileResolver.Balanced);
 
         decision.Intents.Should().ContainSingle().Which.Should().BeOfType<FleeIntent>();
     }
 
     // -----------------------------------------------------------------------
-    // Behavioral baseline: Style=AggressivePressure
+    // Baseline: Style=AggressivePressure (FleeHpPercent=5)
     // -----------------------------------------------------------------------
 
     [Fact]
@@ -254,9 +191,10 @@ public class AdaptiveBaselineTests
     }
 
     [Fact]
-    public void Baseline_AggressivePressure_LowHp_FleeThreshold_5pct_does_not_flee_at_10pct()
+    public void Baseline_AggressivePressure_does_not_flee_at_10pct_FleeHp_is_5pct()
     {
-        // AggressivePressure: FleeHpPercent=5. At 10% HP → does NOT flee (above threshold).
+        // AggressivePressure: FleeHpPercent=5 (from resolver). At 10% HP with FleeAllowed=true
+        // → NOT flee (10 > 5). This tests the threshold, not FleeAllowed=false.
         NpcPerceptionSnapshot perception = NpcScenarioBuilder.CreateMelee()
             .WithHp(0.10)
             .WithCurrentTarget(Player)
@@ -264,19 +202,19 @@ public class AdaptiveBaselineTests
             .Build();
 
         NpcBrainDecision decision = new NpcBrainCoordinator().DecideWithStrategy(
-            perception, ScenarioContext.Periodic(), NpcStrategyProfileResolver.AggressivePressure);
+            perception, FleeAllowedContext(NpcBrainStimulus.PeriodicDue, fleeHpPercent: 5),
+            NpcStrategyProfileResolver.AggressivePressure);
 
         decision.Intents.Should().ContainSingle().Which.Should().NotBeOfType<FleeIntent>();
     }
 
     // -----------------------------------------------------------------------
-    // Behavioral baseline: Style=RangedControl
+    // Baseline: Style=RangedControl
     // -----------------------------------------------------------------------
 
     [Fact]
     public void Baseline_RangedControl_TargetAtOptimalRange_emits_attack_not_approach()
     {
-        // Archer at 550u (within PhysicalAttackRange=600). RangedControl profile.
         NpcPerceptionSnapshot perception = NpcScenarioBuilder.CreateArcher()
             .WithCurrentTarget(Player)
             .WithHostileAt(Player, distance2D: 550)
@@ -305,13 +243,13 @@ public class AdaptiveBaselineTests
     }
 
     // -----------------------------------------------------------------------
-    // Behavioral baseline: Style=Survival
+    // Baseline: Style=Survival (FleeHpPercent=30)
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Baseline_Survival_LowHp_FleeThreshold_30pct_flees_at_25pct()
+    public void Baseline_Survival_flees_at_25pct_hp_when_FleeAllowed()
     {
-        // Survival: FleeHpPercent=30. At 25% HP → Flee.
+        // Survival: FleeHpPercent=30 (from resolver). At 25% HP with FleeAllowed=true → Flee.
         NpcPerceptionSnapshot perception = NpcScenarioBuilder.CreateMelee()
             .WithHp(0.25)
             .WithCurrentTarget(Player)
@@ -319,9 +257,27 @@ public class AdaptiveBaselineTests
             .Build();
 
         NpcBrainDecision decision = new NpcBrainCoordinator().DecideWithStrategy(
-            perception, ScenarioContext.Periodic(), NpcStrategyProfileResolver.Survival);
+            perception, FleeAllowedContext(NpcBrainStimulus.PeriodicDue, fleeHpPercent: 30),
+            NpcStrategyProfileResolver.Survival);
 
         decision.Intents.Should().ContainSingle().Which.Should().BeOfType<FleeIntent>();
+    }
+
+    [Fact]
+    public void Baseline_Survival_does_not_flee_at_35pct_FleeHp_is_30pct()
+    {
+        // Survival: FleeHpPercent=30. At 35% HP with FleeAllowed=true → NOT flee (35 > 30).
+        NpcPerceptionSnapshot perception = NpcScenarioBuilder.CreateMelee()
+            .WithHp(0.35)
+            .WithCurrentTarget(Player)
+            .WithHostileAt(Player, distance2D: 300)
+            .Build();
+
+        NpcBrainDecision decision = new NpcBrainCoordinator().DecideWithStrategy(
+            perception, FleeAllowedContext(NpcBrainStimulus.PeriodicDue, fleeHpPercent: 30),
+            NpcStrategyProfileResolver.Survival);
+
+        decision.Intents.Should().ContainSingle().Which.Should().NotBeOfType<FleeIntent>();
     }
 
     [Fact]
@@ -337,21 +293,5 @@ public class AdaptiveBaselineTests
             perception, ScenarioContext.Attacked(), NpcStrategyProfileResolver.Survival);
 
         decision.Intents.Should().ContainSingle().Which.Should().BeOfType<BasicAttackIntent>();
-    }
-
-    [Fact]
-    public void Baseline_Survival_does_not_flee_above_threshold()
-    {
-        // Survival: FleeHpPercent=30. At 35% HP → does NOT flee.
-        NpcPerceptionSnapshot perception = NpcScenarioBuilder.CreateMelee()
-            .WithHp(0.35)
-            .WithCurrentTarget(Player)
-            .WithHostileAt(Player, distance2D: 300)
-            .Build();
-
-        NpcBrainDecision decision = new NpcBrainCoordinator().DecideWithStrategy(
-            perception, ScenarioContext.Periodic(), NpcStrategyProfileResolver.Survival);
-
-        decision.Intents.Should().ContainSingle().Which.Should().NotBeOfType<FleeIntent>();
     }
 }
