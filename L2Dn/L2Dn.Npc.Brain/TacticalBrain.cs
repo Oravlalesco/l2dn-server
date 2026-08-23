@@ -61,6 +61,7 @@ public sealed class TacticalBrain
             : _evaluator.Evaluate(perception, profile, distance, targetCollisionRadius,
                 offensiveSkillSuppression);
         NpcPerceptionEnvelope snapshot = perception.Envelope;
+        bool movementDisabled = perception.State.Physical.Flags.HasFlag(NpcPhysicalFlags.MovementDisabled);
         bool defensiveReturn = state.ReturnState == NpcReturnEngagementState.DefensiveReturn;
         if (defensiveReturn && score.Action == NpcTacticalAction.Flee)
         {
@@ -76,6 +77,11 @@ public sealed class TacticalBrain
 
         if (defensiveReturn && score.Action == NpcTacticalAction.Approach)
         {
+            if (movementDisabled)
+            {
+                return null; // rooted — cannot move even during defensive return
+            }
+
             if (perception.State.Environment.SpawnPosition is not { } spawn ||
                 !NpcPerceptionFacts.TryGetVisibleEntity(perception, target, out VisibleEntity visible) ||
                 NpcPerceptionFacts.Distance2D(visible.Position, spawn) >
@@ -107,9 +113,10 @@ public sealed class TacticalBrain
         {
             NpcTacticalAction.BasicAttack => new BasicAttackIntent(
                 Envelope(snapshot, decisionSequence, NpcIntentType.BasicAttack), target),
-            NpcTacticalAction.Approach => new ApproachTargetIntent(
+            NpcTacticalAction.Approach when !movementDisabled => new ApproachTargetIntent(
                 Envelope(snapshot, decisionSequence, NpcIntentType.ApproachTarget), target,
                 score.DesiredRange > 0 ? score.DesiredRange : perception.State.Combat.PhysicalAttackRange),
+            NpcTacticalAction.Approach => null, // rooted — cannot move
             NpcTacticalAction.Flee => new FleeIntent(
                 Envelope(snapshot, decisionSequence, NpcIntentType.Flee), target),
             NpcTacticalAction.CastSkill when score.Skill is { } skill => new CastSkillIntent(
