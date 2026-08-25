@@ -397,3 +397,12 @@ Fuentes: [`00_Roadmap_Maestro.md`](00_Roadmap_Maestro.md), [`01_Plan_Implementac
 - VAL-07 (CC) espera verificación/ampliación de <code>MovementDisabled</code>/<code>AllSkillsDisabled</code> en Tactical.
 - VAL-18 (shadow adaptativo) espera NPC-4B5-12.
 - NPC-4D-07 (TargetHpRatio) debe decidirse antes de cerrar 4C.
+
+---
+
+## Deuda técnica anotada (no bloquean sus fases actuales)
+
+| ID | Descripción | Fase candidata |
+|---|---|---|
+| `NPC-4B5-GEO-01` | Fallback ±30°/60°/90° en `ExecuteRetreat` cuando la posición calculada está geo-bloqueada | 4D.5+ |
+| `NPC-4B5-PERF-01` | `Enum.HasFlag()` sigue usándose en `ReflexBrain`, `TacticalBrain`, `TacticalActionEvaluator` y `NpcPerceptionFacts` (boxing en call-site incluso en .NET 9 sin PGO). Si el P99 de R1–R5 (4B.5.14) no cumple el umbral de latencia, reemplazar con `(flags & bit) != 0` en esos archivos. `StrategyContextBuilder` ya fue corregido. | 4B.5.14 / R1-R5 |
