@@ -89,8 +89,8 @@ Fuentes: [`00_Roadmap_Maestro.md`](00_Roadmap_Maestro.md), [`01_Plan_Implementac
   - Criterio: MaintainRange bidireccional ±60 banda; Retreat fallback sin congelarse (4B5-A20, A21). ✓ Tests: Brain 151/0 + Model 144/0.
   - Dep: NPC-4B5-02
   - Pendiente diferido: fallback ±30°/60°/90° en <code>ExecuteRetreat</code> → <code>NPC-4B5-GEO-01</code> (fase 4D.5+)
-- [ ] **NPC-4B5-04** (4B.5.3) — <code>NpcStrategicPosture</code> + <code>NpcPostureTransitionReason</code> + <code>NpcStrategyDirective</code> (Contracts)
-  - Criterio: enum de 5 posturas; transition reasons ≥ 12; directiva inmutable (4B5-A7, A17).
+- [x] **NPC-4B5-04** (4B.5.3) — <code>NpcStrategicPosture</code> + <code>NpcPostureTransitionReason</code> + <code>NpcStrategyDirective</code> (Contracts)
+  - Criterio: enum de 5 posturas; transition reasons ≥ 12; directiva inmutable (4B5-A7, A17). ✓ Contracts.Tests 21/0.
   - Dep: NPC-4B5-03
 - [ ] **NPC-4B5-05** (4B.5.4) — <code>NpcStrategyEvaluationContext</code> + <code>StrategyContextBuilder</code> (internal Brain)
   - Criterio: contexto derivado de percepción, sin I/O, zero allocation.
