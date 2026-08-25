@@ -15,7 +15,7 @@ public class NpcIntentContractTests
         [
             typeof(AcquireTargetIntent), typeof(ClearTargetIntent), typeof(BasicAttackIntent),
             typeof(ApproachTargetIntent), typeof(ReturnHomeIntent), typeof(FleeIntent),
-            typeof(CastSkillIntent), typeof(StopCombatIntent)
+            typeof(CastSkillIntent), typeof(StopCombatIntent), typeof(RetreatIntent)
         ];
 
         foreach (Type intentType in intentTypes)
