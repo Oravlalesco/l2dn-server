@@ -82,7 +82,7 @@ Fuentes: [`00_Roadmap_Maestro.md`](00_Roadmap_Maestro.md), [`01_Plan_Implementac
 - [ ] **NPC-4B5-01** (4B.5.0) — Congelar Static Strategy V1 como baseline
   - Criterio: Decision/Intent equivalence con Phase 4B (4B5-A1).
   - Dep: —
-- [ ] **NPC-4B5-02** (4B.5.1) — <code>NpcReflexPolicy</code> (readonly record struct en Contracts) + resolver al spawn; ReflexBrain la consume
+- [x] **NPC-4B5-02** (4B.5.1) — <code>NpcReflexPolicy</code> (readonly record struct en Contracts) + resolver al spawn; ReflexBrain la consume
   - Criterio: AggressivePressure→5%, Survival→30% (4B5-A16, A16b).
   - Dep: NPC-4B5-01
 - [ ] **NPC-4B5-03** (4B.5.2) — <code>MaintainRange</code> + <code>Retreat</code> como Tactical candidates

@@ -38,3 +38,14 @@ public readonly record struct NpcSkillObservation(
     int MpCost,
     NpcSkillCategory Category,
     NpcSkillObservationFlags Flags);
+
+/// <summary>
+/// Política inmutable de reflex de emergencia, resuelta al configurar el NPC (spawn-time)
+/// a partir de <see cref="NpcIntelligenceProfile"/> + Static Strategy V1.
+/// <see cref="ReflexBrain"/> la consume directamente; nunca depende de Strategy adaptativa
+/// durante Think (ADR-006 ext, 4B.5.1).
+/// </summary>
+public readonly record struct NpcReflexPolicy(
+    double EmergencyFleeHpPercent,
+    bool FleeAllowed,
+    int LeashRange);
