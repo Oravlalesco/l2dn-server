@@ -22,9 +22,21 @@ public sealed class TacticalBrain
         NpcStrategyDiagnosticsCollector diagnostics) =>
         DecideCore(perception, profile, strategy, state, decisionSequence, diagnostics);
 
+    /// <summary>
+    /// Test/diagnostic seam: exercises the TacticalBrain → RetreatIntent mapping with scores
+    /// injected directly, bypassing the production evaluator path that has no retreat hint yet.
+    /// 4B.5.9 will wire these parameters from NpcStrategyDirective instead.
+    /// </summary>
+    internal NpcIntent? Decide(NpcPerceptionSnapshot perception, NpcIntelligenceProfile profile,
+        NpcBrainState state, long decisionSequence,
+        int suggestedRetreatRange, int maintainRangeScore, int retreatScore) =>
+        DecideCore(perception, profile, null, state, decisionSequence, null,
+            suggestedRetreatRange, maintainRangeScore, retreatScore);
+
     private NpcIntent? DecideCore(NpcPerceptionSnapshot perception, NpcIntelligenceProfile profile,
         NpcStrategyDecision? strategy, NpcBrainState state, long decisionSequence,
-        NpcStrategyDiagnosticsCollector? diagnostics)
+        NpcStrategyDiagnosticsCollector? diagnostics,
+        int? suggestedRetreatRange = null, int maintainRangeScore = 0, int retreatScore = 0)
     {
         if (!profile.TacticalEnabled || !NpcPerceptionFacts.IsActorOperational(perception) ||
             perception.State.Combat.Flags.HasFlag(NpcCombatFlags.Casting) ||
@@ -55,11 +67,14 @@ public sealed class TacticalBrain
             : fighterPhysicalPreference
                 ? NpcStrategyCandidateEligibility.TacticalPreferenceSuppressed
                 : null;
-        NpcTacticalScore score = strategy.HasValue
-            ? _evaluator.Evaluate(perception, profile, strategy.Value, distance,
-                targetCollisionRadius, diagnostics, offensiveSkillSuppression)
-            : _evaluator.Evaluate(perception, profile, distance, targetCollisionRadius,
-                offensiveSkillSuppression);
+        NpcTacticalScore score = suggestedRetreatRange.HasValue
+            ? _evaluator.Evaluate(perception, profile, distance, targetCollisionRadius,
+                suggestedRetreatRange.Value, maintainRangeScore, retreatScore)
+            : strategy.HasValue
+                ? _evaluator.Evaluate(perception, profile, strategy.Value, distance,
+                    targetCollisionRadius, diagnostics, offensiveSkillSuppression)
+                : _evaluator.Evaluate(perception, profile, distance, targetCollisionRadius,
+                    offensiveSkillSuppression);
         NpcPerceptionEnvelope snapshot = perception.Envelope;
         bool movementDisabled = perception.State.Physical.Flags.HasFlag(NpcPhysicalFlags.MovementDisabled);
         bool defensiveReturn = state.ReturnState == NpcReturnEngagementState.DefensiveReturn;
@@ -119,6 +134,14 @@ public sealed class TacticalBrain
             NpcTacticalAction.Approach => null, // rooted — cannot move
             NpcTacticalAction.Flee => new FleeIntent(
                 Envelope(snapshot, decisionSequence, NpcIntentType.Flee), target),
+            NpcTacticalAction.MaintainRange when !movementDisabled => new RetreatIntent(
+                Envelope(snapshot, decisionSequence, NpcIntentType.Retreat), target,
+                score.DesiredRange > 0 ? score.DesiredRange : perception.State.Combat.PhysicalAttackRange),
+            NpcTacticalAction.MaintainRange => null, // rooted — cannot retreat
+            NpcTacticalAction.Retreat when !movementDisabled => new RetreatIntent(
+                Envelope(snapshot, decisionSequence, NpcIntentType.Retreat), target,
+                score.DesiredRange > 0 ? score.DesiredRange : perception.State.Combat.PhysicalAttackRange),
+            NpcTacticalAction.Retreat => null,        // rooted — cannot retreat
             NpcTacticalAction.CastSkill when score.Skill is { } skill => new CastSkillIntent(
                 Envelope(snapshot, decisionSequence, NpcIntentType.CastSkill), skill.SkillId, skill.Level,
                 skill.Category is NpcSkillCategory.Heal or NpcSkillCategory.Buff

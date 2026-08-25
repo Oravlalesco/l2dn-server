@@ -5,16 +5,28 @@ namespace L2Dn.NpcBrain;
 public sealed class ReflexBrain
 {
     internal NpcIntent? Decide(NpcPerceptionSnapshot perception, NpcBrainContext context,
-        NpcIntelligenceProfile profile, NpcBrainState state, long decisionSequence) =>
-        DecideCore(perception, context, profile, profile.FleeHpPercent, state, decisionSequence);
+        NpcIntelligenceProfile profile, NpcBrainState state, long decisionSequence)
+    {
+        if (context.ReflexPolicy is { } policy)
+            return DecideCore(perception, context, profile, policy.FleeAllowed,
+                policy.EmergencyFleeHpPercent, state, decisionSequence);
+        return DecideCore(perception, context, profile, profile.FleeAllowed,
+            profile.FleeHpPercent, state, decisionSequence);
+    }
 
     internal NpcIntent? Decide(NpcPerceptionSnapshot perception, NpcBrainContext context,
         NpcIntelligenceProfile profile, NpcStrategyDecision strategy,
-        NpcBrainState state, long decisionSequence) =>
-        DecideCore(perception, context, profile, strategy.EffectiveFleeHpPercent, state, decisionSequence);
+        NpcBrainState state, long decisionSequence)
+    {
+        if (context.ReflexPolicy is { } policy)
+            return DecideCore(perception, context, profile, policy.FleeAllowed,
+                policy.EmergencyFleeHpPercent, state, decisionSequence);
+        return DecideCore(perception, context, profile, profile.FleeAllowed,
+            strategy.EffectiveFleeHpPercent, state, decisionSequence);
+    }
 
     private static NpcIntent? DecideCore(NpcPerceptionSnapshot perception, NpcBrainContext context,
-        NpcIntelligenceProfile profile, double fleeHpPercent,
+        NpcIntelligenceProfile profile, bool fleeAllowed, double fleeHpPercent,
         NpcBrainState state, long decisionSequence)
     {
         if (!profile.ReflexEnabled || !NpcPerceptionFacts.IsActorOperational(perception))
@@ -230,7 +242,7 @@ public sealed class ReflexBrain
                     highestThreat.Value);
             }
 
-            if (profile.FleeAllowed &&
+            if (fleeAllowed &&
                 NpcPerceptionFacts.HpPercent(perception.State.Physical) <= fleeHpPercent)
             {
                 return new FleeIntent(Envelope(snapshot, decisionSequence, NpcIntentType.Flee), currentTarget);

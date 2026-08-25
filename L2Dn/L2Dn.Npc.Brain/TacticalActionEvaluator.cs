@@ -8,7 +8,9 @@ public enum NpcTacticalAction
     BasicAttack = 1,
     Approach = 2,
     Flee = 3,
-    CastSkill = 4
+    CastSkill = 4,
+    MaintainRange = 5,
+    Retreat = 6
 }
 
 public readonly record struct NpcTacticalScore(
@@ -25,7 +27,9 @@ internal readonly record struct NpcTacticalPolicy(
     int FleeScore,
     double HealHpPercent,
     double FleeHpPercent,
-    int PreferredRange)
+    int PreferredRange,
+    int MaintainRangeScore = 0,
+    int RetreatScore = 0)
 {
     public static NpcTacticalPolicy Baseline(NpcIntelligenceProfile profile) => new(
         NpcTacticalBaseline.BasicAttackScore,
@@ -73,10 +77,29 @@ public sealed class TacticalActionEvaluator
         EvaluateCore(perception, profile, NpcTacticalPolicy.FromStrategy(strategy), targetDistance,
             targetCollisionRadius, diagnostics, offensiveSkillSuppression);
 
+    /// <summary>
+    /// Test/diagnostic seam: evaluates with explicit MaintainRange and Retreat scores injected.
+    /// Production callers use Baseline or FromStrategy (both default these scores to 0 = never selected).
+    /// In 4B.5.9, NpcStrategyDirective will fill these values via NpcTacticalPolicy.
+    /// </summary>
+    internal NpcTacticalScore Evaluate(NpcPerceptionSnapshot perception, NpcIntelligenceProfile profile,
+        double targetDistance, double targetCollisionRadius,
+        int suggestedRetreatRange, int maintainRangeScore, int retreatScore)
+    {
+        NpcTacticalPolicy policy = NpcTacticalPolicy.Baseline(profile) with
+        {
+            MaintainRangeScore = maintainRangeScore,
+            RetreatScore = retreatScore
+        };
+        return EvaluateCore(perception, profile, policy, targetDistance, targetCollisionRadius,
+            null, null, suggestedRetreatRange);
+    }
+
     private static NpcTacticalScore EvaluateCore(NpcPerceptionSnapshot perception,
         NpcIntelligenceProfile profile, NpcTacticalPolicy policy, double targetDistance,
         double targetCollisionRadius, NpcStrategyDiagnosticsCollector? diagnostics,
-        NpcStrategyCandidateEligibility? offensiveSkillSuppression = null)
+        NpcStrategyCandidateEligibility? offensiveSkillSuppression = null,
+        int? suggestedRetreatRange = null)
     {
         NpcTacticalScore selected = default;
         double hpPercent = NpcPerceptionFacts.HpPercent(perception.State.Physical);
@@ -169,7 +192,44 @@ public sealed class TacticalActionEvaluator
             ? new NpcTacticalScore(NpcTacticalAction.Approach, policy.ApproachScore,
                 null, physicalAttackRange)
             : new NpcTacticalScore(NpcTacticalAction.BasicAttack, policy.BasicAttackScore);
-        return Prefer(selected, physical);
+        selected = Prefer(selected, physical);
+
+        // MaintainRange / Retreat — only eligible when a retreat range hint is provided (4B.5.9).
+        // In Disabled / Static Strategy V1, suggestedRetreatRange is always null → scores = 0 →
+        // these actions never compete, preserving the 4B.5.0 baseline exactly.
+        if (suggestedRetreatRange is { } retreatRange && retreatRange > 0)
+        {
+            // Symmetric tolerance band: ±60 units around preferred range.
+            // Without a band, "in-band" would be a single point and the NPC would oscillate.
+            const int Tolerance = 60; // future: NPC_STRATEGY_RANGE_TOLERANCE configurable in 4B.5.8
+
+            if (targetDistance < retreatRange - Tolerance && policy.MaintainRangeScore > 0)
+            {
+                // Target too close → retreat to preferred range.
+                selected = Prefer(selected,
+                    new NpcTacticalScore(NpcTacticalAction.MaintainRange, policy.MaintainRangeScore,
+                        null, retreatRange));
+            }
+            else if (targetDistance > retreatRange + Tolerance && policy.MaintainRangeScore > 0)
+            {
+                // Target too far → approach with explicit range (score+1 makes priority explicit
+                // over the generic physical Approach without a retreat hint).
+                selected = Prefer(selected,
+                    new NpcTacticalScore(NpcTacticalAction.Approach, policy.ApproachScore + 1,
+                        null, retreatRange));
+            }
+            // else: in band [retreatRange-60, retreatRange+60] → no range movement emitted.
+
+            if (policy.RetreatScore > 0)
+            {
+                // Pure tactical retreat — always move away to preferred range regardless of current distance.
+                selected = Prefer(selected,
+                    new NpcTacticalScore(NpcTacticalAction.Retreat, policy.RetreatScore,
+                        null, retreatRange));
+            }
+        }
+
+        return selected;
     }
 
     private static NpcSkillObservation? SelectSkill(NpcPerceptionSnapshot perception,

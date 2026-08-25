@@ -75,6 +75,7 @@ public static class NpcStrategyDecisionComparer
         BasicAttackIntent attack => attack.Target,
         ApproachTargetIntent approach => approach.Target,
         FleeIntent flee => flee.Threat,
+        RetreatIntent retreat => retreat.Threat,
         CastSkillIntent cast => cast.Target,
         _ => null
     };

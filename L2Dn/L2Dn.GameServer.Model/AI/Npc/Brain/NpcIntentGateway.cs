@@ -83,6 +83,7 @@ internal sealed class NpcIntentGateway
             ApproachTargetIntent approach => ExecuteApproach(actor, ai, approach),
             ReturnHomeIntent returnHome => ExecuteReturnHome(actor, ai, returnHome),
             FleeIntent flee => ExecuteFlee(actor, ai, flee),
+            RetreatIntent retreat => ExecuteRetreat(actor, ai, retreat),
             CastSkillIntent cast => ExecuteCast(actor, cast),
             StopCombatIntent => ExecuteStopCombat(actor, ai),
             _ => Reject(NpcIntentRejectionReason.UnsupportedIntent)
@@ -407,6 +408,57 @@ internal sealed class NpcIntentGateway
         return NpcIntentExecutionResult.Executed();
     }
 
+    private NpcIntentExecutionResult ExecuteRetreat(Attackable actor, AttackableAI ai,
+        RetreatIntent intent)
+    {
+        if (actor.isMovementDisabled() || actor.isCastingNow())
+        {
+            return Reject(NpcIntentRejectionReason.Policy);
+        }
+
+        NpcIntentExecutionResult validation = ResolveLiveTarget(actor, intent.Threat, false, out Creature? threat);
+        if (!validation.IsExecuted)
+        {
+            return validation;
+        }
+
+        // Direction: actor → away from threat.
+        double dx = actor.getX() - threat!.getX();
+        double dy = actor.getY() - threat.getY();
+        double currentDistance = Math.Max(1, double.Hypot(dx, dy));
+
+        // Already far enough — nothing to do (not a failure).
+        if (currentDistance >= intent.Distance)
+        {
+            return NpcIntentExecutionResult.Executed();
+        }
+
+        // Project destination along the retreat vector to reach intent.Distance from threat.
+        double ratio = intent.Distance / currentDistance;
+        Location3D desired = new(
+            threat.getX() + (int)(dx * ratio),
+            threat.getY() + (int)(dy * ratio),
+            actor.getZ());
+
+        Location3D destination = _geo.GetValidLocation(
+            actor.Location.Location3D, desired, actor.getInstanceWorld());
+
+        if (destination == actor.Location.Location3D)
+        {
+            // Geo blocked all retreat in primary direction (4B5-A21).
+            // Return Blocked so Brain can decide on the next Think tick.
+            return Reject(NpcIntentRejectionReason.Blocked);
+        }
+
+        _commands.StopFollow(ai);
+        if (!actor.isRunning())
+        {
+            _commands.SetRunning(actor);
+        }
+        _commands.MoveTo(ai, destination);
+        return NpcIntentExecutionResult.Executed();
+    }
+
     private NpcIntentExecutionResult ExecuteCast(Attackable actor, CastSkillIntent intent)
     {
         Skill? skill = actor.getKnownSkill(intent.SkillId) ?? actor.getTemplate().getSkills().get(intent.SkillId);
@@ -518,6 +570,7 @@ internal sealed class NpcIntentGateway
         ApproachTargetIntent => NpcIntentType.ApproachTarget,
         ReturnHomeIntent => NpcIntentType.ReturnHome,
         FleeIntent => NpcIntentType.Flee,
+        RetreatIntent => NpcIntentType.Retreat,
         CastSkillIntent => NpcIntentType.CastSkill,
         StopCombatIntent => NpcIntentType.StopCombat,
         _ => 0

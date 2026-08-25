@@ -34,6 +34,7 @@ public sealed class NpcIntentSemanticComparer: IEqualityComparer<NpcIntent>
                 left.Constraint == right.Constraint,
             (ReturnHomeIntent left, ReturnHomeIntent right) => left.Mode == right.Mode,
             (FleeIntent left, FleeIntent right) => left.Threat == right.Threat,
+            (RetreatIntent left, RetreatIntent right) => left.Threat == right.Threat,
             (CastSkillIntent left, CastSkillIntent right) => left.SkillId == right.SkillId &&
                 left.SkillLevel == right.SkillLevel && left.Target == right.Target,
             (StopCombatIntent, StopCombatIntent) => true,
@@ -67,6 +68,11 @@ public sealed class NpcIntentSemanticComparer: IEqualityComparer<NpcIntent>
                 break;
             case FleeIntent flee:
                 hash.Add(flee.Threat);
+                break;
+            case RetreatIntent retreat:
+                hash.Add(retreat.Threat);
+                // Distance is intentionally excluded: semantic equality is target-based,
+                // consistent with ApproachTargetIntent excluding PreferredRange.
                 break;
             case CastSkillIntent cast:
                 hash.Add(cast.SkillId);

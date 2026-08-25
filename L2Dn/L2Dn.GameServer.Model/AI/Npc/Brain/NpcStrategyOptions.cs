@@ -7,7 +7,8 @@ namespace L2Dn.GameServer.AI.Runtime;
 internal sealed record NpcStrategyOptions(
     NpcStrategyMode ConfiguredMode,
     NpcStrategyMode EffectiveMode,
-    NpcStrategyTemplateRegistry Registry)
+    NpcStrategyTemplateRegistry Registry,
+    NpcAdaptiveStrategyMode AdaptiveMode)
 {
     public static NpcStrategyOptions FromEnvironment(NpcBrainMode brainMode,
         NpcReactiveSchedulerMode reactiveMode, Func<string, string?>? read = null,
@@ -26,7 +27,12 @@ internal sealed record NpcStrategyOptions(
         NpcStrategyTemplateRegistry registry = effective == NpcStrategyMode.Disabled
             ? NpcStrategyTemplateRegistry.Empty
             : NpcStrategyTemplateRegistry.Parse(read("NPC_STRATEGY_TEMPLATE_PROFILES"), warning);
-        return new NpcStrategyOptions(configured, effective, registry);
+
+        // 4B.5.0: parse the adaptive mode env var but only honor Disabled.
+        // Shadow and Enabled will be activated in 4B.5.12 and 4B.5.14 respectively.
+        NpcAdaptiveStrategyMode adaptiveMode = ParseAdaptiveMode(read("NPC_STRATEGY_ADAPTIVE_MODE"), warning);
+
+        return new NpcStrategyOptions(configured, effective, registry, adaptiveMode);
     }
 
     private static NpcStrategyMode ParseMode(string? value, Action<string>? warning)
@@ -43,6 +49,33 @@ internal sealed record NpcStrategyOptions(
         }
         warning?.Invoke($"Unknown NPC_STRATEGY_MODE '{value}'; Strategy is disabled.");
         return NpcStrategyMode.Disabled;
+    }
+
+    /// <summary>
+    /// Parses NPC_STRATEGY_ADAPTIVE_MODE. In Phase 4B.5.0 only Disabled is active;
+    /// requesting Shadow or Enabled logs a warning and falls back to Disabled.
+    /// Shadow support: 4B.5.12. Enabled support: 4B.5.14.
+    /// </summary>
+    private static NpcAdaptiveStrategyMode ParseAdaptiveMode(string? value, Action<string>? warning)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return NpcAdaptiveStrategyMode.Disabled;
+        }
+        string normalized = value.Replace("_", string.Empty, StringComparison.Ordinal)
+            .Replace("-", string.Empty, StringComparison.Ordinal).Trim();
+        if (!Enum.TryParse(normalized, true, out NpcAdaptiveStrategyMode mode))
+        {
+            warning?.Invoke($"Unknown NPC_STRATEGY_ADAPTIVE_MODE '{value}'; Adaptive Strategy is disabled.");
+            return NpcAdaptiveStrategyMode.Disabled;
+        }
+        if (mode != NpcAdaptiveStrategyMode.Disabled)
+        {
+            // Shadow activates in 4B.5.12; Enabled in 4B.5.14.
+            warning?.Invoke($"NPC_STRATEGY_ADAPTIVE_MODE={mode} is not yet supported in this build; Adaptive Strategy is disabled.");
+            return NpcAdaptiveStrategyMode.Disabled;
+        }
+        return NpcAdaptiveStrategyMode.Disabled;
     }
 }
 

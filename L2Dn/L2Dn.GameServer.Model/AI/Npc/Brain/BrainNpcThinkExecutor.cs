@@ -51,7 +51,8 @@ internal sealed class BrainNpcThinkExecutor: INpcThinkExecutor, INpcThinkLifecyc
             }
 
             NpcBrainContext brainContext = new(NpcBrainStimulusMapper.Map(context.Reasons),
-                ReturnDefense: _returnDefense);
+                ReturnDefense: _returnDefense,
+                ReflexPolicy: ResolveReflexPolicy(perception.Snapshot));
             NpcBrainDecision decision = Decide(actor, perception.Snapshot, brainContext);
             foreach (NpcIntent intent in decision.Intents)
             {
@@ -64,6 +65,18 @@ internal sealed class BrainNpcThinkExecutor: INpcThinkExecutor, INpcThinkLifecyc
     }
 
     public void Remove(NpcKey npc) => _brain.Remove(npc);
+
+    private NpcReflexPolicy ResolveReflexPolicy(NpcPerceptionSnapshot perception)
+    {
+        NpcIdentity identity = perception.State.Identity;
+        NpcIntelligenceProfile intelligence =
+            NpcIntelligenceProfileResolver.Instance.Resolve(identity);
+        double fleeHp = _strategy.EffectiveMode != NpcStrategyMode.Disabled &&
+            _strategy.Registry.TryResolve(identity.TemplateId, out NpcStrategyProfile stratProfile, out _)
+                ? stratProfile.FleeHpPercentOverride ?? intelligence.FleeHpPercent
+                : intelligence.FleeHpPercent;
+        return new NpcReflexPolicy(fleeHp, intelligence.FleeAllowed, intelligence.LeashDistance);
+    }
 
     private NpcBrainDecision Decide(Attackable actor, NpcPerceptionSnapshot perception,
         NpcBrainContext context)

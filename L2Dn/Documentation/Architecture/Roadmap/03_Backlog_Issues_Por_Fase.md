@@ -82,14 +82,15 @@ Fuentes: [`00_Roadmap_Maestro.md`](00_Roadmap_Maestro.md), [`01_Plan_Implementac
 - [ ] **NPC-4B5-01** (4B.5.0) — Congelar Static Strategy V1 como baseline
   - Criterio: Decision/Intent equivalence con Phase 4B (4B5-A1).
   - Dep: —
-- [ ] **NPC-4B5-02** (4B.5.1) — <code>NpcReflexPolicy</code> (readonly record struct en Contracts) + resolver al spawn; ReflexBrain la consume
+- [x] **NPC-4B5-02** (4B.5.1) — <code>NpcReflexPolicy</code> (readonly record struct en Contracts) + resolver al spawn; ReflexBrain la consume
   - Criterio: AggressivePressure→5%, Survival→30% (4B5-A16, A16b).
   - Dep: NPC-4B5-01
-- [ ] **NPC-4B5-03** (4B.5.2) — <code>MaintainRange</code> + <code>Retreat</code> como Tactical candidates
-  - Criterio: MaintainRange bidireccional; Retreat fallback sin congelarse (4B5-A20, A21).
+- [x] **NPC-4B5-03** (4B.5.2) — <code>MaintainRange</code> + <code>Retreat</code> como Tactical candidates
+  - Criterio: MaintainRange bidireccional ±60 banda; Retreat fallback sin congelarse (4B5-A20, A21). ✓ Tests: Brain 151/0 + Model 144/0.
   - Dep: NPC-4B5-02
-- [ ] **NPC-4B5-04** (4B.5.3) — <code>NpcStrategicPosture</code> + <code>NpcPostureTransitionReason</code> + <code>NpcStrategyDirective</code> (Contracts)
-  - Criterio: enum de 5 posturas; transition reasons ≥ 12; directiva inmutable (4B5-A7, A17).
+  - Pendiente diferido: fallback ±30°/60°/90° en <code>ExecuteRetreat</code> → <code>NPC-4B5-GEO-01</code> (fase 4D.5+)
+- [x] **NPC-4B5-04** (4B.5.3) — <code>NpcStrategicPosture</code> + <code>NpcPostureTransitionReason</code> + <code>NpcStrategyDirective</code> (Contracts)
+  - Criterio: enum de 5 posturas; transition reasons ≥ 12; directiva inmutable (4B5-A7, A17). ✓ Contracts.Tests 21/0.
   - Dep: NPC-4B5-03
 - [ ] **NPC-4B5-05** (4B.5.4) — <code>NpcStrategyEvaluationContext</code> + <code>StrategyContextBuilder</code> (internal Brain)
   - Criterio: contexto derivado de percepción, sin I/O, zero allocation.
@@ -396,3 +397,12 @@ Fuentes: [`00_Roadmap_Maestro.md`](00_Roadmap_Maestro.md), [`01_Plan_Implementac
 - VAL-07 (CC) espera verificación/ampliación de <code>MovementDisabled</code>/<code>AllSkillsDisabled</code> en Tactical.
 - VAL-18 (shadow adaptativo) espera NPC-4B5-12.
 - NPC-4D-07 (TargetHpRatio) debe decidirse antes de cerrar 4C.
+
+---
+
+## Deuda técnica anotada (no bloquean sus fases actuales)
+
+| ID | Descripción | Fase candidata |
+|---|---|---|
+| `NPC-4B5-GEO-01` | Fallback ±30°/60°/90° en `ExecuteRetreat` cuando la posición calculada está geo-bloqueada | 4D.5+ |
+| `NPC-4B5-PERF-01` | `Enum.HasFlag()` sigue usándose en `ReflexBrain`, `TacticalBrain`, `TacticalActionEvaluator` y `NpcPerceptionFacts` (boxing en call-site incluso en .NET 9 sin PGO). Si el P99 de R1–R5 (4B.5.14) no cumple el umbral de latencia, reemplazar con `(flags & bit) != 0` en esos archivos. `StrategyContextBuilder` ya fue corregido. | 4B.5.14 / R1-R5 |

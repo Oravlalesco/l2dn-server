@@ -59,7 +59,8 @@ public sealed record NpcReturnDefensePolicy(
 public sealed record NpcBrainContext(
     NpcBrainStimulus Stimuli,
     NpcIntelligenceProfile? Profile = null,
-    NpcReturnDefensePolicy? ReturnDefense = null);
+    NpcReturnDefensePolicy? ReturnDefense = null,
+    NpcReflexPolicy? ReflexPolicy = null);
 
 public sealed record NpcBrainDecision
 {

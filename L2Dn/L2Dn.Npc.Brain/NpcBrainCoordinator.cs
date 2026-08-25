@@ -188,6 +188,7 @@ public sealed class NpcBrainCoordinator: INpcBrain
         BasicAttackIntent => NpcStrategyAction.BasicAttack,
         ApproachTargetIntent => NpcStrategyAction.Approach,
         FleeIntent => NpcStrategyAction.Flee,
+        RetreatIntent => NpcStrategyAction.Retreat,
         CastSkillIntent cast when perception.State.Skills.Any(skill =>
             skill.SkillId == cast.SkillId && skill.Level == cast.SkillLevel &&
             skill.Category == NpcSkillCategory.Heal) => NpcStrategyAction.Heal,
