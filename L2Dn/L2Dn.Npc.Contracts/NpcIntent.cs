@@ -11,7 +11,8 @@ public enum NpcIntentType
     ReturnHome = 5,
     Flee = 6,
     CastSkill = 7,
-    StopCombat = 8
+    StopCombat = 8,
+    Retreat = 9
 }
 
 public enum NpcApproachConstraint
@@ -49,6 +50,7 @@ public sealed record NpcIntentEnvelope(
 [JsonDerivedType(typeof(FleeIntent), "flee")]
 [JsonDerivedType(typeof(CastSkillIntent), "castSkill")]
 [JsonDerivedType(typeof(StopCombatIntent), "stopCombat")]
+[JsonDerivedType(typeof(RetreatIntent), "retreat")]
 public abstract record NpcIntent
 {
     public const int CurrentSchemaVersion = 1;
@@ -166,6 +168,27 @@ public sealed record StopCombatIntent: NpcIntent
         : base(envelope, NpcIntentType.StopCombat)
     {
     }
+}
+
+/// <summary>
+/// Tactical retreat: move away from the threat until at least <see cref="Distance"/> units away.
+/// Emitted by TacticalBrain (MaintainRange / Retreat candidates); distinct from the emergency
+/// <see cref="FleeIntent"/> produced by ReflexBrain (governed by NpcReflexPolicy).
+/// </summary>
+public sealed record RetreatIntent: NpcIntent
+{
+    [JsonConstructor]
+    public RetreatIntent(NpcIntentEnvelope envelope, EntityKey threat, int distance)
+        : base(envelope, NpcIntentType.Retreat)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(distance);
+        Threat = threat;
+        Distance = distance;
+    }
+
+    public EntityKey Threat { get; }
+    /// <summary>Desired minimum distance from threat after retreat.</summary>
+    public int Distance { get; }
 }
 
 public enum NpcIntentExecutionStatus

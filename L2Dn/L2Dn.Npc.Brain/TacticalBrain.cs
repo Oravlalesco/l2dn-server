@@ -119,6 +119,14 @@ public sealed class TacticalBrain
             NpcTacticalAction.Approach => null, // rooted — cannot move
             NpcTacticalAction.Flee => new FleeIntent(
                 Envelope(snapshot, decisionSequence, NpcIntentType.Flee), target),
+            NpcTacticalAction.MaintainRange when !movementDisabled => new RetreatIntent(
+                Envelope(snapshot, decisionSequence, NpcIntentType.Retreat), target,
+                score.DesiredRange > 0 ? score.DesiredRange : perception.State.Combat.PhysicalAttackRange),
+            NpcTacticalAction.MaintainRange => null, // rooted — cannot retreat
+            NpcTacticalAction.Retreat when !movementDisabled => new RetreatIntent(
+                Envelope(snapshot, decisionSequence, NpcIntentType.Retreat), target,
+                score.DesiredRange > 0 ? score.DesiredRange : perception.State.Combat.PhysicalAttackRange),
+            NpcTacticalAction.Retreat => null,        // rooted — cannot retreat
             NpcTacticalAction.CastSkill when score.Skill is { } skill => new CastSkillIntent(
                 Envelope(snapshot, decisionSequence, NpcIntentType.CastSkill), skill.SkillId, skill.Level,
                 skill.Category is NpcSkillCategory.Heal or NpcSkillCategory.Buff

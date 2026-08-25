@@ -43,7 +43,8 @@ public enum NpcStrategyAction
     Approach = 2,
     OffensiveSkill = 3,
     Heal = 4,
-    Flee = 5
+    Flee = 5,
+    Retreat = 6
 }
 
 public enum NpcStrategyDecisionReason

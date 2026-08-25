@@ -520,6 +520,39 @@ public class NpcIntentGatewayTests
         ShadowNpcThinkExecutor.Compare([brain], [legacy]).Should().Be(NpcIntentComparisonKind.SemanticMatch);
     }
 
+    /// <summary>
+    /// 4B5-A21: When every direction is geo-blocked, ExecuteRetreat returns Rejected(Blocked).
+    /// The actor does not move and no exception is thrown ("no freeze" invariant).
+    /// TestGeo(false) makes GetValidLocation return source unchanged, simulating full blockage.
+    /// </summary>
+    [Fact]
+    public void Retreat_GeoBlocked_returns_Blocked()
+    {
+        Attackable actor = CreateActor();
+        Attackable threat = CreateActor();
+        actor.addDamageHate(threat, 0, 10);
+        // Place threat close to actor so retreat distance is not already satisfied.
+        threat.setXYZ(actor.getX() + 50, actor.getY(), actor.getZ());
+
+        RecordingCommands commands = new();
+        // TestGeo(false): GetValidLocation returns source = actor's position unchanged.
+        NpcIntentGateway gateway = CreateGateway(commands, false, actor, threat);
+
+        RetreatIntent intent = new(
+            Envelope(actor, NpcIntentType.Retreat),
+            Key(threat),
+            distance: 300);
+
+        NpcIntentExecutionResult result = gateway.Execute(intent);
+
+        result.Status.Should().Be(NpcIntentExecutionStatus.Rejected,
+            because: "geo is fully blocked, retreat destination equals current position");
+        result.RejectionReason.Should().Be(NpcIntentRejectionReason.Blocked,
+            because: "4B5-A21: blocked geo must return Blocked, never freeze or throw");
+        commands.MoveDestination.Should().BeNull(
+            because: "actor must not have moved when retreat was blocked");
+    }
+
     private static NpcIntentGateway CreateGateway(RecordingCommands commands, params Attackable[] actors) =>
         CreateGateway(commands, true, actors);
 
